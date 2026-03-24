@@ -200,19 +200,14 @@ export async function GET(req: NextRequest) {
     const b5  = bCand.slice(0, 10);   // informational (bounce candidates)
 
     const finalSet: string[] = [];
-    const pushUnique = (arr: string[], j: string, limit: number) => {
-      if (arr.length >= limit) return;
+    const pushUnique = (j: string, limit: number) => {
+      if (finalSet.length >= limit) return;
       if (!finalSet.includes(j)) finalSet.push(j);
     };
 
-    // Apply quotas GH/RH/B
-    gh10.forEach((j) => pushUnique(gh10, j, 999)); // no-op, for clarity
-    rh5.forEach((j) => pushUnique(rh5, j, 999));
-    b5.forEach((j) => pushUnique(b5, j, 999));
-
-    gh10.slice(0, 7).forEach((j) => pushUnique(finalSet, j, 20));
-    rh5.slice(0, 7).forEach((j) => pushUnique(finalSet, j, 20));
-    b5.slice(0, 6).forEach((j) => pushUnique(finalSet, j, 20));
+    gh10.slice(0, 7).forEach((j) => pushUnique(j, 20));
+    rh5.slice(0, 7).forEach((j) => pushUnique(j, 20));
+    b5.slice(0, 6).forEach((j) => pushUnique(j, 20));
 
     // Fill if still < 20 (mix of remaining pools)
     const remainder = [...ghCand, ...rhCand, ...bCand].filter((j) => !finalSet.includes(j));

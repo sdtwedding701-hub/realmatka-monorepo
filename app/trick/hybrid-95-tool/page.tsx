@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 /** उपलब्ध मार्केट्स */
 const MARKET_OPTIONS = [
   { key: "sita", label: "Sita" },
-  { key: "andra", label: "Andra" },
+  { key: "andhra", label: "Andhra" },
   { key: "star-tara", label: "Star Tara" },
   { key: "kamal", label: "Kamal" },
 ];

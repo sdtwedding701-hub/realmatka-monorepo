@@ -1,78 +1,91 @@
-// app/api/predict/route.ts
+import fs from "node:fs";
+import path from "node:path";
+import { NextResponse } from "next/server";
 
-import { NextResponse } from 'next/server';
-import path from 'path';
-import fs from 'fs';
-import csv from 'csv-parser';
+function parseCSV(raw: string): Record<string, string>[] {
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(",").map((header) => header.trim());
+  return lines.slice(1).map((line) => {
+    const cells = line.split(",");
+    const row: Record<string, string> = {};
+    headers.forEach((header, index) => {
+      row[header] = (cells[index] ?? "").trim();
+    });
+    return row;
+  });
+}
+
+function sanitizeJodi(value: string): string | null {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (!digits) return null;
+  const normalized = digits.length === 1 ? digits.padStart(2, "0") : digits.slice(-2);
+  return /^\d{2}$/.test(normalized) ? normalized : null;
+}
+
+function collectJodis(row: Record<string, string>) {
+  const values: string[] = [];
+  for (const [key, value] of Object.entries(row)) {
+    const lower = key.toLowerCase();
+    if (["jodi", "open", "close", "morning", "day", "night", "result"].some((item) => lower.includes(item))) {
+      const jodi = sanitizeJodi(value);
+      if (jodi) values.push(jodi);
+    }
+  }
+  return [...new Set(values)];
+}
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const market = searchParams.get('market') || 'sita';
-
-  const filePath = path.join(process.cwd(), 'public', 'data', `${market}_chart_cleaned.csv`);
-
-  // ✅ Wrap the whole logic in try-catch
   try {
-    // File not found
+    const { searchParams } = new URL(req.url);
+    const market = (searchParams.get("market") || "sita").toLowerCase();
+    const filePath = path.join(process.cwd(), "data", `${market}_chart_cleaned.csv`);
+
     if (!fs.existsSync(filePath)) {
-      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+      return NextResponse.json({ error: `CSV not found for market "${market}"` }, { status: 404 });
     }
 
-    const data: { date: string; jodi: string }[] = [];
+    const rows = parseCSV(fs.readFileSync(filePath, "utf8"));
+    const entries = rows.map((row) => collectJodis(row)).filter((row) => row.length > 0);
 
-    // ✅ Return promise from async/await
-    const result = await new Promise((resolve, reject) => {
-      fs.createReadStream(filePath)
-        .pipe(csv())
-        .on('data', (row) => {
-          if (row.date && row.jodi) {
-            data.push({ date: row.date, jodi: row.jodi });
-          }
-        })
-        .on('end', () => {
-          const flat = data.map((r) => r.jodi);
-          const freq: Record<string, number> = {};
-          flat.forEach((j) => {
-            freq[j] = (freq[j] || 0) + 1;
-          });
+    if (entries.length === 0) {
+      return NextResponse.json({ error: `No usable jodi data found for market "${market}"` }, { status: 422 });
+    }
 
-          const GH10 = Object.entries(freq)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 10)
-            .map(([j]) => j);
+    const freq: Record<string, number> = {};
+    const recentFreq: Record<string, number> = {};
+    const recent = entries.slice(-7).flat();
 
-          const recent = data.slice(-7);
-          const recentFreq: Record<string, number> = {};
-          recent.forEach((r) => {
-            recentFreq[r.jodi] = (recentFreq[r.jodi] || 0) + 1;
-          });
-
-          const RH5 = Object.entries(recentFreq)
-            .filter(([j]) => !GH10.includes(j))
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([j]) => j);
-
-          const B5 = Object.entries(freq)
-            .filter(
-              ([j]) =>
-                !recent.map((r) => r.jodi).includes(j) &&
-                !GH10.includes(j) &&
-                !RH5.includes(j)
-            )
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([j]) => j);
-
-          const final20 = Array.from(new Set([...GH10, ...RH5, ...B5])).slice(0, 20);
-
-          resolve({ GH10, RH5, B5, final20 });
-        })
-        .on('error', (err) => reject(err));
+    entries.flat().forEach((jodi) => {
+      freq[jodi] = (freq[jodi] || 0) + 1;
     });
 
-    return NextResponse.json(result);
+    recent.forEach((jodi) => {
+      recentFreq[jodi] = (recentFreq[jodi] || 0) + 1;
+    });
+
+    const GH10 = Object.entries(freq)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 10)
+      .map(([jodi]) => jodi);
+
+    const RH5 = Object.entries(recentFreq)
+      .filter(([jodi]) => !GH10.includes(jodi))
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 5)
+      .map(([jodi]) => jodi);
+
+    const B5 = Object.entries(freq)
+      .filter(([jodi]) => !recent.includes(jodi) && !GH10.includes(jodi) && !RH5.includes(jodi))
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 5)
+      .map(([jodi]) => jodi);
+
+    const final20 = [...new Set([...GH10, ...RH5, ...B5])].slice(0, 20);
+
+    return NextResponse.json({ GH10, RH5, B5, final20 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err?.message || "Internal error" }, { status: 500 });
   }
 }

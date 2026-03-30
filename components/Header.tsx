@@ -1,94 +1,88 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const links = [
-  { href: "/", label: "Home" },
-  { href: "/trick", label: "Trick" },
-  { href: "/matka-tips", label: "Matka Tips" },   // ✅ नया link
-  { href: "/about", label: "About" },
-  { href: "/contact", label: "Contact Us" },
+  { href: "#markets", label: "Markets" },
+  { href: "#rates", label: "Rates" },
+  { href: "#rules", label: "Rules" },
+  { href: "#download", label: "Download" },
 ];
 
-
 export default function Header() {
-  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const toggleMenu = () => setMenuOpen(!menuOpen);
-  const closeMenu = () => setMenuOpen(false);
-
   return (
-    <header className="sticky top-0 z-50 w-full">
-      <div className="w-full bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          {/* Logo + Name */}
-          <Link href="/" className="flex items-center gap-3" onClick={closeMenu}>
-            <img
-              src="/logo.jpg" // <- तुम अपना Untitled-2.jpg यहां public/logo.jpg नाम से रखो
-              alt="Real Matka"
-              className="h-10 w-10 rounded-xl object-cover"
-            />
-            <div className="leading-tight">
-              <div className="text-lg font-extrabold tracking-tight bg-gradient-to-r from-orange-400 to-rose-400 bg-clip-text text-transparent">
-                Real Matka
-              </div>
-              <div className="text-[11px] text-neutral-400">
-                EN + HI • Results • Charts • Guides
-              </div>
+    <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-[#0a0f1f]/88 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+        <Link href="/" className="flex items-center gap-3">
+          <img src="/logo.jpg" alt="Real Matka" className="h-10 w-10 rounded-2xl border border-white/10 object-cover shadow-lg" />
+          <div className="leading-tight">
+            <div className="bg-gradient-to-r from-amber-200 via-orange-300 to-rose-300 bg-clip-text text-lg font-extrabold text-transparent">
+              Real Matka
             </div>
-          </Link>
+            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Play • Charts • Results</div>
+          </div>
+        </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden sm:flex items-center gap-2">
-            {links.map((l) => {
-              const active =
-                pathname === l.href || (l.href !== "/" && pathname.startsWith(l.href));
-              return (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className={[
-                    "px-3 py-1.5 rounded-xl border text-sm transition",
-                    active
-                      ? "border-orange-500/60 bg-orange-500/10 text-white"
-                      : "border-neutral-700 hover:border-neutral-500 text-neutral-200",
-                  ].join(" ")}
-                >
-                  {l.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Mobile menu */}
-          <div className="sm:hidden relative">
-            <button
-              onClick={toggleMenu}
-              className="px-3 py-1.5 rounded-xl border border-neutral-700 text-neutral-200"
+        <nav className="hidden items-center gap-2 md:flex">
+          {links.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-orange-300/40 hover:bg-white/10"
             >
-              {menuOpen ? "✕" : "☰"}
-            </button>
+              {link.label}
+            </a>
+          ))}
+        </nav>
 
-            {menuOpen && (
-              <div className="absolute right-0 mt-2 w-40 rounded-xl border border-neutral-800 bg-neutral-900/95 shadow-lg">
-                {links.map((l) => (
-                  <Link
-                    key={l.href}
-                    href={l.href}
-                    onClick={closeMenu}
-                    className="block px-3 py-2 rounded-lg hover:bg-neutral-800"
-                  >
-                    {l.label}
-                  </Link>
-                ))}
-              </div>
-            )}
+        <div className="hidden items-center gap-2 md:flex">
+          <a
+            href="https://app.realmatka.in/auth/login"
+            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-white/30"
+          >
+            Login
+          </a>
+          <a
+            href="https://app.realmatka.in/auth/register"
+            className="rounded-full bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(249,115,22,0.9)] transition hover:opacity-90"
+          >
+            Register
+          </a>
+        </div>
+
+        <button
+          onClick={() => setMenuOpen((value) => !value)}
+          className="rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-slate-100 md:hidden"
+        >
+          {menuOpen ? "Close" : "Menu"}
+        </button>
+      </div>
+
+      {menuOpen ? (
+        <div className="border-t border-white/10 bg-[#0d1326] px-4 py-4 md:hidden">
+          <div className="flex flex-col gap-2">
+            {links.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={() => setMenuOpen(false)}
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100"
+              >
+                {link.label}
+              </a>
+            ))}
+            <a href="https://app.realmatka.in/auth/login" className="rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-100">
+              Login
+            </a>
+            <a href="https://app.realmatka.in/auth/register" className="rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-3 text-sm font-semibold text-white">
+              Register
+            </a>
           </div>
         </div>
-      </div>
+      ) : null}
     </header>
   );
 }

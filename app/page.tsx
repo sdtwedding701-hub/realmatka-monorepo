@@ -1,366 +1,183 @@
-"use client";
+﻿import Link from "next/link";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import AdSlot from "@/components/AdSlot";
-
-type HomeMarket = {
-  key: string;
-  name: string;
-  open: string[];
-  close: string[];
-  offDay?: boolean;
-};
-
-type HomePayload = {
-  date: string;
-  tagline: string;
-  offDay: boolean;
-  markets: HomeMarket[];
-};
-
-const FALLBACK_MARKETS: HomeMarket[] = [
-  { key: "sita", name: "SITA", open: ["3", "7"], close: ["2", "5", "8", "9", "0"] },
-  { key: "kamal", name: "KAMAL", open: ["2", "8"], close: ["1", "3", "6", "7", "9"] },
-  { key: "andhra", name: "ANDHRA", open: ["5", "9"], close: ["0", "2", "4", "6", "8"] },
-  { key: "star-tara", name: "STAR TARA", open: ["7", "3"], close: ["2", "5", "8", "9", "0"] },
-  { key: "sridevi", name: "SRIDEVI", open: ["1", "6"], close: ["2", "3", "5", "7", "9"] },
-  { key: "mahadevi", name: "MAHADEVI", open: ["0", "4"], close: ["1", "3", "5", "7", "9"] },
+const markets = [
+  { name: "Mahadevi Morning", result: "***-**-***", open: "09:45 AM", close: "12:45 PM", status: "Live" },
+  { name: "Time Bazar", result: "***-**-***", open: "01:00 PM", close: "02:00 PM", status: "Main" },
+  { name: "Kalyan", result: "***-**-***", open: "04:10 PM", close: "06:10 PM", status: "Popular" },
+  { name: "Main Bazar", result: "***-**-***", open: "09:00 PM", close: "11:55 PM", status: "Prime" },
 ];
 
-const MORE_TRICKS = [
-  {
-    href: "/trick/hybrid-95-tool",
-    title: "Top 20 Hot Jodi",
-    tagline: "GH10 + RH5 + B5 logic se 20 strong jodiyaan",
-    icon: "HOT",
-    gradient: "from-orange-500/20 via-rose-500/10 to-transparent",
-  },
-  {
-    href: "/trick/ai-jodi-predictor",
-    title: "AI 3D Jodi Predictor",
-    tagline: "Morning, day aur night trends se top 3 digits",
-    icon: "AI",
-    gradient: "from-green-500/20 via-emerald-500/10 to-transparent",
-  },
-  {
-    href: "/trick/final-number-chart",
-    title: "Final Number Chart",
-    tagline: "Kal ki jodi se final digit aur play map",
-    icon: "MAP",
-    gradient: "from-sky-500/20 via-cyan-500/10 to-transparent",
-  },
+const rates = [
+  { code: "SD", name: "Single Digit", rate: "10" },
+  { code: "JD", name: "Jodi Digit", rate: "100" },
+  { code: "RB", name: "Red Bracket", rate: "100" },
+  { code: "SP", name: "Single Pana", rate: "160" },
+  { code: "DP", name: "Double Pana", rate: "320" },
+  { code: "TP", name: "Triple Pana", rate: "1000" },
+  { code: "HS", name: "Half Sangam", rate: "1000" },
+  { code: "FS", name: "Full Sangam", rate: "10000" },
 ];
 
-const PAYOUT = 9.8;
-const DIGITS = 3;
-const FACTOR = PAYOUT - DIGITS;
-
-type Row = {
-  stage: number;
-  bet: string;
-  total: string;
-  loss: string;
-  ret: string;
-  net: string;
-};
-
-function toMoney(n: number) {
-  return "Rs " + n.toFixed(2).replace(/\.00$/, "");
-}
-
-function build3DigitPlan(target = 200, stages = 6): Row[] {
-  const rows: Row[] = [];
-  let loss = 0;
-  for (let i = 1; i <= stages; i++) {
-    const betPer = (target + loss) / FACTOR;
-    const total = betPer * DIGITS;
-    const nextLoss = loss + total;
-    const ret = nextLoss + target;
-    rows.push({
-      stage: i,
-      bet: toMoney(betPer),
-      total: toMoney(total),
-      loss: toMoney(nextLoss),
-      ret: toMoney(ret),
-      net: toMoney(target),
-    });
-    loss = nextLoss;
-  }
-  return rows;
-}
+const rules = [
+  "Single Digit, Jodi, Pana, Sangam aur related boards backend validation ke saath operate karte hain.",
+  "Panna classification canonical chart ke hisaab se hoti hai, random 3-digit entry allowed nahi hoti.",
+  "Bid place hone ke baad final validation, balance check, aur settlement authority backend ke paas hoti hai.",
+  "Market schedule aur result publish timing ke hisaab se board availability change ho sakti hai.",
+];
 
 export default function HomePage() {
-  const today = useMemo(
-    () =>
-      new Date().toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "2-digit",
-        timeZone: "Asia/Kolkata",
-      }),
-    []
-  );
-
-  const [plan, setPlan] = useState<Row[]>(build3DigitPlan(200, 6));
-  const [payload, setPayload] = useState<HomePayload | null>(null);
-  const [loadError, setLoadError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadHome() {
-      try {
-        const res = await fetch("/api/home", { cache: "no-store" });
-        if (!res.ok) throw new Error("Unable to load home data");
-        const data = (await res.json()) as HomePayload;
-        if (active) setPayload(data);
-      } catch (error) {
-        if (active) {
-          setLoadError(error instanceof Error ? error.message : "Unable to load home data");
-        }
-      }
-    }
-
-    loadHome();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const markets = payload?.markets?.length ? payload.markets : FALLBACK_MARKETS;
-  const noPrediction = payload ? payload.offDay || markets.every((market) => market.offDay) : false;
-
-  async function shareSite() {
-    const url = typeof window !== "undefined" ? window.location.href : "https://realmatka.in";
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "Real Matka", text: "Daily predictions dekhein.", url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        alert("Link copy ho gaya.");
-      }
-    } catch {
-      // ignore
-    }
-  }
-
   return (
-    <div className="min-h-screen w-full overflow-x-hidden text-white">
-      <main className="relative mx-auto max-w-6xl px-4 py-8 sm:py-10">
-        <div className="mb-8 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-orange-400 to-rose-400 text-sm font-extrabold text-black">
-              RM
-            </div>
+    <div className="min-h-screen text-white">
+      <main className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-10">
+        <section className="section-shell relative overflow-hidden px-6 py-10 sm:px-10 sm:py-14">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.15),transparent_30%)]" />
+          <div className="relative grid gap-8 lg:grid-cols-[1.2fr_0.9fr] lg:items-center">
             <div>
-              <div className="text-base font-extrabold tracking-tight sm:text-lg">Real Matka</div>
-              <div className="text-[11px] uppercase tracking-wider text-white/60">
-                EN · HI · Results · Charts · Guides
+              <div className="metric-pill">realmatka.in • Live Markets • Full Rate</div>
+              <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-tight sm:text-5xl">
+                Real Matka ka clean landing experience, aur actual play flow ke liye direct app access.
+              </h1>
+              <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300 sm:text-lg">
+                Live market cards, charts, game rates, rule summary, aur quick login/register flow. Public website se user seedha app experience me ja sake, isi flow ke liye yeh landing design bana hai.
+              </p>
+              <div className="mt-7 flex flex-wrap gap-3">
+                <a href="https://app.realmatka.in/auth/register" className="action-primary">Register Now</a>
+                <a href="https://app.realmatka.in/auth/login" className="action-secondary">Login To App</a>
+                <a href="#markets" className="action-secondary">Browse Markets</a>
+              </div>
+            </div>
+
+            <div className="glass-card p-5 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Quick Snapshot</div>
+                  <div className="mt-2 text-2xl font-extrabold">Today Markets</div>
+                </div>
+                <div className="rounded-full bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-white">
+                  Live
+                </div>
+              </div>
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="text-sm text-slate-400">Open Markets</div>
+                  <div className="mt-2 text-3xl font-extrabold">24+</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="text-sm text-slate-400">Board Types</div>
+                  <div className="mt-2 text-3xl font-extrabold">15+</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="text-sm text-slate-400">Chart Access</div>
+                  <div className="mt-2 text-3xl font-extrabold">Jodi + Pana</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="text-sm text-slate-400">App Flow</div>
+                  <div className="mt-2 text-3xl font-extrabold">Fast</div>
+                </div>
               </div>
             </div>
           </div>
+        </section>
 
-          <div className="flex items-center gap-2">
-            <Link
-              href="/about"
-              aria-label="About"
-              className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-xs font-bold hover:border-white/20"
-            >
-              AB
-            </Link>
-            <a
-              href="https://chat.whatsapp.com/B6rOvsK6MMGKa8DBTtvMs8"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="WhatsApp Group"
-              className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-xs font-bold hover:border-white/20"
-            >
-              WA
-            </a>
-            <button
-              aria-label="Share Site"
-              onClick={shareSite}
-              className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-xs font-bold hover:border-white/20"
-            >
-              SH
-            </button>
-          </div>
-        </div>
-
-        <header className="mb-10 px-2 text-center">
-          <h1 className="mx-auto max-w-3xl bg-gradient-to-r from-amber-200 via-rose-200 to-orange-300 bg-clip-text text-2xl font-extrabold leading-tight text-transparent sm:text-4xl">
-            Aaj Ki Bhavishyavaniyaan
-          </h1>
-          <div className="mt-2 text-sm text-white/70">
-            {payload?.tagline || "Daily Guessing - Open / Close"}
-          </div>
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-sm">
-            <span className="text-white/70">Date:</span>
-            <span className="font-semibold">{payload?.date || today}</span>
-          </div>
-
-          {noPrediction && (
-            <p className="mt-4 text-center text-lg font-bold text-red-400">OFF DAY / DATA UPDATE</p>
-          )}
-
-          {loadError && (
-            <p className="mt-3 text-sm text-amber-300">
-              Live home data load nahi hua, fallback content dikhaya ja raha hai.
-            </p>
-          )}
-        </header>
-
-        <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {markets.map((market) => (
-            <div
-              key={market.key}
-              className="relative rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/[0.06] p-6 backdrop-blur-sm transition-all hover:border-white/20 hover:shadow-[0_0_25px_-6px_rgba(255,255,255,0.2)]"
-            >
-              <div className="mb-5 flex items-center justify-between gap-3">
-                <h2 className="bg-gradient-to-r from-orange-300 to-amber-200 bg-clip-text text-xl font-extrabold uppercase tracking-wide text-transparent">
-                  {market.name}
-                </h2>
-                <Link
-                  href={`/market/${market.key}`}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold hover:border-white/20"
-                >
-                  View
-                </Link>
-              </div>
-
-              <div className="mb-4 flex justify-center">
-                <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
-                  <span className="text-[12px] font-extrabold uppercase tracking-wide text-orange-300">
-                    OPEN
-                  </span>
-                  <span className="h-4 w-px bg-white/15" />
-                  <span className="text-[12px] font-extrabold uppercase tracking-wide text-sky-300">
-                    CLOSE
-                  </span>
-                </div>
-              </div>
-
-              {market.offDay ? (
-                <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center text-sm font-bold text-red-300">
-                  Market Off Day
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <div className="mb-2 text-center text-xs font-bold uppercase tracking-wide text-orange-300">
-                      Open Digits
-                    </div>
-                    <div className="flex flex-wrap justify-center gap-2">
-                      {market.open.map((digit) => (
-                        <span
-                          key={`${market.key}-open-${digit}`}
-                          className="min-w-[48px] rounded-xl border border-white/20 bg-gradient-to-br from-orange-400/25 via-rose-400/20 to-amber-400/25 px-4 py-2 text-center text-lg font-extrabold text-amber-100 sm:text-2xl"
-                        >
-                          {digit}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="mb-2 text-center text-xs font-bold uppercase tracking-wide text-sky-300">
-                      Close Digits
-                    </div>
-                    <div className="flex flex-wrap justify-center gap-2">
-                      {market.close.map((digit) => (
-                        <span
-                          key={`${market.key}-close-${digit}`}
-                          className="min-w-[48px] rounded-xl border border-white/20 bg-gradient-to-br from-sky-400/25 via-cyan-400/20 to-blue-400/25 px-4 py-2 text-center text-lg font-extrabold text-sky-100 sm:text-2xl"
-                        >
-                          {digit}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+        <section id="markets" className="section-shell px-6 py-8 sm:px-8 sm:py-10">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Live Markets</div>
+              <h2 className="mt-2 text-3xl font-extrabold">Play-style cards, charts, and quick app entry</h2>
             </div>
-          ))}
-        </section>
-
-        <section className="mt-10">
-          <AdSlot slot="1000000003" format="horizontal" />
-        </section>
-
-        <section className="mt-12">
-          <h3 className="mb-3 text-center text-xl font-extrabold">
-            3-Digit 6-Stage Fixed Profit Plan (1:9.8 payout)
-          </h3>
-
-          <div className="mb-6 flex justify-center gap-3">
-            <label className="flex items-center gap-2 text-sm font-semibold text-white/80">
-              Target Profit (Rs):
-              <input
-                type="number"
-                defaultValue={200}
-                min={50}
-                step={50}
-                className="w-24 rounded border border-white/20 bg-white/10 px-2 py-1 text-center text-white"
-                onChange={(e) => {
-                  const newTarget = parseInt(e.target.value, 10) || 200;
-                  setPlan(build3DigitPlan(newTarget, 6));
-                }}
-              />
-            </label>
+            <a href="https://app.realmatka.in" className="action-secondary">Open Full App</a>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#12131a]">
-            <table className="w-full min-w-[600px] text-sm">
-              <thead className="bg-white/[0.06] text-white/80">
-                <tr>
-                  <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase">Stage</th>
-                  <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase">Bet Per Digit</th>
-                  <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase">Total Bet</th>
-                  <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase">Cumulative Loss</th>
-                  <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase">Return on Win</th>
-                  <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase">Net Profit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plan.map((row) => (
-                  <tr key={row.stage} className="odd:bg-white/[0.02]">
-                    <td className="px-3 py-2">{row.stage}</td>
-                    <td className="px-3 py-2">{row.bet}</td>
-                    <td className="px-3 py-2">{row.total}</td>
-                    <td className="px-3 py-2">{row.loss}</td>
-                    <td className="px-3 py-2">{row.ret}</td>
-                    <td className="px-3 py-2">{row.net}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="mt-12" aria-label="Latest Tricks">
-          <h3 className="mb-4 text-center text-xl font-bold">Latest Tricks</h3>
-          <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {MORE_TRICKS.map((trick) => (
-              <li key={trick.href}>
-                <Link
-                  href={trick.href}
-                  className="group relative block overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/[0.03] p-5 transition-all hover:border-white/20 focus-visible:ring-2 focus-visible:ring-orange-400/70"
-                >
-                  <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${trick.gradient}`} />
-                  <div className="relative z-[1] flex items-start gap-4">
-                    <div className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-black/20 text-xs font-bold">
-                      {trick.icon}
+          <div className="grid gap-4 lg:grid-cols-2">
+            {markets.map((market) => (
+              <div key={market.name} className="glass-card p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-2xl font-extrabold">{market.name}</h3>
+                      <span className="rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-orange-200">
+                        {market.status}
+                      </span>
                     </div>
-                    <div className="min-w-0">
-                      <h4 className="text-lg font-bold">{trick.title}</h4>
-                      <p className="mt-1 text-sm text-white/80">{trick.tagline}</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-300">Result: {market.result}</p>
+                    <p className="mt-3 text-sm text-slate-400">Open {market.open} • Close {market.close}</p>
+                    <div className="mt-4 flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-200">
+                      <Link href="https://app.realmatka.in/charts" className="rounded-full border border-white/10 bg-white/5 px-3 py-2 hover:border-white/20">
+                        Jodi Chart
+                      </Link>
+                      <Link href="https://app.realmatka.in/charts" className="rounded-full border border-white/10 bg-white/5 px-3 py-2 hover:border-white/20">
+                        Panna Chart
+                      </Link>
                     </div>
                   </div>
-                </Link>
-              </li>
+                  <a href="https://app.realmatka.in" className="action-primary min-w-[150px]">Play Now</a>
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
+        </section>
+
+        <section id="rates" className="section-shell px-6 py-8 sm:px-8 sm:py-10">
+          <div className="mb-6">
+            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Game Rates</div>
+            <h2 className="mt-2 text-3xl font-extrabold">Full rate display with your current rulebook</h2>
+          </div>
+
+          <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#0c1426]">
+            <div className="grid grid-cols-[0.8fr_2fr_1fr] gap-3 border-b border-white/10 px-5 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+              <div>Code</div>
+              <div>Game Type</div>
+              <div>Rate</div>
+            </div>
+            {rates.map((rate) => (
+              <div key={rate.code} className="grid grid-cols-[0.8fr_2fr_1fr] gap-3 border-b border-white/5 px-5 py-4 text-sm text-slate-100 last:border-b-0">
+                <div className="font-extrabold text-orange-200">{rate.code}</div>
+                <div className="font-semibold">{rate.name}</div>
+                <div className="font-extrabold">Rs {rate.rate}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="rules" className="section-shell px-6 py-8 sm:px-8 sm:py-10">
+          <div className="mb-6">
+            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Rule Summary</div>
+            <h2 className="mt-2 text-3xl font-extrabold">Reference layout, but your own backend rules</h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {rules.map((rule) => (
+              <div key={rule} className="glass-card p-5 text-sm leading-7 text-slate-200">
+                {rule}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="download" className="section-shell px-6 py-8 sm:px-8 sm:py-10">
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">App Access</div>
+              <h2 className="mt-2 text-3xl font-extrabold">Landing se seedha app me login ya register flow</h2>
+              <p className="mt-4 max-w-2xl text-base leading-8 text-slate-300">
+                Public website ka kaam product dikhana hai. Actual wallet, bidding, charts, account, aur betting flow dedicated app environment me chalega.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <a href="https://app.realmatka.in/auth/register" className="action-primary">Create Account</a>
+                <a href="https://app.realmatka.in/auth/login" className="action-secondary">Already Have Account</a>
+              </div>
+            </div>
+
+            <div className="glass-card p-6">
+              <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Flow</div>
+              <ol className="mt-4 space-y-3 text-sm text-slate-200">
+                <li>1. User realmatka.in par product aur markets dekhega.</li>
+                <li>2. Login/Register par click karke app.realmatka.in par jayega.</li>
+                <li>3. App me auth, wallet, bidding, and charts ka actual flow chalega.</li>
+                <li>4. Backend-driven rules aur settlement secure API layer par honge.</li>
+              </ol>
+            </div>
+          </div>
         </section>
       </main>
     </div>

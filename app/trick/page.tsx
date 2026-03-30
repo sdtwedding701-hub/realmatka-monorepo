@@ -24,6 +24,7 @@ const TRICKS: Trick[] = [
   { slug: "hybrid-95-tool", title: "Top 20 Hot Jodi (Hybrid-95)", tagline: "GH10 + RH5 + B5 se daily prediction shortlist", badge: "New", emoji: "TJ", enabled: true },
   { slug: "final-number-chart", title: "Final Number Chart", tagline: "Kal ki jodi se final digit aur play map", badge: "New", emoji: "FN", enabled: true },
   { slug: "ai-jodi-predictor", title: "AI 3D Jodi Predictor", tagline: "Morning/day/night patterns se top 3 digits", badge: "New", emoji: "AI", enabled: true },
+  { slug: "ai-single-digit-predictor", title: "AI Single Digit Predictor", tagline: "Open ya close ke liye single digit model", badge: "New", emoji: "SD", enabled: true },
   { slug: "digit-cluster", title: "Digit Cluster Filter", tagline: "Close-digit based refine layer", badge: "Coming Soon", emoji: "DC", enabled: false },
   { slug: "smart-bounce-v2", title: "Smart Bounce v2", tagline: "Recent-absent strong jodi logic", badge: "Coming Soon", emoji: "SB", enabled: false },
 ];

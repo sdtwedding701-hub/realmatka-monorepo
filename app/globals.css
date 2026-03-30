@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -28,7 +28,7 @@ body {
 }
 
 .section-shell {
-  @apply rounded-[28px] border border-white/10 bg-white/[0.04] backdrop-blur-xl;
+  @apply rounded-[26px] border border-white/10 bg-white/[0.04] backdrop-blur-xl;
 }
 
 .glass-card {
@@ -49,4 +49,30 @@ body {
 
 .action-secondary {
   @apply action-button border border-white/10 bg-white/5 text-slate-100 hover:border-white/20 hover:bg-white/10;
+}
+
+.rate-card {
+  min-height: 170px;
+}
+
+.market-card {
+  min-height: 250px;
+}
+
+@media (max-width: 640px) {
+  .section-shell {
+    @apply rounded-[22px];
+  }
+
+  .action-button {
+    @apply px-4 py-2.5 text-[13px];
+  }
+
+  .rate-card {
+    min-height: 148px;
+  }
+
+  .market-card {
+    min-height: auto;
+  }
 }

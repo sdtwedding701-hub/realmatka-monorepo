@@ -8,16 +8,17 @@
             Real Matka
           </h3>
           <p className="mt-3 max-w-md text-sm leading-7 text-slate-300">
-            Fast matka play flow, live market cards, charts, wallet tools, and backend-driven rules with a cleaner modern experience.
+            Full game rate, complete markets, app screenshots, and direct login/register access for a cleaner modern Real Matka landing flow.
           </p>
         </div>
 
         <div>
           <h4 className="text-sm font-bold uppercase tracking-[0.22em] text-slate-400">Quick Access</h4>
           <div className="mt-4 flex flex-col gap-2 text-sm text-slate-200">
-            <a href="#markets" className="transition hover:text-white">Live Markets</a>
             <a href="#rates" className="transition hover:text-white">Game Rates</a>
-            <a href="#rules" className="transition hover:text-white">Rules</a>
+            <a href="#download" className="transition hover:text-white">Download App</a>
+            <a href="#games" className="transition hover:text-white">Available Games</a>
+            <a href="#markets" className="transition hover:text-white">All Markets</a>
             <a href="https://app.realmatka.in/auth/login" className="transition hover:text-white">Login</a>
             <a href="https://app.realmatka.in/auth/register" className="transition hover:text-white">Register</a>
           </div>
@@ -27,8 +28,8 @@
           <h4 className="text-sm font-bold uppercase tracking-[0.22em] text-slate-400">Important</h4>
           <div className="mt-4 flex flex-col gap-2 text-sm text-slate-200">
             <p>18+ only. Play responsibly.</p>
-            <p>Results, rates, and game rules are subject to market schedule.</p>
-            <p>For support and account help, use the in-app support options after login.</p>
+            <p>Results, rates, and game rules are subject to market schedule and admin control.</p>
+            <p>Wallet, bidding, charts, and settlement secure app/backend flow me chalte hain.</p>
           </div>
         </div>
       </div>

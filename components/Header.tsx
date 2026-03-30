@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 
 const links = [
-  { href: "#markets", label: "Markets" },
   { href: "#rates", label: "Rates" },
-  { href: "#rules", label: "Rules" },
   { href: "#download", label: "Download" },
+  { href: "#games", label: "Games" },
+  { href: "#markets", label: "Markets" },
+  { href: "#rules", label: "Rules" },
 ];
 
 export default function Header() {
@@ -22,7 +23,7 @@ export default function Header() {
             <div className="bg-gradient-to-r from-amber-200 via-orange-300 to-rose-300 bg-clip-text text-lg font-extrabold text-transparent">
               Real Matka
             </div>
-            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Play • Charts • Results</div>
+            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Rates • Markets • Download App</div>
           </div>
         </Link>
 

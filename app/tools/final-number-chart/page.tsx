@@ -1,1 +1,0 @@
-export default function FinalNumberChart(){return(<main className='container-max'><div className='card p-6'><h1 className='text-2xl font-bold'>Final Number Chart (Demo)</h1><p className='text-neutral-400 mt-2'>Calculator coming soon.</p></div></main>)}

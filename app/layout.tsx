@@ -6,8 +6,10 @@ import Footer from "@/components/Footer";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Real Matka | Play Online | Full Rate | Live Markets",
-  description: "Real Matka landing website with live market cards, game rates, rule summary, and direct login/register access to the app experience.",
+  metadataBase: new URL("https://realmatka.in"),
+  title: "Real Matka | Full Game Rate | All Markets | Download App",
+  description:
+    "Real Matka landing website with full game rate, app screenshots, all markets, available games, and direct login/register access to the app.",
   icons: { icon: "/logo.jpg" },
 };
 

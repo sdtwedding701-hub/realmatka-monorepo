@@ -1,8 +1,9 @@
 ﻿import Image from "next/image";
 
 const apkUrl = "https://expo.dev/artifacts/eas/wu67fPLia8QBrVWpNt3uMY.apk";
-const loginUrl = "https://app.realmatka.in/auth/login";
-const chartUrl = "https://app.realmatka.in/charts";
+const webAppBaseUrl = "https://realmatka-app.expo.app";
+const loginUrl = `${webAppBaseUrl}/auth/login`;
+const chartUrl = `${webAppBaseUrl}/charts`;
 
 const rates = [
   { name: "Single Digit", rate: "10" },

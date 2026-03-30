@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useState } from "react";
 
+const webAppBaseUrl = "https://realmatka-app.expo.app";
+
 const links = [
   { href: "#rates", label: "Rates" },
   { href: "#download", label: "Download" },
   { href: "#games", label: "Games" },
   { href: "#markets", label: "Markets" },
-  { href: "#rules", label: "Rules" },
 ];
 
 export default function Header() {
@@ -41,16 +42,16 @@ export default function Header() {
 
         <div className="hidden items-center gap-2 md:flex">
           <a
-            href="https://app.realmatka.in/auth/login"
+            href={`${webAppBaseUrl}/auth/login`}
             className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-white/30"
           >
             Login
           </a>
           <a
-            href="https://app.realmatka.in/auth/register"
+            href={webAppBaseUrl}
             className="rounded-full bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(249,115,22,0.9)] transition hover:opacity-90"
           >
-            Register
+            Open App
           </a>
         </div>
 
@@ -75,11 +76,11 @@ export default function Header() {
                 {link.label}
               </a>
             ))}
-            <a href="https://app.realmatka.in/auth/login" className="rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-100">
+            <a href={`${webAppBaseUrl}/auth/login`} className="rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-100">
               Login
             </a>
-            <a href="https://app.realmatka.in/auth/register" className="rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-3 text-sm font-semibold text-white">
-              Register
+            <a href={webAppBaseUrl} className="rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-3 text-sm font-semibold text-white">
+              Open App
             </a>
           </div>
         </div>

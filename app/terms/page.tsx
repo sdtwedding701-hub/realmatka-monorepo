@@ -1,1 +1,0 @@
-export default function Terms(){return(<main className='container-max'><div className='card p-6'><h1 className='text-2xl font-bold'>Terms of Use</h1><p className='text-neutral-400 mt-2'>Educational information only. Users must be 18+ and follow local laws.</p></div></main>)}

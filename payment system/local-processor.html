@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Matka Payment Processor</title>
+    <link rel="stylesheet" href="./local-processor.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="welcome">Opening UPI</p>
+      </section>
+
+      <section class="card">
+        <label class="field">
+          <span>Amount</span>
+          <input id="amount" type="number" min="1" step="1" value="100" />
+        </label>
+
+        <label class="field">
+          <span>UPI ID</span>
+          <input id="upiId" value="sdtwedding701@okicici" />
+        </label>
+
+        <div class="status-card">
+          <p class="status-title" id="statusValue">Idle</p>
+          <p class="status-meta" id="referenceText">Creating payment reference...</p>
+        </div>
+
+        <button id="startButton" class="primary">Open UPI App</button>
+        <p class="timer-text" id="timerText">Local processor ready.</p>
+
+        <div class="app-row">
+          <button id="googlePayButton" class="app-chip" type="button" disabled>Google Pay</button>
+          <button id="phonePeButton" class="app-chip" type="button" disabled>PhonePe</button>
+          <button id="paytmButton" class="app-chip" type="button" disabled>Paytm</button>
+          <button id="otherUpiButton" class="app-chip" type="button" disabled>Other UPI</button>
+        </div>
+        <p class="app-hint" id="launchHint">Launch target: googlePay</p>
+
+        <div class="processor">
+          <div>
+            <span class="label">Reference</span>
+            <strong id="referenceValue">-</strong>
+          </div>
+          <div>
+            <span class="label">UPI ID</span>
+            <strong id="upiIdPreview">-</strong>
+          </div>
+          <div>
+            <span class="label">Amount</span>
+            <strong id="amountPreview">-</strong>
+          </div>
+        </div>
+
+        <p id="message" class="message">Ready for local testing.</p>
+
+        <details class="debug-panel">
+          <summary>Advanced Local Testing</summary>
+          <p class="debug-copy">Ye section sirf backend session/status testing ke liye hai. Normal payment-open test ke liye isko use karna zaroori nahi.</p>
+          <div class="grid">
+            <label>
+              <span>API Base URL</span>
+              <input id="apiBase" value="http://localhost:3000" />
+            </label>
+            <label>
+              <span>Bearer Token</span>
+              <input id="token" placeholder="Paste user session token" />
+            </label>
+            <label>
+              <span>UPI URL</span>
+              <input id="upiUrlValue" readonly />
+            </label>
+          </div>
+
+          <div class="actions compact">
+            <button id="refreshButton" class="secondary" type="button" disabled>Refresh Status</button>
+            <button id="successButton" class="pill success" type="button" disabled>Report SUCCESS</button>
+            <button id="failedButton" class="pill danger" type="button" disabled>Report FAILED</button>
+            <button id="cancelledButton" class="pill neutral" type="button" disabled>Report CANCELLED</button>
+          </div>
+
+          <label class="wide">
+            <span>Raw Response / Debug Note</span>
+            <textarea id="rawResponse" rows="4" placeholder="Optional raw app return string for local testing"></textarea>
+          </label>
+
+          <div class="result-block">
+            <h2>Latest Backend Response</h2>
+            <pre id="resultPanel">{}</pre>
+          </div>
+        </details>
+      </section>
+    </main>
+
+    <script src="./local-processor.js"></script>
+  </body>
+</html>

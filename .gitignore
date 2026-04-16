@@ -1,13 +1,17 @@
 # dependencies
 /node_modules
+**/node_modules
 
 # next.js build output
 /.next
+**/.next
 /out
 /dist
+**/dist
 
 # production
 /build
+**/build
 
 # misc
 .DS_Store
@@ -22,10 +26,32 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+.env.production
+**/.env
+**/.env.local
+**/.env.production
+**/.env.*.local
 
 # vercel
 .vercel
+**/.vercel
 
 # typescript
 *.tsbuildinfo
 .env*.local
+
+# expo / react native
+**/.expo
+**/.expo-shared
+**/android/.gradle
+**/android/app/build
+**/android/build
+**/ios/build
+
+# local databases and generated data
+*.db
+*.sqlite
+*.sqlite3
+*.log
+Backend/data/
+data/

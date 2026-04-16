@@ -1,0 +1,95 @@
+import { useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
+import { useAppState } from "@/lib/app-state";
+import { colors } from "@/theme/colors";
+
+export default function AddBankDetailsScreen() {
+  const { addBankAccount, bankAccounts } = useAppState();
+  const latestBank = useMemo(() => bankAccounts[0] ?? null, [bankAccounts]);
+  const [accountNumber, setAccountNumber] = useState(latestBank?.accountNumber ?? "");
+  const [holderName, setHolderName] = useState(latestBank?.holderName ?? "");
+  const [ifsc, setIfsc] = useState(latestBank?.ifsc ?? "");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  return (
+    <View style={styles.page}>
+      <BackHeader title="Add Bank Details" subtitle={undefined} />
+      <AppScreen showPromo={false}>
+        <SurfaceCard>
+          <Text style={styles.title}>Bank Account Details</Text>
+          <TextInput keyboardType="number-pad" onChangeText={setAccountNumber} placeholder="Enter account number" placeholderTextColor="#98a2b3" style={styles.input} value={accountNumber} />
+          <TextInput autoCapitalize="words" onChangeText={setHolderName} placeholder="Enter holder name" placeholderTextColor="#98a2b3" style={styles.input} value={holderName} />
+          <TextInput autoCapitalize="characters" onChangeText={setIfsc} placeholder="Enter IFSC code" placeholderTextColor="#98a2b3" style={styles.input} value={ifsc} />
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {message ? <Text style={styles.success}>{message}</Text> : null}
+
+          <Pressable onPress={() => void submit()} style={[styles.primary, submitting && styles.disabled]}>
+            {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>Save Bank Details</Text>}
+          </Pressable>
+        </SurfaceCard>
+      </AppScreen>
+    </View>
+  );
+
+  async function submit() {
+    try {
+      setSubmitting(true);
+      setError("");
+      setMessage("");
+      await addBankAccount(accountNumber, holderName, ifsc);
+      setMessage("Bank details saved successfully.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to save bank details");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+}
+
+const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+    backgroundColor: colors.background
+  },
+  title: {
+    textAlign: "center",
+    color: "#111827",
+    fontSize: 20,
+    fontWeight: "900"
+  },
+  input: {
+    minHeight: 54,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: "#dbe1ea",
+    paddingHorizontal: 14,
+    color: "#374151"
+  },
+  primary: {
+    minHeight: 50,
+    borderRadius: 999,
+    backgroundColor: "#273caa",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  disabled: {
+    opacity: 0.7
+  },
+  primaryText: {
+    color: colors.surface,
+    fontWeight: "800"
+  },
+  error: {
+    color: "#dc2626",
+    fontWeight: "600"
+  },
+  success: {
+    color: "#16a34a",
+    fontWeight: "600"
+  }
+});

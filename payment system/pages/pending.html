@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Payment Pending</title>
+    <link rel="stylesheet" href="../shared/styles.css" />
+  </head>
+  <body>
+    <main class="shell status-shell">
+      <section class="card result-card">
+        <div class="result-badge pending-badge">Pending</div>
+        <h1>Waiting For Payment Confirmation</h1>
+        <p class="result-copy">The payment app returned, but the deposit still appears to be in progress. Refresh the checkout status or retry from a supported UPI app.</p>
+        <div class="result-meta">
+          <span>Reference</span>
+          <strong id="pendingReference">-</strong>
+        </div>
+        <div class="entry-actions">
+          <a id="pendingBackCheckout" class="primary-link" href="./checkout.html">Return To Checkout</a>
+          <a class="secondary-link" href="./index.html">Payment System Home</a>
+        </div>
+      </section>
+    </main>
+    <script src="../shared/status.js"></script>
+  </body>
+</html>

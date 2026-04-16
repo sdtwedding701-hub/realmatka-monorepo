@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Payment Successful</title>
+    <link rel="stylesheet" href="../shared/styles.css" />
+  </head>
+  <body>
+    <main class="shell status-shell">
+      <section class="card result-card">
+        <div class="result-badge success-badge">Success</div>
+        <h1>Payment Submitted Successfully</h1>
+        <p class="result-copy">Your deposit request has been submitted. You can return to wallet history or open the checkout page again for another test.</p>
+        <div class="result-meta">
+          <span>Reference</span>
+          <strong id="successReference">-</strong>
+        </div>
+        <div class="entry-actions">
+          <a id="successBackCheckout" class="primary-link" href="./checkout.html">Back To Checkout</a>
+          <a class="secondary-link" href="./index.html">Payment System Home</a>
+        </div>
+      </section>
+    </main>
+    <script src="../shared/status.js"></script>
+  </body>
+</html>

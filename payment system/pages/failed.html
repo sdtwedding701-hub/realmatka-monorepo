@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Payment Failed</title>
+    <link rel="stylesheet" href="../shared/styles.css" />
+  </head>
+  <body>
+    <main class="shell status-shell">
+      <section class="card result-card">
+        <div class="result-badge failed-badge">Failed</div>
+        <h1>Payment Could Not Be Completed</h1>
+        <p class="result-copy">The payment app did not complete this request. You can retry from the checkout page or switch to another UPI app.</p>
+        <div class="result-meta">
+          <span>Reference</span>
+          <strong id="failedReference">-</strong>
+        </div>
+        <div class="entry-actions">
+          <a id="failedBackCheckout" class="primary-link" href="./checkout.html">Retry Checkout</a>
+          <a class="secondary-link" href="./index.html">Payment System Home</a>
+        </div>
+      </section>
+    </main>
+    <script src="../shared/status.js"></script>
+  </body>
+</html>

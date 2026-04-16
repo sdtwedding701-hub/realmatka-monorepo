@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Secure Deposit Checkout</title>
+    <link rel="stylesheet" href="../shared/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="welcome">Welcome to Secure Deposit</p>
+      </section>
+
+      <section class="card">
+        <label class="field">
+          <span>Amount</span>
+          <input id="checkoutAmount" readonly />
+        </label>
+
+        <div class="status-card">
+          <p class="status-title" id="checkoutStatus">Creating secure deposit session...</p>
+          <p class="status-meta" id="checkoutReference">Creating payment reference...</p>
+        </div>
+
+        <div class="beneficiary-card">
+          <div class="beneficiary-line">
+            <span class="beneficiary-label">Paying To</span>
+            <strong class="beneficiary-value" id="checkoutBeneficiary">-</strong>
+          </div>
+          <div class="beneficiary-line">
+            <span class="beneficiary-label">UPI ID</span>
+            <strong class="beneficiary-subtle" id="checkoutUpiId">-</strong>
+          </div>
+          <div class="beneficiary-line">
+            <span class="beneficiary-label">Amount</span>
+            <strong class="beneficiary-value" id="checkoutAmountPreview">-</strong>
+          </div>
+        </div>
+
+        <div class="debug-card">
+          <span class="debug-label">UPI Launch URL</span>
+          <code class="debug-value" id="checkoutUpiUrl">Preparing UPI URL...</code>
+        </div>
+
+        <button id="checkoutPrimary" class="primary">Deposit via UPI</button>
+        <p class="timer-text" id="checkoutTimer">processor auto-opens in: 0 Min : 30 Secs</p>
+
+        <div class="app-row">
+          <button id="checkoutGooglePay" class="app-chip">Google Pay</button>
+          <button id="checkoutPhonePe" class="app-chip">PhonePe</button>
+          <button id="checkoutPaytm" class="app-chip">Paytm</button>
+          <button id="checkoutOther" class="app-chip">Other UPI</button>
+        </div>
+        <p class="app-hint" id="checkoutHint">Choose your payment app. Current target: googlePay</p>
+
+        <p class="message" id="checkoutMessage">Secure processor ready.</p>
+
+        <details class="debug-panel">
+          <summary>Advanced Local Testing</summary>
+          <div class="actions compact">
+            <button id="checkoutRefresh" class="secondary" type="button">Refresh Status</button>
+            <button id="checkoutSubmitted" class="pill success" type="button">Mark Submitted</button>
+            <button id="checkoutFailed" class="pill danger" type="button">Mark Failed</button>
+            <button id="checkoutCancelled" class="pill neutral" type="button">Mark Cancelled</button>
+          </div>
+          <label class="wide">
+            <span>Raw Response / Debug Note</span>
+            <textarea id="checkoutRawResponse" rows="4" placeholder="Optional return string for backend testing"></textarea>
+          </label>
+          <div class="result-block">
+            <h2>Latest Backend Response</h2>
+            <pre id="checkoutResult">{}</pre>
+          </div>
+        </details>
+      </section>
+    </main>
+
+    <script src="../shared/checkout.js"></script>
+  </body>
+</html>

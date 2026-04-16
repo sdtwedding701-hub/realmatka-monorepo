@@ -1,1 +1,0 @@
-export default function Privacy(){return(<main className='container-max'><div className='card p-6'><h1 className='text-2xl font-bold'>Privacy Policy</h1><p className='text-neutral-400 mt-2'>We use analytics and cookies to improve UX. No personal data is sold.</p></div></main>)}

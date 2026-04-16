@@ -1,51 +1,51 @@
-# RealMatka.in — Full Starter (Next.js App Router + Tailwind)
+# Real Matka Workspace
 
-Colorful, animated scaffold with a **Home page grid** that matches your mock (title, tagline, date badge, OFF DAY red line, 2×3 black cards). Includes market routes, guides, legal, and tools placeholders.
+This repo now uses a simple 4-part structure:
 
-## Quick Start
+- `user apk`
+  - main user app for Android and Expo web
+- `admin frontend`
+  - admin operator panel
+- `realmatka frontend web`
+  - promo / marketing website
+- `Backend`
+  - shared API and PostgreSQL backend
 
-```bash
-unzip realmatka-full-starter.zip
-cd realmatka-full-starter
+## Local startup
+
+1. Backend
+
+```powershell
+cd "C:\Users\SDT-WEDDING\Desktop\realmatka app\Backend"
 npm install
-npm run dev
-# open http://localhost:3000
+npm start
 ```
 
-## Daily Predictions (Home Grid)
+2. User app
 
-Edit `data/home-predictions.json`:
-
-```json
-{
-  "date": "2025-09-06",
-  "tagline": "Daily Guessing Cards — आज की प्रेडिक्शन (Educational)",
-  "offDay": false,
-  "markets": [
-    { "key": "sita", "name": "SITA", "lines": ["37 58 79"], "offDay": false },
-    { "key": "kamal", "name": "KAMAL", "lines": ["21 23 26"], "offDay": false },
-    { "key": "andhra", "name": "ANDHRA", "lines": ["50 52 56"], "offDay": false },
-    { "key": "star-tara", "name": "STAR TARA", "lines": ["32 35 39"], "offDay": false },
-    { "key": "sridevi", "name": "SRIDEVI", "lines": ["12 15 19"], "offDay": false },
-    { "key": "mahadevi", "name": "MAHADEVI", "lines": ["01 05 09"], "offDay": false }
-  ]
-}
+```powershell
+cd "C:\Users\SDT-WEDDING\Desktop\realmatka app\user apk"
+npm.cmd install
+npm.cmd run start:clear
 ```
 
-- Global **OFF DAY** → set `"offDay": true`.
-- Per‑market **OFF DAY** → set `"offDay": true` for that market.
-- Multiple lines allowed, e.g. `"lines": ["Top 10","37 58 79"]`.
+3. Admin app
 
-## Markets & Sessions
-- `/market/[market]` (Sita, Kamal, Andhra, Star Tara, Sridevi, Bharat, Mahadevi)
-- `/market/[market]/[session]` (morning/day/night) — with today's card + last 7 days.
+```powershell
+cd "C:\Users\SDT-WEDDING\Desktop\realmatka app\admin frontend"
+npm.cmd install
+npm.cmd run dev
+```
 
-## Customize Colors
-Edit these in `app/globals.css`:
-```css
---brand-from: 99 102 241;
---brand-to:   59 130 246;
---accent-from: 236 72 153;
---accent-to:   168 85 247;
-```Test update 12-09-2025
+## Local URLs
 
+- backend health: `http://localhost:3000/health`
+- user app: `http://localhost:8081`
+- admin app: `http://localhost:5501`
+
+## Notes
+
+- `user apk/.env.local` is set for local backend development
+- `user apk/.env.production` is set for production backend usage
+- `admin frontend/config.js` automatically uses local backend on localhost
+- `realmatka frontend web` stays separate as the public promo website

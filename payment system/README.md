@@ -18,8 +18,8 @@ Current target:
 Main app areas that will integrate with this module:
 
 - `/Backend`
-- `/user apk`
-- `/admin frontend`
+- `/user-apk`
+- `/admin-frontend`
 
 Recommended next steps:
 

@@ -14,7 +14,7 @@ npm start
 Start admin:
 
 ```powershell
-cd "C:\Users\SDT-WEDDING\Desktop\realmatka app\admin frontend"
+cd "C:\Users\SDT-WEDDING\Desktop\realmatka app\admin-frontend"
 npm.cmd install
 npm.cmd run dev
 ```
@@ -26,7 +26,7 @@ Open:
 ## Build check
 
 ```powershell
-cd "C:\Users\SDT-WEDDING\Desktop\realmatka app\admin frontend"
+cd "C:\Users\SDT-WEDDING\Desktop\realmatka app\admin-frontend"
 npm.cmd run build
 ```
 

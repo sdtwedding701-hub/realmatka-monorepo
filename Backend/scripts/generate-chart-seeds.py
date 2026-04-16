@@ -11,7 +11,7 @@ from xml.etree import ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
-MOCK_PATH = ROOT / "user apk" / "data" / "mock.ts"
+MOCK_PATH = ROOT / "user-apk" / "data" / "mock.ts"
 FILE_SLUG_OVERRIDES = {
     "ANDHRA DAY MATKA PANEL RECORD 2021 - 2026.xlsx": "andhra-day",
     "ANDHRA MORNING MATKA PANEL RECORD.xlsx": "andhra-morning",

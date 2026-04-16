@@ -2,11 +2,11 @@
 
 This repo now uses a simple 4-part structure:
 
-- `user apk`
+- `user-apk`
   - main user app for Android and Expo web
-- `admin frontend`
+- `admin-frontend`
   - admin operator panel
-- `realmatka frontend web`
+- `realmatka-frontend-web`
   - promo / marketing website
 - `Backend`
   - shared API and PostgreSQL backend
@@ -24,7 +24,7 @@ npm start
 2. User app
 
 ```powershell
-cd "C:\Users\SDT-WEDDING\Desktop\realmatka app\user apk"
+cd "C:\Users\SDT-WEDDING\Desktop\realmatka app\user-apk"
 npm.cmd install
 npm.cmd run start:clear
 ```
@@ -32,7 +32,7 @@ npm.cmd run start:clear
 3. Admin app
 
 ```powershell
-cd "C:\Users\SDT-WEDDING\Desktop\realmatka app\admin frontend"
+cd "C:\Users\SDT-WEDDING\Desktop\realmatka app\admin-frontend"
 npm.cmd install
 npm.cmd run dev
 ```
@@ -45,7 +45,7 @@ npm.cmd run dev
 
 ## Notes
 
-- `user apk/.env.local` is set for local backend development
-- `user apk/.env.production` is set for production backend usage
-- `admin frontend/config.js` automatically uses local backend on localhost
-- `realmatka frontend web` stays separate as the public promo website
+- `user-apk/.env.local` is set for local backend development
+- `user-apk/.env.production` is set for production backend usage
+- `admin-frontend/config.js` automatically uses local backend on localhost
+- `realmatka-frontend-web` stays separate as the public promo website

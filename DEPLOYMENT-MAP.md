@@ -3,15 +3,15 @@
 ## Domain Mapping
 
 - `https://www.realmatka.in`
-  - folder: `C:\Users\SDT-WEDDING\Desktop\realmatka app\realmatka frontend web`
+  - folder: `C:\Users\SDT-WEDDING\Desktop\realmatka app\realmatka-frontend-web`
   - use as: landing / marketing website
 
 - `https://play.realmatka.in`
-  - folder: `C:\Users\SDT-WEDDING\Desktop\realmatka app\user apk`
+  - folder: `C:\Users\SDT-WEDDING\Desktop\realmatka app\user-apk`
   - use as: main user app for Android and web
 
 - `https://admin.realmatka.in`
-  - folder: `C:\Users\SDT-WEDDING\Desktop\realmatka app\admin frontend`
+  - folder: `C:\Users\SDT-WEDDING\Desktop\realmatka app\admin-frontend`
   - use as: admin panel
 
 - backend API
@@ -31,8 +31,8 @@
 
 ## Files Updated
 
-- `realmatka frontend web/app/page.tsx`
-- `realmatka frontend web/components/Header.tsx`
-- `realmatka frontend web/components/Footer.tsx`
-- `user apk/.env.production`
-- `admin frontend/config.js`
+- `realmatka-frontend-web/app/page.tsx`
+- `realmatka-frontend-web/components/Header.tsx`
+- `realmatka-frontend-web/components/Footer.tsx`
+- `user-apk/.env.production`
+- `admin-frontend/config.js`

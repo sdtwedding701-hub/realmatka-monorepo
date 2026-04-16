@@ -111,7 +111,7 @@ Where to get them:
 After adding keys:
 
 1. backend restart karo
-2. `user apk` me `Add Fund` open karo
+2. `user-apk` me `Add Fund` open karo
 3. amount enter karke payment link generate karo
 4. test payment complete karke app me `Check Status` dabao
 

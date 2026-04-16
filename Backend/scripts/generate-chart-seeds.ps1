@@ -3,7 +3,7 @@ param(
 )
 
 $dataDir = Join-Path $WorkspaceRoot "data"
-$mockPath = Join-Path $WorkspaceRoot "user apk\data\mock.ts"
+$mockPath = Join-Path $WorkspaceRoot "user-apk\data\mock.ts"
 
 function Normalize-Text([string]$Value) {
   if ([string]::IsNullOrWhiteSpace($Value)) {

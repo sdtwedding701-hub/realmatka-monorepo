@@ -75,6 +75,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [bids, setBids] = useState<BidEntry[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [draftBid, setDraftBid] = useState<DraftBid | null>(null);
+  const activeSessionTokenRef = useRef("");
   const lastSessionReloadAtRef = useRef(0);
   const lastWalletReloadAtRef = useRef(0);
   const lastBidReloadAtRef = useRef(0);
@@ -85,6 +86,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const bankReloadPromiseRef = useRef<Promise<void> | null>(null);
 
   const clearSession = useCallback(async () => {
+    activeSessionTokenRef.current = "";
     setSessionToken("");
     setCurrentUser(null);
     setWalletBalance(0);
@@ -113,6 +115,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       walletBalance: resolvedBalance
     };
 
+    activeSessionTokenRef.current = token;
     setSessionToken(token);
     setCurrentUser(mergedUser);
     setWalletBalance(resolvedBalance);
@@ -154,8 +157,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let clearing = false;
 
-    setAuthFailureListener(() => {
+    setAuthFailureListener((failedToken) => {
       if (clearing) {
+        return;
+      }
+
+      if (!failedToken || activeSessionTokenRef.current !== failedToken) {
         return;
       }
 

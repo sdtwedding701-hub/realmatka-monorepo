@@ -100,7 +100,7 @@ type ApiEnvelope<T> = {
   error?: string;
 };
 
-type AuthFailureListener = () => void;
+type AuthFailureListener = (failedToken: string) => void;
 
 export class ApiError extends Error {
   status: number;
@@ -173,7 +173,7 @@ async function request<T>(path: string, options: RequestOptions = {}) {
   if (!response.ok || !payload?.ok) {
     const error = new ApiError(payload?.error || "Request failed", response.status || 500);
     if (error.isAuthError && options.token) {
-      authFailureListener?.();
+      authFailureListener?.(options.token);
     }
     throw error;
   }

@@ -2240,6 +2240,50 @@ export async function getChartRecord(slug, chartType) {
     : null;
 }
 
+export async function getChartRecordsForMarkets(slugs, chartTypes = ["jodi", "panna"]) {
+  const normalizedSlugs = Array.from(
+    new Set((Array.isArray(slugs) ? slugs : []).map((value) => String(value ?? "").trim()).filter(Boolean))
+  );
+  const normalizedChartTypes = Array.from(
+    new Set((Array.isArray(chartTypes) ? chartTypes : []).map((value) => String(value ?? "").trim()).filter(Boolean))
+  );
+
+  if (!normalizedSlugs.length || !normalizedChartTypes.length) {
+    return [];
+  }
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await getReadyPgPool();
+    const result = await pool.query(
+      `SELECT market_slug, chart_type, rows_json
+       FROM charts
+       WHERE market_slug = ANY($1::text[]) AND chart_type = ANY($2::text[])`,
+      [normalizedSlugs, normalizedChartTypes]
+    );
+    return result.rows.map((row) => ({
+      marketSlug: row.market_slug,
+      chartType: row.chart_type,
+      rows: normalizeChartRowsForStorage(row.chart_type, toChartRows(row.rows_json))
+    }));
+  }
+
+  const slugPlaceholders = normalizedSlugs.map(() => "?").join(", ");
+  const chartTypePlaceholders = normalizedChartTypes.map(() => "?").join(", ");
+  const rows = getSqlite()
+    .prepare(
+      `SELECT market_slug, chart_type, rows_json
+       FROM charts
+       WHERE market_slug IN (${slugPlaceholders}) AND chart_type IN (${chartTypePlaceholders})`
+    )
+    .all(...normalizedSlugs, ...normalizedChartTypes);
+
+  return rows.map((row) => ({
+    marketSlug: row.market_slug,
+    chartType: row.chart_type,
+    rows: normalizeChartRowsForStorage(row.chart_type, toChartRows(row.rows_json))
+  }));
+}
+
 export async function upsertChartRecord(marketSlug, chartType, rows) {
   const normalizedRows = normalizeChartRowsForStorage(chartType, rows);
   if (isStandalonePostgresEnabled()) {

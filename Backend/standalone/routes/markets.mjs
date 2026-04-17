@@ -1,4 +1,4 @@
-import { findMarketBySlug, getChartRecord, listMarkets } from "../db.mjs";
+import { findMarketBySlug, getChartRecord, getChartRecordsForMarkets, listMarkets } from "../db.mjs";
 import { corsPreflight, fail, ok } from "../http.mjs";
 
 export function options(request) {
@@ -143,9 +143,48 @@ async function decorateMarketWithTodayResult(market) {
   };
 }
 
+function buildChartLookup(charts) {
+  const lookup = new Map();
+
+  for (const chart of Array.isArray(charts) ? charts : []) {
+    if (!chart?.marketSlug || !chart?.chartType) {
+      continue;
+    }
+    lookup.set(`${chart.marketSlug}:${chart.chartType}`, chart);
+  }
+
+  return lookup;
+}
+
+function decorateMarketWithLookup(market, chartLookup) {
+  if (!market || !isPlaceholderResult(market.result)) {
+    return market;
+  }
+
+  const jodiChart = chartLookup.get(`${market.slug}:jodi`) ?? null;
+  const pannaChart = chartLookup.get(`${market.slug}:panna`) ?? null;
+
+  return {
+    ...market,
+    result: deriveTodayResultFromCharts(market, jodiChart, pannaChart)
+  };
+}
+
 export async function list(request) {
   const markets = await listMarkets();
-  return ok(await Promise.all(markets.map((market) => decorateMarketWithTodayResult(market))), request);
+  const placeholderMarkets = markets.filter((market) => isPlaceholderResult(market?.result));
+
+  if (!placeholderMarkets.length) {
+    return ok(markets, request);
+  }
+
+  const charts = await getChartRecordsForMarkets(
+    placeholderMarkets.map((market) => market.slug),
+    ["jodi", "panna"]
+  );
+  const chartLookup = buildChartLookup(charts);
+
+  return ok(markets.map((market) => decorateMarketWithLookup(market, chartLookup)), request);
 }
 
 export async function detail(request, params) {

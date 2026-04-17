@@ -50,6 +50,7 @@ function RootNavigator() {
   const lastInteractionAtRef = useRef(Date.now());
   const backgroundedAtRef = useRef<number | null>(null);
   const unlockedSessionTokenRef = useRef("");
+  const lastVerifiedPinRef = useRef("");
   const registeredPushSessionTokenRef = useRef("");
   const webWindowIdRef = useRef(`web_${Math.random().toString(36).slice(2, 10)}`);
 
@@ -143,6 +144,7 @@ function RootNavigator() {
     if (!sessionToken || !currentUser) {
       setSecurityMode(null);
       unlockedSessionTokenRef.current = "";
+      lastVerifiedPinRef.current = "";
       setSecurityBootstrapReady(true);
       void clearPersistedUnlockState();
       return;
@@ -481,11 +483,17 @@ function RootNavigator() {
           return;
         }
         await updateMpin(nextPin, nextConfirmPin);
+        lastVerifiedPinRef.current = nextPin;
       } else {
         if (nextPin.length !== 4) {
           return;
         }
-        await verifyMpin(nextPin);
+        if (lastVerifiedPinRef.current && lastVerifiedPinRef.current === nextPin) {
+          // Same-session unlock can be instant after the first successful PIN verification.
+        } else {
+          await verifyMpin(nextPin);
+          lastVerifiedPinRef.current = nextPin;
+        }
       }
 
       unlockedSessionTokenRef.current = sessionToken;

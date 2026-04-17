@@ -157,7 +157,7 @@ function formatWalletTitle(type: string) {
 
 export default function HistoryScreen() {
   const params = useLocalSearchParams<{ payment?: string; reference?: string; amount?: string }>();
-  const { bids, walletEntries, reloadSessionData } = useAppState();
+  const { bids, walletEntries, loadBidHistory, loadWalletHistory } = useAppState();
   const [isFilterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -177,16 +177,16 @@ export default function HistoryScreen() {
   const refreshData = useCallback(async () => {
     setRefreshing(true);
     try {
-      await reloadSessionData();
+      await Promise.all([loadBidHistory({ force: true }), loadWalletHistory({ force: true })]);
     } finally {
       setRefreshing(false);
     }
-  }, [reloadSessionData]);
+  }, [loadBidHistory, loadWalletHistory]);
 
   useFocusEffect(
     useCallback(() => {
-      void reloadSessionData();
-    }, [reloadSessionData])
+      void Promise.all([loadBidHistory(), loadWalletHistory()]);
+    }, [loadBidHistory, loadWalletHistory])
   );
 
   const filteredBidItems = useMemo(() => {

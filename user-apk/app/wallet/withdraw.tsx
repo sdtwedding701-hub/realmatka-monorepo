@@ -10,7 +10,7 @@ const MIN_WITHDRAW_AMOUNT = 500;
 
 export default function WithdrawScreen() {
   const insets = useSafeAreaInsets();
-  const { walletBalance, requestWithdrawOtp, confirmWithdraw, bankAccounts, walletEntries } = useAppState();
+  const { walletBalance, requestWithdrawOtp, confirmWithdraw, bankAccounts, walletEntries, loadBankAccounts, loadWalletHistory } = useAppState();
   const latestBank = useMemo(() => bankAccounts[0] ?? null, [bankAccounts]);
   const pendingWithdraw = useMemo(
     () => walletEntries.find((entry) => entry.type === "WITHDRAW" && (entry.status === "INITIATED" || entry.status === "BACKOFFICE")) ?? null,
@@ -29,6 +29,10 @@ export default function WithdrawScreen() {
   const hasValidAmount = Number.isFinite(withdrawAmount) && withdrawAmount >= MIN_WITHDRAW_AMOUNT && withdrawAmount <= walletBalance;
   const hasValidOtp = otp.trim().length === 6;
   const isMultipleOfHundred = Number.isFinite(withdrawAmount) && withdrawAmount % 100 === 0;
+
+  useEffect(() => {
+    void Promise.all([loadBankAccounts(), loadWalletHistory()]);
+  }, [loadBankAccounts, loadWalletHistory]);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";

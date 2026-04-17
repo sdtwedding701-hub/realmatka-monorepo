@@ -103,7 +103,7 @@ function compareBidsByHistoryOrder(left: { id: string; createdAt: string }, righ
 }
 
 export default function BidsScreen() {
-  const { bids, reloadSessionData } = useAppState();
+  const { bids, loadBidHistory } = useAppState();
   const [isFilterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -114,16 +114,16 @@ export default function BidsScreen() {
   const refreshData = useCallback(async () => {
     setRefreshing(true);
     try {
-      await reloadSessionData();
+      await loadBidHistory({ force: true });
     } finally {
       setRefreshing(false);
     }
-  }, [reloadSessionData]);
+  }, [loadBidHistory]);
 
   useFocusEffect(
     useCallback(() => {
-      void reloadSessionData();
-    }, [reloadSessionData])
+      void loadBidHistory();
+    }, [loadBidHistory])
   );
 
   const filteredItems = useMemo(() => {

@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
 import { colors } from "@/theme/colors";
 
 export default function AddBankDetailsScreen() {
-  const { addBankAccount, bankAccounts } = useAppState();
+  const { addBankAccount, bankAccounts, loadBankAccounts } = useAppState();
   const latestBank = useMemo(() => bankAccounts[0] ?? null, [bankAccounts]);
   const [accountNumber, setAccountNumber] = useState(latestBank?.accountNumber ?? "");
   const [holderName, setHolderName] = useState(latestBank?.holderName ?? "");
@@ -13,6 +13,20 @@ export default function AddBankDetailsScreen() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    void loadBankAccounts();
+  }, [loadBankAccounts]);
+
+  useEffect(() => {
+    if (!latestBank) {
+      return;
+    }
+
+    setAccountNumber((current) => current || latestBank.accountNumber || "");
+    setHolderName((current) => current || latestBank.holderName || "");
+    setIfsc((current) => current || latestBank.ifsc || "");
+  }, [latestBank]);
 
   return (
     <View style={styles.page}>

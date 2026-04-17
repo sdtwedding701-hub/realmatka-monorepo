@@ -25,6 +25,9 @@ type AppStateValue = {
   register: (firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode?: string) => Promise<void>;
   logout: () => Promise<void>;
   reloadSessionData: (options?: { force?: boolean }) => Promise<void>;
+  loadWalletHistory: (options?: { force?: boolean }) => Promise<void>;
+  loadBidHistory: (options?: { force?: boolean }) => Promise<void>;
+  loadBankAccounts: (options?: { force?: boolean }) => Promise<void>;
   updatePassword: (currentPassword: string, password: string, confirmPassword: string) => Promise<void>;
   updateMpin: (pin: string, confirmPin: string) => Promise<void>;
   verifyMpin: (pin: string) => Promise<void>;
@@ -36,7 +39,8 @@ type AppStateValue = {
 };
 
 const AppStateContext = createContext<AppStateValue | null>(null);
-const SESSION_REFRESH_STALE_MS = 15_000;
+const SESSION_REFRESH_STALE_MS = 60_000;
+const COLLECTION_REFRESH_STALE_MS = 60_000;
 
 function ensureMessage(value: unknown, fallback: string) {
   return value instanceof Error ? value.message : fallback;
@@ -72,7 +76,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [draftBid, setDraftBid] = useState<DraftBid | null>(null);
   const lastSessionReloadAtRef = useRef(0);
+  const lastWalletReloadAtRef = useRef(0);
+  const lastBidReloadAtRef = useRef(0);
+  const lastBankReloadAtRef = useRef(0);
   const sessionReloadPromiseRef = useRef<Promise<void> | null>(null);
+  const walletReloadPromiseRef = useRef<Promise<void> | null>(null);
+  const bidReloadPromiseRef = useRef<Promise<void> | null>(null);
+  const bankReloadPromiseRef = useRef<Promise<void> | null>(null);
 
   const clearSession = useCallback(async () => {
     setSessionToken("");
@@ -83,37 +93,31 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setBankAccounts([]);
     setDraftBid(null);
     lastSessionReloadAtRef.current = 0;
+    lastWalletReloadAtRef.current = 0;
+    lastBidReloadAtRef.current = 0;
+    lastBankReloadAtRef.current = 0;
     sessionReloadPromiseRef.current = null;
+    walletReloadPromiseRef.current = null;
+    bidReloadPromiseRef.current = null;
+    bankReloadPromiseRef.current = null;
     await clearStoredSessionToken();
   }, []);
 
-  const hydrateSession = useCallback(
-    async (token: string) => {
-      const me = await api.me(token);
-      const [walletHistory, bidHistory, bankList, mpinConfigured] = await Promise.all([
-        api.walletHistory(token),
-        api.bidHistory(token),
-        api.listBankAccounts(token),
-        readStoredMpinConfigured(me.id)
-      ]);
+  const hydrateSession = useCallback(async (token: string) => {
+    const me = await api.me(token);
+    const mpinConfigured = await readStoredMpinConfigured(me.id);
+    const resolvedBalance = typeof me.walletBalance === "number" ? me.walletBalance : 0;
+    const mergedUser = {
+      ...me,
+      hasMpin: Boolean(me.hasMpin || mpinConfigured),
+      walletBalance: resolvedBalance
+    };
 
-      const resolvedBalance = typeof me.walletBalance === "number" ? me.walletBalance : 0;
-      const mergedUser = {
-        ...me,
-        hasMpin: Boolean(me.hasMpin || mpinConfigured),
-        walletBalance: resolvedBalance
-      };
-
-      setSessionToken(token);
-      setCurrentUser(mergedUser);
-      setWalletBalance(resolvedBalance);
-      setWalletEntries(walletHistory);
-      setBids(bidHistory);
-      setBankAccounts(bankList);
-      lastSessionReloadAtRef.current = Date.now();
-    },
-    []
-  );
+    setSessionToken(token);
+    setCurrentUser(mergedUser);
+    setWalletBalance(resolvedBalance);
+    lastSessionReloadAtRef.current = Date.now();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -166,30 +170,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     };
   }, [clearSession]);
 
-  const login = useCallback(
-    async (phone: string, password: string) => {
-      const response = await api.login(phone, password);
-      await writeStoredSessionToken(response.token);
-      await hydrateSession(response.token);
-    },
-    [hydrateSession]
-  );
+  const login = useCallback(async (phone: string, password: string) => {
+    const response = await api.login(phone, password);
+    await writeStoredSessionToken(response.token);
+    await hydrateSession(response.token);
+  }, [hydrateSession]);
 
-  const otpLogin = useCallback(
-    async (phone: string, otp: string) => {
-      const response = await api.otpLogin(phone, otp);
-      await writeStoredSessionToken(response.token);
-      await hydrateSession(response.token);
-    },
-    [hydrateSession]
-  );
+  const otpLogin = useCallback(async (phone: string, otp: string) => {
+    const response = await api.otpLogin(phone, otp);
+    await writeStoredSessionToken(response.token);
+    await hydrateSession(response.token);
+  }, [hydrateSession]);
 
-  const register = useCallback(
-    async (firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode = "") => {
-      await api.register(firstName, lastName, phone, otp, password, confirmPassword, referenceCode);
-    },
-    []
-  );
+  const register = useCallback(async (firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode = "") => {
+    await api.register(firstName, lastName, phone, otp, password, confirmPassword, referenceCode);
+  }, []);
 
   const logout = useCallback(async () => {
     try {
@@ -219,19 +214,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
     sessionReloadPromiseRef.current = (async () => {
       try {
-        const [me, walletHistory, bidHistory, bankList] = await Promise.all([
-          api.me(sessionToken),
-          api.walletHistory(sessionToken),
-          api.bidHistory(sessionToken),
-          api.listBankAccounts(sessionToken)
-        ]);
-
+        const me = await api.me(sessionToken);
         const resolvedBalance = typeof me.walletBalance === "number" ? me.walletBalance : walletBalance;
         setCurrentUser((existing) => mergeUser(existing, me, resolvedBalance));
         setWalletBalance(resolvedBalance);
-        setWalletEntries(walletHistory);
-        setBids(bidHistory);
-        setBankAccounts(bankList);
         lastSessionReloadAtRef.current = Date.now();
       } catch (error) {
         if (isAuthFailure(error)) {
@@ -246,119 +232,199 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return sessionReloadPromiseRef.current;
   }, [clearSession, sessionToken, walletBalance]);
 
-  const updatePassword = useCallback(
-    async (currentPassword: string, password: string, confirmPassword: string) => {
-      if (!sessionToken) {
-        throw new Error("Login required");
-      }
+  const loadWalletHistory = useCallback(async (options?: { force?: boolean }) => {
+    if (!sessionToken) {
+      return;
+    }
+
+    const force = Boolean(options?.force);
+    if (!force && Date.now() - lastWalletReloadAtRef.current < COLLECTION_REFRESH_STALE_MS) {
+      return;
+    }
+
+    if (walletReloadPromiseRef.current) {
+      return walletReloadPromiseRef.current;
+    }
+
+    walletReloadPromiseRef.current = (async () => {
       try {
-        await api.updatePassword(sessionToken, currentPassword, password, confirmPassword);
+        const walletHistory = await api.walletHistory(sessionToken);
+        setWalletEntries(walletHistory);
+        lastWalletReloadAtRef.current = Date.now();
       } catch (error) {
         if (isAuthFailure(error)) {
           await clearSession();
         }
         throw error;
+      } finally {
+        walletReloadPromiseRef.current = null;
       }
-    },
-    [clearSession, sessionToken]
-  );
+    })();
 
-  const updateMpin = useCallback(
-    async (pin: string, confirmPin: string) => {
-      if (!sessionToken || !currentUser) {
-        throw new Error("Login required");
-      }
+    return walletReloadPromiseRef.current;
+  }, [clearSession, sessionToken]);
 
+  const loadBidHistory = useCallback(async (options?: { force?: boolean }) => {
+    if (!sessionToken) {
+      return;
+    }
+
+    const force = Boolean(options?.force);
+    if (!force && Date.now() - lastBidReloadAtRef.current < COLLECTION_REFRESH_STALE_MS) {
+      return;
+    }
+
+    if (bidReloadPromiseRef.current) {
+      return bidReloadPromiseRef.current;
+    }
+
+    bidReloadPromiseRef.current = (async () => {
       try {
-        await api.updateMpin(sessionToken, pin, confirmPin);
+        const bidHistory = await api.bidHistory(sessionToken);
+        setBids(bidHistory);
+        lastBidReloadAtRef.current = Date.now();
       } catch (error) {
         if (isAuthFailure(error)) {
           await clearSession();
         }
         throw error;
+      } finally {
+        bidReloadPromiseRef.current = null;
       }
-      await writeStoredMpinConfigured(currentUser.id, true);
-      setCurrentUser((existing) => (existing ? { ...existing, hasMpin: true } : existing));
-    },
-    [clearSession, currentUser, sessionToken]
-  );
+    })();
 
-  const verifyMpin = useCallback(
-    async (pin: string) => {
-      if (!sessionToken) {
-        throw new Error("Login required");
-      }
+    return bidReloadPromiseRef.current;
+  }, [clearSession, sessionToken]);
 
+  const loadBankAccounts = useCallback(async (options?: { force?: boolean }) => {
+    if (!sessionToken) {
+      return;
+    }
+
+    const force = Boolean(options?.force);
+    if (!force && Date.now() - lastBankReloadAtRef.current < COLLECTION_REFRESH_STALE_MS) {
+      return;
+    }
+
+    if (bankReloadPromiseRef.current) {
+      return bankReloadPromiseRef.current;
+    }
+
+    bankReloadPromiseRef.current = (async () => {
       try {
-        await api.verifyMpin(sessionToken, pin);
+        const bankList = await api.listBankAccounts(sessionToken);
+        setBankAccounts(bankList);
+        lastBankReloadAtRef.current = Date.now();
       } catch (error) {
         if (isAuthFailure(error)) {
           await clearSession();
         }
         throw error;
+      } finally {
+        bankReloadPromiseRef.current = null;
       }
-    },
-    [clearSession, sessionToken]
-  );
+    })();
 
-  const addBankAccount = useCallback(
-    async (accountNumber: string, holderName: string, ifsc: string) => {
-      if (!sessionToken) {
-        throw new Error("Login required");
-      }
+    return bankReloadPromiseRef.current;
+  }, [clearSession, sessionToken]);
 
-      let account: BankAccount;
-      try {
-        account = await api.addBankAccount(sessionToken, accountNumber, holderName, ifsc);
-      } catch (error) {
-        if (isAuthFailure(error)) {
-          await clearSession();
-        }
-        throw error;
+  const updatePassword = useCallback(async (currentPassword: string, password: string, confirmPassword: string) => {
+    if (!sessionToken) {
+      throw new Error("Login required");
+    }
+    try {
+      await api.updatePassword(sessionToken, currentPassword, password, confirmPassword);
+    } catch (error) {
+      if (isAuthFailure(error)) {
+        await clearSession();
       }
-      setBankAccounts((existing) => [account, ...existing.filter((item) => item.id !== account.id)]);
-    },
-    [clearSession, sessionToken]
-  );
+      throw error;
+    }
+  }, [clearSession, sessionToken]);
 
-  const requestWithdrawOtp = useCallback(
-    async (amount: number) => {
-      if (!sessionToken) {
-        throw new Error("Login required");
-      }
+  const updateMpin = useCallback(async (pin: string, confirmPin: string) => {
+    if (!sessionToken || !currentUser) {
+      throw new Error("Login required");
+    }
 
-      try {
-        return await api.requestWithdrawOtp(sessionToken, amount);
-      } catch (error) {
-        if (isAuthFailure(error)) {
-          await clearSession();
-        }
-        throw error;
+    try {
+      await api.updateMpin(sessionToken, pin, confirmPin);
+    } catch (error) {
+      if (isAuthFailure(error)) {
+        await clearSession();
       }
-    },
-    [clearSession, sessionToken]
-  );
+      throw error;
+    }
+    await writeStoredMpinConfigured(currentUser.id, true);
+    setCurrentUser((existing) => (existing ? { ...existing, hasMpin: true } : existing));
+  }, [clearSession, currentUser, sessionToken]);
 
-  const confirmWithdraw = useCallback(
-    async (amount: number, otp: string) => {
-      if (!sessionToken) {
-        throw new Error("Login required");
-      }
+  const verifyMpin = useCallback(async (pin: string) => {
+    if (!sessionToken) {
+      throw new Error("Login required");
+    }
 
-      let entry: WalletEntry;
-      try {
-        entry = await api.confirmWithdraw(sessionToken, amount, otp);
-      } catch (error) {
-        if (isAuthFailure(error)) {
-          await clearSession();
-        }
-        throw error;
+    try {
+      await api.verifyMpin(sessionToken, pin);
+    } catch (error) {
+      if (isAuthFailure(error)) {
+        await clearSession();
       }
-      setWalletEntries((existing) => [entry, ...existing]);
-      await reloadSessionData({ force: true });
-    },
-    [clearSession, reloadSessionData, sessionToken]
-  );
+      throw error;
+    }
+  }, [clearSession, sessionToken]);
+
+  const addBankAccount = useCallback(async (accountNumber: string, holderName: string, ifsc: string) => {
+    if (!sessionToken) {
+      throw new Error("Login required");
+    }
+
+    let account: BankAccount;
+    try {
+      account = await api.addBankAccount(sessionToken, accountNumber, holderName, ifsc);
+    } catch (error) {
+      if (isAuthFailure(error)) {
+        await clearSession();
+      }
+      throw error;
+    }
+    setBankAccounts((existing) => [account, ...existing.filter((item) => item.id !== account.id)]);
+    lastBankReloadAtRef.current = Date.now();
+  }, [clearSession, sessionToken]);
+
+  const requestWithdrawOtp = useCallback(async (amount: number) => {
+    if (!sessionToken) {
+      throw new Error("Login required");
+    }
+
+    try {
+      return await api.requestWithdrawOtp(sessionToken, amount);
+    } catch (error) {
+      if (isAuthFailure(error)) {
+        await clearSession();
+      }
+      throw error;
+    }
+  }, [clearSession, sessionToken]);
+
+  const confirmWithdraw = useCallback(async (amount: number, otp: string) => {
+    if (!sessionToken) {
+      throw new Error("Login required");
+    }
+
+    let entry: WalletEntry;
+    try {
+      entry = await api.confirmWithdraw(sessionToken, amount, otp);
+    } catch (error) {
+      if (isAuthFailure(error)) {
+        await clearSession();
+      }
+      throw error;
+    }
+    setWalletEntries((existing) => [entry, ...existing]);
+    lastWalletReloadAtRef.current = Date.now();
+    await reloadSessionData({ force: true });
+  }, [clearSession, reloadSessionData, sessionToken]);
 
   const submitDraftBid = useCallback(async () => {
     if (!sessionToken) {
@@ -377,57 +443,60 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       throw error;
     }
     setDraftBid(null);
-    await reloadSessionData({ force: true });
-  }, [clearSession, draftBid, reloadSessionData, sessionToken]);
+    await Promise.all([reloadSessionData({ force: true }), loadBidHistory({ force: true })]);
+  }, [clearSession, draftBid, loadBidHistory, reloadSessionData, sessionToken]);
 
-  const value = useMemo<AppStateValue>(
-    () => ({
-      currentUser,
-      loading,
-      isAuthenticated: Boolean(sessionToken && currentUser),
-      sessionToken,
-      walletBalance,
-      walletEntries,
-      bids,
-      bankAccounts,
-      draftBid,
-      login,
-      otpLogin,
-      register,
-      logout,
-      reloadSessionData,
-      updatePassword,
-      updateMpin,
-      verifyMpin,
-      addBankAccount,
-      requestWithdrawOtp,
-      confirmWithdraw,
-      setDraftBid,
-      submitDraftBid
-    }),
-    [
-      addBankAccount,
-      bankAccounts,
-      bids,
-      currentUser,
-      draftBid,
-      loading,
-      login,
-      logout,
-      otpLogin,
-      confirmWithdraw,
-      register,
-      reloadSessionData,
-      requestWithdrawOtp,
-      sessionToken,
-      submitDraftBid,
-      updateMpin,
-      updatePassword,
-      verifyMpin,
-      walletBalance,
-      walletEntries
-    ]
-  );
+  const value = useMemo<AppStateValue>(() => ({
+    currentUser,
+    loading,
+    isAuthenticated: Boolean(sessionToken && currentUser),
+    sessionToken,
+    walletBalance,
+    walletEntries,
+    bids,
+    bankAccounts,
+    draftBid,
+    login,
+    otpLogin,
+    register,
+    logout,
+    reloadSessionData,
+    loadWalletHistory,
+    loadBidHistory,
+    loadBankAccounts,
+    updatePassword,
+    updateMpin,
+    verifyMpin,
+    addBankAccount,
+    requestWithdrawOtp,
+    confirmWithdraw,
+    setDraftBid,
+    submitDraftBid
+  }), [
+    addBankAccount,
+    bankAccounts,
+    bids,
+    confirmWithdraw,
+    currentUser,
+    draftBid,
+    loadBankAccounts,
+    loadBidHistory,
+    loadWalletHistory,
+    loading,
+    login,
+    logout,
+    otpLogin,
+    register,
+    reloadSessionData,
+    requestWithdrawOtp,
+    sessionToken,
+    submitDraftBid,
+    updateMpin,
+    updatePassword,
+    verifyMpin,
+    walletBalance,
+    walletEntries
+  ]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }

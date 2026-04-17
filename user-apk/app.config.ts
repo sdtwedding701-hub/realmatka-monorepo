@@ -50,7 +50,7 @@ const config: ExpoConfig = {
   web: {
     bundler: "metro",
     output: webOutput as "single" | "server",
-    favicon: "./assets/images/app-icon.png"
+    favicon: "./assets/images/app-icon.jpg"
   },
   plugins: ["expo-notifications"],
   extra: {

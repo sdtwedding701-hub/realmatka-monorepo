@@ -8,6 +8,10 @@ const firebaseProjectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "";
 const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "9fa7873a-3033-40f2-b845-41d7dbd6e447";
 const androidPackage = process.env.EXPO_PUBLIC_ANDROID_PACKAGE || "com.realmatka.app";
 const iosBundleIdentifier = process.env.EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER || "com.realmatka.app";
+const appIconPath = process.env.EXPO_PUBLIC_APP_ICON || "./assets/branding/icon.png";
+const adaptiveIconPath = process.env.EXPO_PUBLIC_ADAPTIVE_ICON || "./assets/branding/adaptive-icon.png";
+const splashImagePath = process.env.EXPO_PUBLIC_SPLASH_IMAGE || "./assets/branding/splash.png";
+const webFaviconPath = process.env.EXPO_PUBLIC_WEB_FAVICON || "./assets/images/app-icon.jpg";
 const appBuildProfile = process.env.APP_BUILD_PROFILE || "development";
 const webOutput = process.env.EXPO_PUBLIC_WEB_OUTPUT || "single";
 const productionApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL_PRODUCTION || "https://realmatka-backend.onrender.com";
@@ -30,9 +34,9 @@ const config: ExpoConfig = {
   owner: expoOwner,
   scheme,
   version: "1.0.0",
-  icon: "./assets/images/app-icon.png",
+  icon: appIconPath,
   splash: {
-    image: "./assets/images/app-icon.png",
+    image: splashImagePath,
     resizeMode: "contain",
     backgroundColor: "#ffffff"
   },
@@ -40,7 +44,7 @@ const config: ExpoConfig = {
     package: androidPackage,
     jsEngine: "hermes",
     adaptiveIcon: {
-      foregroundImage: "./assets/images/adaptive-icon.png",
+      foregroundImage: adaptiveIconPath,
       backgroundColor: "#ffffff"
     }
   },
@@ -50,7 +54,7 @@ const config: ExpoConfig = {
   web: {
     bundler: "metro",
     output: webOutput as "single" | "server",
-    favicon: "./assets/images/app-icon.jpg"
+    favicon: webFaviconPath
   },
   plugins: ["expo-notifications"],
   extra: {

@@ -100,7 +100,7 @@ export default function HomePage() {
             <div className="text-2xl font-extrabold sm:text-3xl">Game Rate</div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             {rates.map((rate) => (
               <div key={rate.name} className="glass-card rate-card p-4 sm:p-5">
                 <div className="text-lg font-extrabold sm:text-xl">{rate.name}</div>
@@ -115,7 +115,7 @@ export default function HomePage() {
             <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Available Games</div>
             <h2 className="mt-2 text-2xl font-extrabold sm:text-3xl">Har popular game board ek hi place par</h2>
           </div>
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-3 gap-3 md:grid-cols-3 xl:grid-cols-5">
             {games.map((game) => (
               <div key={game} className="glass-card p-4 text-sm font-semibold text-slate-100">{game}</div>
             ))}

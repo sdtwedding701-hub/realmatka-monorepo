@@ -33,9 +33,7 @@ export async function userConversation(request) {
 
   const bundle = await getSupportConversationBundleForUser(user.id);
   await markSupportMessagesReadByUser(bundle.conversation.id);
-  const refreshed = await getSupportConversationBundleForUser(user.id);
-
-  return ok(refreshed, request);
+  return ok(bundle, request);
 }
 
 export async function userSend(request) {

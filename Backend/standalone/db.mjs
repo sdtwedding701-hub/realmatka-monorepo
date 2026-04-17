@@ -13,6 +13,8 @@ const backendRoot = path.resolve(__dirname, "..");
 const sqlitePath = path.join(backendRoot, "data", "server.db");
 const postgresSchemaSql = readFileSync(path.join(backendRoot, "postgres-schema.sql"), "utf8");
 const sessionTtlMs = standaloneConfig.sessionTtlHours * 60 * 60 * 1000;
+const authSessionCache = new Map();
+const AUTH_SESSION_CACHE_TTL_MS = 15_000;
 const signupBonusAmount = 25;
 const supportChatResolvedRetentionMs = Math.max(1, standaloneConfig.supportChatResolvedRetentionDays) * 24 * 60 * 60 * 1000;
 const dbIndexDefinitions = [
@@ -290,6 +292,38 @@ function mapUserRow(row) {
         referredByUserId: row.referred_by_user_id ?? null
       }
     : null;
+}
+
+function getCachedActiveUserByTokenHash(tokenHash) {
+  const cached = authSessionCache.get(tokenHash);
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    authSessionCache.delete(tokenHash);
+    return null;
+  }
+
+  return cached.user;
+}
+
+function cacheActiveUserByTokenHash(tokenHash, user) {
+  if (!tokenHash || !user) {
+    return;
+  }
+
+  authSessionCache.set(tokenHash, {
+    user,
+    expiresAt: Date.now() + AUTH_SESSION_CACHE_TTL_MS
+  });
+}
+
+function clearCachedAuthSession(tokenHash) {
+  if (!tokenHash) {
+    return;
+  }
+  authSessionCache.delete(tokenHash);
 }
 
 function mapWalletEntryRow(row) {
@@ -1037,6 +1071,7 @@ export async function createSession(userId) {
     }
   }
 
+  clearCachedAuthSession(tokenHash);
   return { rawToken, tokenHash, createdAt };
 }
 
@@ -1046,6 +1081,7 @@ export async function revokeSession(token) {
   }
 
   const tokenHash = hashSecret(token);
+  clearCachedAuthSession(tokenHash);
   if (isStandalonePostgresEnabled()) {
       const pool = await getReadyPgPool();
     await pool.query("DELETE FROM sessions WHERE token_hash = $1", [tokenHash]);
@@ -1061,6 +1097,10 @@ export async function requireUserByToken(token) {
   }
 
   const tokenHash = hashSecret(token);
+  const cachedUser = getCachedActiveUserByTokenHash(tokenHash);
+  if (cachedUser) {
+    return cachedUser;
+  }
   const minCreatedAt = new Date(Date.now() - sessionTtlMs).toISOString();
 
   if (isStandalonePostgresEnabled()) {
@@ -1074,7 +1114,13 @@ export async function requireUserByToken(token) {
       [tokenHash, minCreatedAt]
     );
     const user = mapUserRow(result.rows[0]);
-    return isUserAccountActive(user) ? user : null;
+    const activeUser = isUserAccountActive(user) ? user : null;
+    if (activeUser) {
+      cacheActiveUserByTokenHash(tokenHash, activeUser);
+    } else {
+      clearCachedAuthSession(tokenHash);
+    }
+    return activeUser;
   }
 
   const row = getSqlite()
@@ -1087,7 +1133,116 @@ export async function requireUserByToken(token) {
     )
     .get(tokenHash, minCreatedAt);
   const user = mapUserRow(row);
-  return isUserAccountActive(user) ? user : null;
+  const activeUser = isUserAccountActive(user) ? user : null;
+  if (activeUser) {
+    cacheActiveUserByTokenHash(tokenHash, activeUser);
+  } else {
+    clearCachedAuthSession(tokenHash);
+  }
+  return activeUser;
+}
+
+export async function requireUserSnapshotByToken(token) {
+  if (!token) {
+    return null;
+  }
+
+  const tokenHash = hashSecret(token);
+  const minCreatedAt = new Date(Date.now() - sessionTtlMs).toISOString();
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await getReadyPgPool();
+    const result = await pool.query(
+      `SELECT
+         u.id,
+         u.phone,
+         u.password_hash,
+         u.mpin_hash,
+         u.mpin_configured,
+         u.name,
+         u.role,
+         u.referral_code,
+         u.joined_at,
+         u.approval_status,
+         u.approved_at,
+         u.rejected_at,
+         u.blocked_at,
+         u.deactivated_at,
+         u.status_note,
+         u.signup_bonus_granted,
+         u.referred_by_user_id,
+         COALESCE((
+           SELECT we.after_balance
+           FROM wallet_entries we
+           WHERE we.user_id = u.id
+           ORDER BY we.created_at DESC, we.id DESC
+           LIMIT 1
+         ), 0) AS wallet_balance
+       FROM sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token_hash = $1 AND s.created_at >= $2
+       LIMIT 1`,
+      [tokenHash, minCreatedAt]
+    );
+
+    const user = mapUserRow(result.rows[0]);
+    if (!isUserAccountActive(user)) {
+      clearCachedAuthSession(tokenHash);
+      return null;
+    }
+
+    cacheActiveUserByTokenHash(tokenHash, user);
+    return {
+      ...user,
+      walletBalance: Number(result.rows[0]?.wallet_balance ?? 0)
+    };
+  }
+
+  const row = getSqlite()
+    .prepare(
+      `SELECT
+         u.id,
+         u.phone,
+         u.password_hash,
+         u.mpin_hash,
+         u.mpin_configured,
+         u.name,
+         u.role,
+         u.referral_code,
+         u.joined_at,
+         u.approval_status,
+         u.approved_at,
+         u.rejected_at,
+         u.blocked_at,
+         u.deactivated_at,
+         u.status_note,
+         u.signup_bonus_granted,
+         u.referred_by_user_id,
+         COALESCE((
+           SELECT we.after_balance
+           FROM wallet_entries we
+           WHERE we.user_id = u.id
+           ORDER BY we.created_at DESC, we.id DESC
+           LIMIT 1
+         ), 0) AS wallet_balance
+       FROM sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token_hash = ? AND s.created_at >= ?
+       LIMIT 1`
+    )
+    .get(tokenHash, minCreatedAt);
+
+  const user = mapUserRow(row);
+  if (!isUserAccountActive(user)) {
+    clearCachedAuthSession(tokenHash);
+    return null;
+  }
+
+  cacheActiveUserByTokenHash(tokenHash, user);
+  return {
+    ...user,
+    walletBalance: Number(row?.wallet_balance ?? 0)
+  };
 }
 
 export async function getUserBalance(userId) {

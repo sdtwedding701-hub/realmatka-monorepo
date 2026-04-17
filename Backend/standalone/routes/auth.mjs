@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { createSession, findUserByPhone, getAppSettings, getUserBalance, requireUserByToken, verifyCredential } from "../db.mjs";
+import { createSession, findUserByPhone, getAppSettings, requireUserByToken, requireUserSnapshotByToken, verifyCredential } from "../db.mjs";
 import { corsPreflight, fail, getJsonBody, getSessionToken, normalizeIndianPhone, ok, unauthorized } from "../http.mjs";
 import { issueOtp, verifyOtp } from "./auth-otp.mjs";
 
@@ -162,7 +162,7 @@ export async function verifyAdminTwoFactor(request) {
 }
 
 export async function me(request) {
-  const user = await requireUserByToken(getSessionToken(request));
+  const user = await requireUserSnapshotByToken(getSessionToken(request));
   if (!user) {
     return unauthorized(request);
   }
@@ -176,7 +176,7 @@ export async function me(request) {
       hasMpin: user.hasMpin,
       referralCode: user.referralCode,
       joinedAt: user.joinedAt,
-      walletBalance: await getUserBalance(user.id)
+      walletBalance: Number(user.walletBalance ?? 0)
     },
     request
   );

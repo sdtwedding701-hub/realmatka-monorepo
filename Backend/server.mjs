@@ -83,86 +83,106 @@ function isAllowedCorsOrigin(origin) {
 
   return /^(https?:\/\/)(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/i.test(origin);
 }
-const authRoutes = await import("./standalone/routes/auth.mjs");
-const authAccountRoutes = await import("./standalone/routes/auth-account.mjs");
-const authOtpRoutes = await import("./standalone/routes/auth-otp.mjs");
-const authRegisterRoutes = await import("./standalone/routes/auth-register.mjs");
-const walletRoutes = await import("./standalone/routes/wallet.mjs");
-const walletBalanceRoutes = await import("./standalone/routes/wallet-balance.mjs");
-const bidsRoutes = await import("./standalone/routes/bids.mjs");
-const bankRoutes = await import("./standalone/routes/bank.mjs");
-const profileRoutes = await import("./standalone/routes/profile.mjs");
-const notificationsRoutes = await import("./standalone/routes/notifications.mjs");
-const paymentsRoutes = await import("./standalone/routes/payments.mjs");
-const marketsRoutes = await import("./standalone/routes/markets.mjs");
-const bidsPlaceRoutes = await import("./standalone/routes/bids-place.mjs");
-const chatRoutes = await import("./standalone/routes/chat.mjs");
-const adminRoutes = await import("./standalone/routes/admin.mjs");
+const routeModuleLoaders = {
+  auth: () => import("./standalone/routes/auth.mjs"),
+  authAccount: () => import("./standalone/routes/auth-account.mjs"),
+  authOtp: () => import("./standalone/routes/auth-otp.mjs"),
+  authRegister: () => import("./standalone/routes/auth-register.mjs"),
+  wallet: () => import("./standalone/routes/wallet.mjs"),
+  walletBalance: () => import("./standalone/routes/wallet-balance.mjs"),
+  bids: () => import("./standalone/routes/bids.mjs"),
+  bidsPlace: () => import("./standalone/routes/bids-place.mjs"),
+  bank: () => import("./standalone/routes/bank.mjs"),
+  profile: () => import("./standalone/routes/profile.mjs"),
+  notifications: () => import("./standalone/routes/notifications.mjs"),
+  payments: () => import("./standalone/routes/payments.mjs"),
+  markets: () => import("./standalone/routes/markets.mjs"),
+  chat: () => import("./standalone/routes/chat.mjs"),
+  admin: () => import("./standalone/routes/admin.mjs")
+};
+
+const routeModuleCache = new Map();
+
+async function loadStandaloneModule(key) {
+  if (routeModuleCache.has(key)) {
+    return routeModuleCache.get(key);
+  }
+
+  const loader = routeModuleLoaders[key];
+  if (typeof loader !== "function") {
+    throw new Error(`Unknown standalone route module: ${key}`);
+  }
+
+  const loaded = await loader();
+  routeModuleCache.set(key, loaded);
+  return loaded;
+}
+
 const standaloneRoutes = new Map([
-  ["/api/auth/login", { OPTIONS: authRoutes.options, POST: authRoutes.login }],
-  ["/api/auth/admin-verify-2fa", { OPTIONS: authRoutes.options, POST: authRoutes.verifyAdminTwoFactor }],
-  ["/api/auth/me", { OPTIONS: authRoutes.options, GET: authRoutes.me }],
-  ["/api/auth/request-otp", { OPTIONS: authOtpRoutes.options, POST: authOtpRoutes.requestOtp }],
-  ["/api/auth/otp-login", { OPTIONS: authOtpRoutes.options, POST: authOtpRoutes.otpLogin }],
-  ["/api/auth/forgot-password", { OPTIONS: authOtpRoutes.options, POST: authOtpRoutes.forgotPassword }],
-  ["/api/auth/register", { OPTIONS: authRegisterRoutes.options, POST: authRegisterRoutes.register }],
-  ["/api/auth/logout", { OPTIONS: authAccountRoutes.options, POST: authAccountRoutes.logout }],
-  ["/api/auth/update-password", { OPTIONS: authAccountRoutes.options, POST: authAccountRoutes.updatePassword }],
-  ["/api/auth/update-mpin", { OPTIONS: authAccountRoutes.options, POST: authAccountRoutes.updateMpin }],
-  ["/api/auth/verify-mpin", { OPTIONS: authAccountRoutes.options, POST: authAccountRoutes.verifyMpin }],
-  ["/api/profile/update", { OPTIONS: profileRoutes.options, POST: profileRoutes.update }],
-  ["/api/profile/referrals", { OPTIONS: profileRoutes.options, GET: profileRoutes.referrals }],
-  ["/api/wallet/balance", { OPTIONS: walletBalanceRoutes.options, GET: walletBalanceRoutes.balance }],
-  ["/api/wallet/history", { OPTIONS: walletRoutes.options, GET: walletRoutes.history }],
-  ["/api/wallet/deposit", { OPTIONS: walletRoutes.options, POST: walletRoutes.deposit }],
-  ["/api/wallet/withdraw", { OPTIONS: walletRoutes.options, POST: walletRoutes.withdraw }],
-  ["/api/wallet/withdraw/request-otp", { OPTIONS: walletRoutes.options, POST: walletRoutes.requestWithdrawOtp }],
-  ["/api/wallet/withdraw/confirm", { OPTIONS: walletRoutes.options, POST: walletRoutes.confirmWithdraw }],
-  ["/api/bids/history", { OPTIONS: bidsRoutes.options, GET: bidsRoutes.history }],
-  ["/api/bids/place", { OPTIONS: bidsPlaceRoutes.options, POST: bidsPlaceRoutes.place }],
-  ["/api/bids/board-helper", { OPTIONS: bidsPlaceRoutes.options, GET: bidsPlaceRoutes.boardHelper }],
-  ["/api/bank/list", { OPTIONS: bankRoutes.options, GET: bankRoutes.list }],
-  ["/api/bank/add", { OPTIONS: bankRoutes.options, POST: bankRoutes.add }],
-  ["/api/markets/list", { OPTIONS: marketsRoutes.options, GET: marketsRoutes.list }],
-  ["/api/notifications/history", { OPTIONS: notificationsRoutes.options, GET: notificationsRoutes.history }],
-  ["/api/notifications/devices/register", { OPTIONS: notificationsRoutes.options, POST: notificationsRoutes.registerDevice }],
-  ["/api/chat/conversation", { OPTIONS: chatRoutes.options, GET: chatRoutes.userConversation }],
-  ["/api/chat/send", { OPTIONS: chatRoutes.options, POST: chatRoutes.userSend }],
-  ["/api/payments/create-order", { OPTIONS: paymentsRoutes.options, POST: paymentsRoutes.createOrder }],
-  ["/api/payments/status", { OPTIONS: paymentsRoutes.options, GET: paymentsRoutes.getPaymentOrderStatus, POST: paymentsRoutes.getPaymentOrderStatus }],
-  ["/api/payments/upi-start", { OPTIONS: paymentsRoutes.options, GET: paymentsRoutes.startUpiDeposit, POST: paymentsRoutes.startUpiDeposit }],
-  ["/api/payments/upi-report", { OPTIONS: paymentsRoutes.options, GET: paymentsRoutes.reportUpiDeposit, POST: paymentsRoutes.reportUpiDeposit }],
-  ["/api/payments/upi-status", { OPTIONS: paymentsRoutes.options, GET: paymentsRoutes.getUpiDepositStatus, POST: paymentsRoutes.getUpiDepositStatus }],
-  ["/api/payments/webhook", { OPTIONS: paymentsRoutes.options, POST: paymentsRoutes.webhook }],
-  ["/api/settings", { OPTIONS: adminRoutes.options, GET: adminRoutes.settingsPublic }],
-  ["/api/admin/users", { OPTIONS: adminRoutes.options, GET: adminRoutes.users }],
-  ["/api/admin/user-detail", { OPTIONS: adminRoutes.options, GET: adminRoutes.userDetail }],
-  ["/api/admin/user-approval", { OPTIONS: adminRoutes.options, POST: adminRoutes.userApproval }],
-  ["/api/admin/user-status", { OPTIONS: adminRoutes.options, POST: adminRoutes.userStatus }],
-  ["/api/admin/wallet-requests", { OPTIONS: adminRoutes.options, GET: adminRoutes.walletRequests }],
-  ["/api/admin/wallet-request-history", { OPTIONS: adminRoutes.options, GET: adminRoutes.walletRequestHistory }],
-  ["/api/admin/wallet-request-action", { OPTIONS: adminRoutes.options, POST: adminRoutes.walletRequestAction }],
-  ["/api/admin/wallet-test-cleanup", { OPTIONS: adminRoutes.options, POST: adminRoutes.cleanupWalletTestData }],
-  ["/api/admin/wallet-adjustment", { OPTIONS: adminRoutes.options, POST: adminRoutes.walletAdjustment }],
-  ["/api/admin/audit-logs", { OPTIONS: adminRoutes.options, GET: adminRoutes.auditLogs }],
-  ["/api/admin/bids", { OPTIONS: adminRoutes.options, GET: adminRoutes.bidsList }],
-  ["/api/admin/notifications", { OPTIONS: adminRoutes.options, GET: adminRoutes.notificationsList, POST: adminRoutes.notificationsSend }],
-  ["/api/admin/settings", { OPTIONS: adminRoutes.options, GET: adminRoutes.settingsGet, POST: adminRoutes.settingsUpdate }],
-  ["/api/admin/chart-update", { OPTIONS: adminRoutes.options, POST: adminRoutes.chartUpdate }],
-  ["/api/admin/market-update", { OPTIONS: adminRoutes.options, POST: adminRoutes.marketUpdate }],
-  ["/api/admin/settle-market", { OPTIONS: adminRoutes.options, POST: adminRoutes.settleMarket }],
-  ["/api/admin/settlement-preview", { OPTIONS: adminRoutes.options, GET: adminRoutes.settlementPreview }],
-  ["/api/admin/market-exposure", { OPTIONS: adminRoutes.options, GET: adminRoutes.marketExposure }],
-  ["/api/admin/reconciliation-summary", { OPTIONS: adminRoutes.options, GET: adminRoutes.reconciliationSummary }],
-  ["/api/admin/monitoring-summary", { OPTIONS: adminRoutes.options, GET: adminRoutes.monitoringSummary }],
-  ["/api/admin/export", { OPTIONS: adminRoutes.options, GET: adminRoutes.exportData }],
-  ["/api/admin/backup-snapshot", { OPTIONS: adminRoutes.options, GET: adminRoutes.backupSnapshot, POST: adminRoutes.restoreSnapshot }],
-  ["/api/admin/dashboard-summary", { OPTIONS: adminRoutes.options, GET: adminRoutes.dashboardSummary }],
-  ["/api/admin/reports-summary", { OPTIONS: adminRoutes.options, GET: adminRoutes.reportsSummary }],
-  ["/api/admin/chat-conversations", { OPTIONS: chatRoutes.options, GET: chatRoutes.adminConversations }],
-  ["/api/admin/chat-messages", { OPTIONS: chatRoutes.options, GET: chatRoutes.adminMessages }],
-  ["/api/admin/chat-send", { OPTIONS: chatRoutes.options, POST: chatRoutes.adminSend }],
-  ["/api/admin/chat-status", { OPTIONS: chatRoutes.options, POST: chatRoutes.adminUpdateStatus }]
+  ["/api/auth/login", { loader: "auth", methods: { OPTIONS: "options", POST: "login" } }],
+  ["/api/auth/admin-verify-2fa", { loader: "auth", methods: { OPTIONS: "options", POST: "verifyAdminTwoFactor" } }],
+  ["/api/auth/me", { loader: "auth", methods: { OPTIONS: "options", GET: "me" } }],
+  ["/api/auth/request-otp", { loader: "authOtp", methods: { OPTIONS: "options", POST: "requestOtp" } }],
+  ["/api/auth/otp-login", { loader: "authOtp", methods: { OPTIONS: "options", POST: "otpLogin" } }],
+  ["/api/auth/forgot-password", { loader: "authOtp", methods: { OPTIONS: "options", POST: "forgotPassword" } }],
+  ["/api/auth/register", { loader: "authRegister", methods: { OPTIONS: "options", POST: "register" } }],
+  ["/api/auth/logout", { loader: "authAccount", methods: { OPTIONS: "options", POST: "logout" } }],
+  ["/api/auth/update-password", { loader: "authAccount", methods: { OPTIONS: "options", POST: "updatePassword" } }],
+  ["/api/auth/update-mpin", { loader: "authAccount", methods: { OPTIONS: "options", POST: "updateMpin" } }],
+  ["/api/auth/verify-mpin", { loader: "authAccount", methods: { OPTIONS: "options", POST: "verifyMpin" } }],
+  ["/api/profile/update", { loader: "profile", methods: { OPTIONS: "options", POST: "update" } }],
+  ["/api/profile/referrals", { loader: "profile", methods: { OPTIONS: "options", GET: "referrals" } }],
+  ["/api/wallet/balance", { loader: "walletBalance", methods: { OPTIONS: "options", GET: "balance" } }],
+  ["/api/wallet/history", { loader: "wallet", methods: { OPTIONS: "options", GET: "history" } }],
+  ["/api/wallet/deposit", { loader: "wallet", methods: { OPTIONS: "options", POST: "deposit" } }],
+  ["/api/wallet/withdraw", { loader: "wallet", methods: { OPTIONS: "options", POST: "withdraw" } }],
+  ["/api/wallet/withdraw/request-otp", { loader: "wallet", methods: { OPTIONS: "options", POST: "requestWithdrawOtp" } }],
+  ["/api/wallet/withdraw/confirm", { loader: "wallet", methods: { OPTIONS: "options", POST: "confirmWithdraw" } }],
+  ["/api/bids/history", { loader: "bids", methods: { OPTIONS: "options", GET: "history" } }],
+  ["/api/bids/place", { loader: "bidsPlace", methods: { OPTIONS: "options", POST: "place" } }],
+  ["/api/bids/board-helper", { loader: "bidsPlace", methods: { OPTIONS: "options", GET: "boardHelper" } }],
+  ["/api/bank/list", { loader: "bank", methods: { OPTIONS: "options", GET: "list" } }],
+  ["/api/bank/add", { loader: "bank", methods: { OPTIONS: "options", POST: "add" } }],
+  ["/api/markets/list", { loader: "markets", methods: { OPTIONS: "options", GET: "list" } }],
+  ["/api/notifications/history", { loader: "notifications", methods: { OPTIONS: "options", GET: "history" } }],
+  ["/api/notifications/devices/register", { loader: "notifications", methods: { OPTIONS: "options", POST: "registerDevice" } }],
+  ["/api/chat/conversation", { loader: "chat", methods: { OPTIONS: "options", GET: "userConversation" } }],
+  ["/api/chat/send", { loader: "chat", methods: { OPTIONS: "options", POST: "userSend" } }],
+  ["/api/payments/create-order", { loader: "payments", methods: { OPTIONS: "options", POST: "createOrder" } }],
+  ["/api/payments/status", { loader: "payments", methods: { OPTIONS: "options", GET: "getPaymentOrderStatus", POST: "getPaymentOrderStatus" } }],
+  ["/api/payments/upi-start", { loader: "payments", methods: { OPTIONS: "options", GET: "startUpiDeposit", POST: "startUpiDeposit" } }],
+  ["/api/payments/upi-report", { loader: "payments", methods: { OPTIONS: "options", GET: "reportUpiDeposit", POST: "reportUpiDeposit" } }],
+  ["/api/payments/upi-status", { loader: "payments", methods: { OPTIONS: "options", GET: "getUpiDepositStatus", POST: "getUpiDepositStatus" } }],
+  ["/api/payments/webhook", { loader: "payments", methods: { OPTIONS: "options", POST: "webhook" } }],
+  ["/api/settings", { loader: "admin", methods: { OPTIONS: "options", GET: "settingsPublic" } }],
+  ["/api/admin/users", { loader: "admin", methods: { OPTIONS: "options", GET: "users" } }],
+  ["/api/admin/user-detail", { loader: "admin", methods: { OPTIONS: "options", GET: "userDetail" } }],
+  ["/api/admin/user-approval", { loader: "admin", methods: { OPTIONS: "options", POST: "userApproval" } }],
+  ["/api/admin/user-status", { loader: "admin", methods: { OPTIONS: "options", POST: "userStatus" } }],
+  ["/api/admin/wallet-requests", { loader: "admin", methods: { OPTIONS: "options", GET: "walletRequests" } }],
+  ["/api/admin/wallet-request-history", { loader: "admin", methods: { OPTIONS: "options", GET: "walletRequestHistory" } }],
+  ["/api/admin/wallet-request-action", { loader: "admin", methods: { OPTIONS: "options", POST: "walletRequestAction" } }],
+  ["/api/admin/wallet-test-cleanup", { loader: "admin", methods: { OPTIONS: "options", POST: "cleanupWalletTestData" } }],
+  ["/api/admin/wallet-adjustment", { loader: "admin", methods: { OPTIONS: "options", POST: "walletAdjustment" } }],
+  ["/api/admin/audit-logs", { loader: "admin", methods: { OPTIONS: "options", GET: "auditLogs" } }],
+  ["/api/admin/bids", { loader: "admin", methods: { OPTIONS: "options", GET: "bidsList" } }],
+  ["/api/admin/notifications", { loader: "admin", methods: { OPTIONS: "options", GET: "notificationsList", POST: "notificationsSend" } }],
+  ["/api/admin/settings", { loader: "admin", methods: { OPTIONS: "options", GET: "settingsGet", POST: "settingsUpdate" } }],
+  ["/api/admin/chart-update", { loader: "admin", methods: { OPTIONS: "options", POST: "chartUpdate" } }],
+  ["/api/admin/market-update", { loader: "admin", methods: { OPTIONS: "options", POST: "marketUpdate" } }],
+  ["/api/admin/settle-market", { loader: "admin", methods: { OPTIONS: "options", POST: "settleMarket" } }],
+  ["/api/admin/settlement-preview", { loader: "admin", methods: { OPTIONS: "options", GET: "settlementPreview" } }],
+  ["/api/admin/market-exposure", { loader: "admin", methods: { OPTIONS: "options", GET: "marketExposure" } }],
+  ["/api/admin/reconciliation-summary", { loader: "admin", methods: { OPTIONS: "options", GET: "reconciliationSummary" } }],
+  ["/api/admin/monitoring-summary", { loader: "admin", methods: { OPTIONS: "options", GET: "monitoringSummary" } }],
+  ["/api/admin/export", { loader: "admin", methods: { OPTIONS: "options", GET: "exportData" } }],
+  ["/api/admin/backup-snapshot", { loader: "admin", methods: { OPTIONS: "options", GET: "backupSnapshot", POST: "restoreSnapshot" } }],
+  ["/api/admin/dashboard-summary", { loader: "admin", methods: { OPTIONS: "options", GET: "dashboardSummary" } }],
+  ["/api/admin/reports-summary", { loader: "admin", methods: { OPTIONS: "options", GET: "reportsSummary" } }],
+  ["/api/admin/chat-conversations", { loader: "chat", methods: { OPTIONS: "options", GET: "adminConversations" } }],
+  ["/api/admin/chat-messages", { loader: "chat", methods: { OPTIONS: "options", GET: "adminMessages" } }],
+  ["/api/admin/chat-send", { loader: "chat", methods: { OPTIONS: "options", POST: "adminSend" } }],
+  ["/api/admin/chat-status", { loader: "chat", methods: { OPTIONS: "options", POST: "adminUpdateStatus" } }]
 ]);
 
 let cachedManifest = null;
@@ -298,9 +318,11 @@ async function handleApiRequest(req, res) {
   const standaloneRoute = standaloneRoutes.get(pathname);
 
   if (standaloneRoute) {
-    const handler = standaloneRoute[methodName];
+    const module = await loadStandaloneModule(standaloneRoute.loader);
+    const handlerName = standaloneRoute.methods[methodName];
+    const handler = handlerName ? module[handlerName] : null;
     if (typeof handler !== "function") {
-      res.setHeader("allow", Object.keys(standaloneRoute).join(", "));
+      res.setHeader("allow", Object.keys(standaloneRoute.methods).join(", "));
       sendJson(res, 405, { ok: false, error: "Method not allowed" });
       return;
     }
@@ -314,6 +336,7 @@ async function handleApiRequest(req, res) {
   if (pathname.startsWith("/api/markets/")) {
     const slug = pathname.replace(/^\/api\/markets\//, "").replace(/\/$/, "");
     if (slug) {
+      const marketsRoutes = await loadStandaloneModule("markets");
       const handler = methodName === "OPTIONS" ? marketsRoutes.options : methodName === "GET" ? marketsRoutes.detail : null;
       if (typeof handler !== "function") {
         res.setHeader("allow", "GET, OPTIONS");
@@ -330,6 +353,7 @@ async function handleApiRequest(req, res) {
   if (pathname.startsWith("/api/charts/")) {
     const slug = pathname.replace(/^\/api\/charts\//, "").replace(/\/$/, "");
     if (slug) {
+      const marketsRoutes = await loadStandaloneModule("markets");
       const handler = methodName === "OPTIONS" ? marketsRoutes.options : methodName === "GET" ? marketsRoutes.chart : null;
       if (typeof handler !== "function") {
         res.setHeader("allow", "GET, OPTIONS");
@@ -386,6 +410,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === "/payments/checkout") {
+      const paymentsRoutes = await loadStandaloneModule("payments");
       const webRequest = toWebRequest(req);
       const webResponse = await paymentsRoutes.checkoutPage(webRequest);
       await sendWebResponse(res, webResponse);
@@ -393,6 +418,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === "/payments/callback") {
+      const paymentsRoutes = await loadStandaloneModule("payments");
       const webRequest = toWebRequest(req);
       const webResponse = await paymentsRoutes.callbackPage(webRequest);
       await sendWebResponse(res, webResponse);

@@ -141,7 +141,7 @@ function sortMarketsByTime(markets: MarketItem[], currentMinutes: number) {
 }
 
 export default function HomeScreen() {
-  const { currentUser, walletBalance, reloadSessionData } = useAppState();
+  const { walletBalance } = useAppState();
   const { height } = useWindowDimensions();
   const [markets, setMarkets] = useState<MarketItem[]>(() => getCachedMarkets() ?? FALLBACK_MARKETS);
   const lastGoodMarketsRef = useRef<MarketItem[]>([]);
@@ -366,7 +366,7 @@ export default function HomeScreen() {
       if (showPullRefresh) {
         setRefreshing(true);
       }
-      await Promise.allSettled([reloadSessionData(), loadMarkets(false), loadSettings()]);
+      await loadMarkets(false);
     } finally {
       if (showPullRefresh) {
         setRefreshing(false);

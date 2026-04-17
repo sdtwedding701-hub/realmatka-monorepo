@@ -6,6 +6,8 @@ type RequestOptions = {
   method?: HttpMethod;
   body?: unknown;
   token?: string;
+  timeoutMs?: number;
+  retries?: number;
 };
 
 export type SessionUser = {
@@ -115,6 +117,8 @@ export class ApiError extends Error {
 }
 
 let authFailureListener: AuthFailureListener | null = null;
+const DEFAULT_GET_TIMEOUT_MS = 8_000;
+const DEFAULT_MUTATION_TIMEOUT_MS = 15_000;
 
 function normalizeApiBaseUrl(value: string) {
   const trimmed = String(value || "").trim();
@@ -157,28 +161,63 @@ export function setAuthFailureListener(listener: AuthFailureListener | null) {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}) {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    method: options.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {})
-    },
-    ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {})
-  }).catch(() => {
-    throw new Error(`API server connect nahi ho raha. API Base URL check karo: ${getApiBaseUrl()}`);
-  });
+  const method = options.method ?? "GET";
+  const timeoutMs = options.timeoutMs ?? (method === "GET" ? DEFAULT_GET_TIMEOUT_MS : DEFAULT_MUTATION_TIMEOUT_MS);
+  const retries = Math.max(0, Number(options.retries ?? (method === "GET" ? 1 : 0)));
+  const url = `${getApiBaseUrl()}${path}`;
 
-  const payload = (await response.json().catch(() => null)) as ApiEnvelope<T> | null;
+  let attempt = 0;
 
-  if (!response.ok || !payload?.ok) {
-    const error = new ApiError(payload?.error || "Request failed", response.status || 500);
-    if (error.isAuthError && options.token) {
-      authFailureListener?.(options.token);
+  while (true) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.token ? { Authorization: `Bearer ${options.token}` } : {})
+        },
+        ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+        signal: controller.signal
+      });
+    } catch (error) {
+      clearTimeout(timer);
+      const isAbort = error instanceof Error && error.name === "AbortError";
+      if (attempt < retries) {
+        attempt += 1;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 900));
+        continue;
+      }
+      throw new Error(
+        isAbort
+          ? `API server response time bahut slow hai. Server ko retry karo: ${getApiBaseUrl()}`
+          : `API server connect nahi ho raha. API Base URL check karo: ${getApiBaseUrl()}`
+      );
     }
-    throw error;
-  }
 
-  return payload.data as T;
+    clearTimeout(timer);
+
+    const payload = (await response.json().catch(() => null)) as ApiEnvelope<T> | null;
+
+    if (!response.ok || !payload?.ok) {
+      const error = new ApiError(payload?.error || "Request failed", response.status || 500);
+      const shouldRetry = method === "GET" && response.status >= 500 && attempt < retries;
+      if (shouldRetry) {
+        attempt += 1;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 900));
+        continue;
+      }
+      if (error.isAuthError && options.token) {
+        authFailureListener?.(options.token);
+      }
+      throw error;
+    }
+
+    return payload.data as T;
+  }
 }
 
 function queryString(params: Record<string, string | undefined>) {
@@ -201,7 +240,7 @@ export const api = {
   },
 
   me(token: string) {
-    return request<SessionUser & { walletBalance: number }>("/api/auth/me", { token });
+    return request<SessionUser & { walletBalance: number }>("/api/auth/me", { token, retries: 1, timeoutMs: 7_000 });
   },
 
   logout(token: string) {
@@ -267,7 +306,7 @@ export const api = {
   },
 
   listMarkets() {
-    return request<MarketItem[]>("/api/markets/list");
+    return request<MarketItem[]>("/api/markets/list", { retries: 2, timeoutMs: 7_000 });
   },
 
   getChart(slug: string, chartType: "jodi" | "panna") {
@@ -277,7 +316,7 @@ export const api = {
   },
 
   async getSettings() {
-    return request<SettingItem[]>("/api/settings");
+    return request<SettingItem[]>("/api/settings", { retries: 1, timeoutMs: 6_000 });
   },
 
   boardHelper(boardLabel: string, query = "", sessionType?: "Open" | "Close", first = "", second = "") {

@@ -1,7 +1,14 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, api, setAuthFailureListener, type BankAccount, type BidEntry, type SessionUser, type WalletEntry } from "@/lib/api";
 import { readStoredMpinConfigured, writeStoredMpinValue, writeStoredMpinConfigured } from "@/lib/security-storage";
-import { clearStoredSessionToken, readStoredSessionToken, writeStoredSessionToken } from "@/lib/session-storage";
+import {
+  clearStoredSessionSnapshot,
+  clearStoredSessionToken,
+  readStoredSessionSnapshot,
+  readStoredSessionToken,
+  writeStoredSessionSnapshot,
+  writeStoredSessionToken
+} from "@/lib/session-storage";
 
 type DraftBid = {
   market: string;
@@ -85,6 +92,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const bidReloadPromiseRef = useRef<Promise<void> | null>(null);
   const bankReloadPromiseRef = useRef<Promise<void> | null>(null);
 
+  const persistSessionSnapshot = useCallback(async (user: SessionUser, balance: number) => {
+    await writeStoredSessionSnapshot({
+      user: {
+        id: user.id,
+        phone: user.phone,
+        name: user.name,
+        role: user.role,
+        hasMpin: Boolean(user.hasMpin),
+        referralCode: user.referralCode,
+        joinedAt: user.joinedAt,
+        walletBalance: balance
+      },
+      savedAt: new Date().toISOString()
+    });
+  }, []);
+
   const clearSession = useCallback(async () => {
     activeSessionTokenRef.current = "";
     setSessionToken("");
@@ -103,24 +126,44 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     bidReloadPromiseRef.current = null;
     bankReloadPromiseRef.current = null;
     await clearStoredSessionToken();
+    await clearStoredSessionSnapshot();
   }, []);
 
   const hydrateSession = useCallback(async (token: string) => {
-    const me = await api.me(token);
-    const mpinConfigured = await readStoredMpinConfigured(me.id);
-    const resolvedBalance = typeof me.walletBalance === "number" ? me.walletBalance : 0;
-    const mergedUser = {
-      ...me,
-      hasMpin: Boolean(me.hasMpin || mpinConfigured),
-      walletBalance: resolvedBalance
-    };
+    try {
+      const me = await api.me(token);
+      const mpinConfigured = await readStoredMpinConfigured(me.id);
+      const resolvedBalance = typeof me.walletBalance === "number" ? me.walletBalance : 0;
+      const mergedUser = {
+        ...me,
+        hasMpin: Boolean(me.hasMpin || mpinConfigured),
+        walletBalance: resolvedBalance
+      };
 
-    activeSessionTokenRef.current = token;
-    setSessionToken(token);
-    setCurrentUser(mergedUser);
-    setWalletBalance(resolvedBalance);
-    lastSessionReloadAtRef.current = Date.now();
-  }, []);
+      activeSessionTokenRef.current = token;
+      setSessionToken(token);
+      setCurrentUser(mergedUser);
+      setWalletBalance(resolvedBalance);
+      lastSessionReloadAtRef.current = Date.now();
+      await persistSessionSnapshot(mergedUser, resolvedBalance);
+      return;
+    } catch (error) {
+      if (isAuthFailure(error)) {
+        throw error;
+      }
+
+      const snapshot = await readStoredSessionSnapshot();
+      if (!snapshot?.user?.id) {
+        throw error;
+      }
+
+      activeSessionTokenRef.current = token;
+      setSessionToken(token);
+      setCurrentUser(snapshot.user);
+      setWalletBalance(Number(snapshot.user.walletBalance || 0));
+      lastSessionReloadAtRef.current = 0;
+    }
+  }, [persistSessionSnapshot]);
 
   useEffect(() => {
     let active = true;
@@ -138,8 +181,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         }
 
         await hydrateSession(storedToken);
-      } catch {
-        if (active) {
+      } catch (error) {
+        if (active && isAuthFailure(error)) {
           await clearSession();
         }
       } finally {
@@ -223,9 +266,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       try {
         const me = await api.me(sessionToken);
         const resolvedBalance = typeof me.walletBalance === "number" ? me.walletBalance : walletBalance;
-        setCurrentUser((existing) => mergeUser(existing, me, resolvedBalance));
+        const nextUser = mergeUser(currentUser, me, resolvedBalance);
+        setCurrentUser(nextUser);
         setWalletBalance(resolvedBalance);
         lastSessionReloadAtRef.current = Date.now();
+        if (nextUser) {
+          await persistSessionSnapshot(nextUser, resolvedBalance);
+        }
       } catch (error) {
         if (isAuthFailure(error)) {
           await clearSession();
@@ -237,7 +284,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     })();
 
     return sessionReloadPromiseRef.current;
-  }, [clearSession, sessionToken, walletBalance]);
+  }, [clearSession, currentUser, persistSessionSnapshot, sessionToken, walletBalance]);
 
   const loadWalletHistory = useCallback(async (options?: { force?: boolean }) => {
     if (!sessionToken) {

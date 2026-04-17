@@ -18,14 +18,8 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-[#0a0f1f]/88 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-3">
-          <img src="/header-logo.png" alt="Real Matka" className="h-10 w-10 rounded-2xl border border-white/10 object-cover shadow-lg" />
-          <div className="leading-tight">
-            <div className="bg-gradient-to-r from-amber-200 via-orange-300 to-rose-300 bg-clip-text text-lg font-extrabold text-transparent">
-              Real Matka
-            </div>
-            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Rates • Markets • Website</div>
-          </div>
+        <Link href="/" className="flex items-center">
+          <img src="/header-logo.png" alt="Real Matka" className="h-11 w-auto object-contain" />
         </Link>
 
         <nav className="hidden items-center gap-2 md:flex">
@@ -78,7 +72,12 @@ export default function Header() {
                 {link.label}
               </a>
             ))}
-            <a href={`${webAppBaseUrl}/auth/login`} target="_blank" rel="noreferrer" className="rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-100">
+            <a
+              href={`${webAppBaseUrl}/auth/login`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-100"
+            >
               Login
             </a>
             <a href={registerUrl} className="rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-3 text-sm font-semibold text-white">

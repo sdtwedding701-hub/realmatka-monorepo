@@ -19,7 +19,7 @@ export default function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-[#0a0f1f]/88 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-3">
-          <img src="/heder logo.png" alt="Real Matka" className="h-10 w-10 rounded-2xl border border-white/10 object-cover shadow-lg" />
+          <img src="/header-logo.png" alt="Real Matka" className="h-10 w-10 rounded-2xl border border-white/10 object-cover shadow-lg" />
           <div className="leading-tight">
             <div className="bg-gradient-to-r from-amber-200 via-orange-300 to-rose-300 bg-clip-text text-lg font-extrabold text-transparent">
               Real Matka

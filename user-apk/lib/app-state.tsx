@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, api, setAuthFailureListener, type BankAccount, type BidEntry, type SessionUser, type WalletEntry } from "@/lib/api";
-import { readStoredMpinConfigured, writeStoredMpinConfigured } from "@/lib/security-storage";
+import { readStoredMpinConfigured, writeStoredMpinValue, writeStoredMpinConfigured } from "@/lib/security-storage";
 import { clearStoredSessionToken, readStoredSessionToken, writeStoredSessionToken } from "@/lib/session-storage";
 
 type DraftBid = {
@@ -356,6 +356,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       throw error;
     }
     await writeStoredMpinConfigured(currentUser.id, true);
+    await writeStoredMpinValue(currentUser.id, pin);
     setCurrentUser((existing) => (existing ? { ...existing, hasMpin: true } : existing));
   }, [clearSession, currentUser, sessionToken]);
 
@@ -372,7 +373,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       throw error;
     }
-  }, [clearSession, sessionToken]);
+    if (currentUser?.id) {
+      await writeStoredMpinValue(currentUser.id, pin);
+    }
+  }, [clearSession, currentUser?.id, sessionToken]);
 
   const addBankAccount = useCallback(async (accountNumber: string, holderName: string, ifsc: string) => {
     if (!sessionToken) {

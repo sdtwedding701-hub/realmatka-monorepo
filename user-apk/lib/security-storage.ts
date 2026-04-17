@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import { debugLog } from "@/lib/debug";
 
 const MPIN_KEY_PREFIX = "realmatkampinconfigured";
+const MPIN_VALUE_KEY_PREFIX = "realmatkampinvalue";
 
 type SecureStoreLike = {
   getItemAsync: (key: string) => Promise<string | null>;
@@ -19,6 +20,24 @@ function getStorageKey(userId: string) {
   }
 
   return `${MPIN_KEY_PREFIX}${normalizedUserId}`;
+}
+
+function getPinStorageKey(userId: string) {
+  const normalizedUserId = String(userId || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9]/g, "");
+
+  if (!normalizedUserId) {
+    return "";
+  }
+
+  return `${MPIN_VALUE_KEY_PREFIX}${normalizedUserId}`;
+}
+
+function normalizePinValue(value: string) {
+  return String(value || "")
+    .replace(/[^0-9]/g, "")
+    .slice(0, 4);
 }
 
 function getWebStorage() {
@@ -112,4 +131,81 @@ export async function clearStoredMpinConfigured(userId: string) {
 
   await secureStore.deleteItemAsync(key);
   debugLog("security-storage", "cleared mpin flag from secure store", { userId });
+}
+
+export async function readStoredMpinValue(userId: string) {
+  const key = getPinStorageKey(userId);
+  if (!key) {
+    return "";
+  }
+
+  const webStorage = getWebStorage();
+  if (webStorage) {
+    const value = normalizePinValue(webStorage.getItem(key) || "");
+    debugLog("security-storage", "read mpin value from localStorage", { userId, hasValue: Boolean(value) });
+    return value;
+  }
+
+  const secureStore = getNativeSecureStore();
+  if (!secureStore) {
+    debugLog("security-storage", "secure store unavailable while reading mpin value", { userId });
+    return "";
+  }
+
+  const value = normalizePinValue((await secureStore.getItemAsync(key)) || "");
+  debugLog("security-storage", "read mpin value from secure store", { userId, hasValue: Boolean(value) });
+  return value;
+}
+
+export async function writeStoredMpinValue(userId: string, pin: string) {
+  const key = getPinStorageKey(userId);
+  const normalizedPin = normalizePinValue(pin);
+  if (!key || normalizedPin.length !== 4) {
+    return;
+  }
+
+  const webStorage = getWebStorage();
+  if (webStorage) {
+    webStorage.setItem(key, normalizedPin);
+    debugLog("security-storage", "wrote mpin value to localStorage", { userId });
+    return;
+  }
+
+  const secureStore = getNativeSecureStore();
+  if (!secureStore) {
+    debugLog("security-storage", "secure store unavailable while writing mpin value", { userId });
+    return;
+  }
+
+  await secureStore.setItemAsync(key, normalizedPin);
+  debugLog("security-storage", "wrote mpin value to secure store", { userId });
+}
+
+export async function clearStoredMpinValue(userId: string) {
+  const key = getPinStorageKey(userId);
+  if (!key) {
+    return;
+  }
+
+  const webStorage = getWebStorage();
+  if (webStorage) {
+    webStorage.removeItem(key);
+    debugLog("security-storage", "cleared mpin value from localStorage", { userId });
+    return;
+  }
+
+  const secureStore = getNativeSecureStore();
+  if (!secureStore) {
+    debugLog("security-storage", "secure store unavailable while clearing mpin value", { userId });
+    return;
+  }
+
+  await secureStore.deleteItemAsync(key);
+  debugLog("security-storage", "cleared mpin value from secure store", { userId });
+}
+
+export async function verifyStoredMpinValue(userId: string, pin: string) {
+  const storedPin = await readStoredMpinValue(userId);
+  const normalizedPin = normalizePinValue(pin);
+  return storedPin.length === 4 && normalizedPin.length === 4 && storedPin === normalizedPin;
 }

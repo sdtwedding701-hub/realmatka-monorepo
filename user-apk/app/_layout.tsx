@@ -6,6 +6,7 @@ import { clearPersistedUnlockState, readPersistedUnlockState, writePersistedUnlo
 import { AppChromeProvider } from "@/components/ui";
 import { UniversalBottomTabs } from "@/components/universal-bottom-tabs";
 import { AppStateProvider, useAppState } from "@/lib/app-state";
+import { clearStoredMpinValue, verifyStoredMpinValue, writeStoredMpinValue } from "@/lib/security-storage";
 import {
   getNotificationTargetUrl,
   initializeNotificationBehavior,
@@ -488,8 +489,27 @@ function RootNavigator() {
         if (nextPin.length !== 4) {
           return;
         }
+
         if (lastVerifiedPinRef.current && lastVerifiedPinRef.current === nextPin) {
           // Same-session unlock can be instant after the first successful PIN verification.
+        } else if (currentUser?.id && (await verifyStoredMpinValue(currentUser.id, nextPin))) {
+          lastVerifiedPinRef.current = nextPin;
+          void verifyMpin(nextPin)
+            .then(async () => {
+              await writeStoredMpinValue(currentUser.id, nextPin);
+            })
+            .catch(async (error) => {
+              lastVerifiedPinRef.current = "";
+              await clearStoredMpinValue(currentUser.id);
+              await clearPersistedUnlockState();
+              setSecurityMode("unlock");
+              setSecurityError(error instanceof Error ? error.message : "PIN verify nahi hua");
+              setPin("");
+              setConfirmPin("");
+              setTimeout(() => {
+                focusDigit("pin", 0);
+              }, 0);
+            });
         } else {
           await verifyMpin(nextPin);
           lastVerifiedPinRef.current = nextPin;

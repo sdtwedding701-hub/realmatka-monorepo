@@ -6,7 +6,7 @@ import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { marketCatalog } from "../../data/mock";
 import { api } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
-import { getCachedMarkets, getCachedSettings, setCachedMarkets, setCachedSettings } from "@/lib/content-cache";
+import { getCachedMarkets, getCachedSettings, hydrateCachedMarkets, hydrateCachedSettings, setCachedMarkets, setCachedSettings } from "@/lib/content-cache";
 import { colors } from "@/theme/colors";
 
 type MarketItem = {
@@ -23,6 +23,18 @@ type MarketItem = {
 
 const HOME_SOFT_REFRESH_INTERVAL_MS = 120_000;
 const CLOCK_REFRESH_INTERVAL_MS = 60_000;
+
+const FALLBACK_MARKETS: MarketItem[] = marketCatalog.map((fallback) => ({
+  id: fallback.slug,
+  slug: fallback.slug,
+  name: fallback.name,
+  result: "",
+  status: "Active",
+  action: "Open",
+  open: fallback.open,
+  close: fallback.close,
+  category: fallback.category
+}));
 
 function parseClockTimeToMinutes(value: string) {
   const match = value.trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
@@ -131,10 +143,10 @@ function sortMarketsByTime(markets: MarketItem[], currentMinutes: number) {
 export default function HomeScreen() {
   const { currentUser, walletBalance, reloadSessionData } = useAppState();
   const { height } = useWindowDimensions();
-  const [markets, setMarkets] = useState<MarketItem[]>(() => getCachedMarkets() ?? []);
+  const [markets, setMarkets] = useState<MarketItem[]>(() => getCachedMarkets() ?? FALLBACK_MARKETS);
   const lastGoodMarketsRef = useRef<MarketItem[]>([]);
   const lastSoftRefreshAtRef = useRef(0);
-  const [loading, setLoading] = useState(() => !getCachedMarkets());
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [noticeText, setNoticeText] = useState("Notice: Market open-close time change ho sakta hai, bet place karne se pehle check karein.");
@@ -143,9 +155,10 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const cachedMarkets = getCachedMarkets();
-    if (cachedMarkets?.length) {
-      lastGoodMarketsRef.current = cachedMarkets;
-    }
+    const initialMarkets = cachedMarkets?.length ? cachedMarkets : FALLBACK_MARKETS;
+    lastGoodMarketsRef.current = initialMarkets;
+    setMarkets(initialMarkets);
+
     const cachedSettings = getCachedSettings();
     if (cachedSettings?.length) {
       const map = Object.fromEntries(cachedSettings.map((item) => [item.key, item.value]));
@@ -154,7 +167,23 @@ export default function HomeScreen() {
       }
     }
 
-    void Promise.allSettled([loadMarkets(!cachedMarkets?.length), loadSettings()]);
+    void (async () => {
+      const persistedMarkets = await hydrateCachedMarkets();
+      if (persistedMarkets?.length) {
+        lastGoodMarketsRef.current = persistedMarkets;
+        setMarkets(persistedMarkets);
+      }
+
+      const persistedSettings = await hydrateCachedSettings();
+      if (persistedSettings?.length) {
+        const map = Object.fromEntries(persistedSettings.map((item) => [item.key, item.value]));
+        if (map.notice_text?.trim()) {
+          setNoticeText(map.notice_text.trim());
+        }
+      }
+
+      await Promise.allSettled([loadMarkets(false), loadSettings()]);
+    })();
   }, []);
 
   useEffect(() => {
@@ -387,6 +416,8 @@ export default function HomeScreen() {
       setError(loadError instanceof Error ? loadError.message : "Unable to load markets");
       if (lastGoodMarketsRef.current.length > 0) {
         setMarkets(lastGoodMarketsRef.current);
+      } else {
+        setMarkets(FALLBACK_MARKETS);
       }
     } finally {
       if (showLoader) {

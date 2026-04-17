@@ -3,7 +3,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
-import { profile } from "@/data/mock";
+import { profile } from "../data/mock";
 import { api } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
 import { colors } from "@/theme/colors";

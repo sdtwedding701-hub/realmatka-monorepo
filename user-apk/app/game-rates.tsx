@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
-import { gameRates } from "@/data/mock";
+import { gameRates } from "../data/mock";
 import { colors } from "@/theme/colors";
 
 export default function GameRatesScreen() {

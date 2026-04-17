@@ -17,9 +17,12 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-[#0a0f1f]/88 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-center">
-          <img src="/header-logo.png" alt="Real Matka" className="h-11 w-auto object-contain" />
+      <div className="mx-auto flex h-20 w-full max-w-[1620px] items-center justify-between px-3 sm:px-5 xl:px-6">
+        <Link href="/" className="flex items-center gap-3">
+          <img src="/header-logo.png" alt="Real Matka" className="h-14 w-auto object-contain" />
+          <div className="leading-tight">
+            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Rates • Markets • Website</div>
+          </div>
         </Link>
 
         <nav className="hidden items-center gap-2 md:flex">

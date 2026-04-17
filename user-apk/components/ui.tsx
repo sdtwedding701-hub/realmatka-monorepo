@@ -7,7 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { useAppState } from "@/lib/app-state";
 import { colors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
-import { drawerItems, profile } from "@/data/mock";
+import { drawerItems, profile } from "../data/mock";
 
 const DrawerContext = createContext<{ openDrawer: () => void; closeDrawer: () => void } | null>(null);
 

@@ -9,6 +9,7 @@ const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "9fa7873a-3033-40
 const androidPackage = process.env.EXPO_PUBLIC_ANDROID_PACKAGE || "com.realmatka.app";
 const iosBundleIdentifier = process.env.EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER || "com.realmatka.app";
 const appBuildProfile = process.env.APP_BUILD_PROFILE || "development";
+const webOutput = process.env.EXPO_PUBLIC_WEB_OUTPUT || "single";
 const productionApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL_PRODUCTION || "https://realmatka-backend.onrender.com";
 const localApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_APP_URL || "";
 const apiBaseUrl = ["preview", "production"].includes(appBuildProfile) ? productionApiBaseUrl : localApiBaseUrl;
@@ -48,7 +49,7 @@ const config: ExpoConfig = {
   },
   web: {
     bundler: "metro",
-    output: "server",
+    output: webOutput as "single" | "server",
     favicon: "./assets/images/app-icon.png"
   },
   plugins: ["expo-notifications"],

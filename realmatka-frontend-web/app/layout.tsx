@@ -11,9 +11,9 @@ export const metadata = {
   description:
     "Real Matka landing website with full game rate, app screenshots, all markets, available games, and direct login/register access to the app.",
   icons: {
-    icon: "/app-icon.png",
-    shortcut: "/app-icon.png",
-    apple: "/app-icon.png"
+    icon: "/app-icon.jpg",
+    shortcut: "/app-icon.jpg",
+    apple: "/app-icon.jpg"
   },
   openGraph: {
     title: "Real Matka | Full Game Rate | All Markets | Download App",
@@ -23,7 +23,7 @@ export const metadata = {
     siteName: "Real Matka",
     images: [
       {
-        url: "/app-icon.png",
+        url: "/app-icon.jpg",
         width: 1024,
         height: 1024,
         alt: "Real Matka"

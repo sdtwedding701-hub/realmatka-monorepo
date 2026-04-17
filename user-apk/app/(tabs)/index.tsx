@@ -3,7 +3,7 @@ import { Link, router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Easing, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
-import { marketCatalog } from "@/data/mock";
+import { marketCatalog } from "../../data/mock";
 import { api } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
 import { getCachedMarkets, getCachedSettings, setCachedMarkets, setCachedSettings } from "@/lib/content-cache";

@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { colors } from "@/theme/colors";
-import { rules } from "@/data/mock";
+import { rules } from "../data/mock";
 
 const highlights = [
   "Minimum bid is 5 points",

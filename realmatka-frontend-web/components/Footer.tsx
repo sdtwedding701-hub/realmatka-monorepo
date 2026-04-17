@@ -9,9 +9,7 @@ export default function Footer() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.12),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.12),transparent_28%)]" />
       <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-3">
         <div>
-          <h3 className="bg-gradient-to-r from-amber-200 via-orange-300 to-rose-300 bg-clip-text text-2xl font-extrabold text-transparent">
-            Real Matka
-          </h3>
+          <img src="/header-logo.png" alt="Real Matka" className="h-14 w-auto object-contain" />
           <p className="mt-3 max-w-md text-sm leading-7 text-slate-300">
             Full game rate, complete markets, charts, and quick access to the live Real Matka website.
           </p>

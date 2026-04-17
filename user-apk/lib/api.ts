@@ -1,3 +1,5 @@
+import Constants from "expo-constants";
+
 type HttpMethod = "GET" | "POST";
 
 type RequestOptions = {
@@ -114,13 +116,40 @@ export class ApiError extends Error {
 
 let authFailureListener: AuthFailureListener | null = null;
 
-function getApiBaseUrl() {
-  const configured =
-    process.env.EXPO_PUBLIC_API_BASE_URL ||
-    process.env.EXPO_PUBLIC_APP_URL ||
-    "http://localhost:3000";
+function normalizeApiBaseUrl(value: string) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) {
+    return "";
+  }
 
-  return configured.replace(/\/$/, "");
+  const normalized = trimmed.replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(normalized)) {
+    return "";
+  }
+
+  return normalized;
+}
+
+function getApiBaseUrl() {
+  const configuredFromAppConfig =
+    normalizeApiBaseUrl(String(Constants.expoConfig?.extra?.apiBaseUrl || "")) ||
+    normalizeApiBaseUrl(String(Constants.manifest2?.extra?.expoClient?.extra?.apiBaseUrl || "")) ||
+    normalizeApiBaseUrl(String(Constants.manifest?.extra?.apiBaseUrl || ""));
+
+  if (configuredFromAppConfig) {
+    return configuredFromAppConfig;
+  }
+
+  const configuredFromEnv =
+    normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL || "") ||
+    normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL_PRODUCTION || "") ||
+    normalizeApiBaseUrl(process.env.EXPO_PUBLIC_APP_URL || "");
+
+  if (configuredFromEnv) {
+    return configuredFromEnv;
+  }
+
+  return "https://realmatka-backend.onrender.com";
 }
 
 export function setAuthFailureListener(listener: AuthFailureListener | null) {

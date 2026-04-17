@@ -3,8 +3,9 @@ import type { ExpoConfig } from "expo/config";
 const appName = process.env.EXPO_PUBLIC_APP_NAME || "Real Matka";
 const slug = process.env.EXPO_PUBLIC_APP_SLUG || "realmatka-app";
 const scheme = process.env.EXPO_PUBLIC_APP_SCHEME || "realmatka";
+const expoOwner = process.env.EXPO_PUBLIC_EXPO_OWNER || "siddhantborkar";
 const firebaseProjectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "";
-const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "48d51bd1-ae6f-4e26-8a6d-ae7192ef7133";
+const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "9fa7873a-3033-40f2-b845-41d7dbd6e447";
 const androidPackage = process.env.EXPO_PUBLIC_ANDROID_PACKAGE || "com.realmatka.app";
 const iosBundleIdentifier = process.env.EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER || "com.realmatka.app";
 const appBuildProfile = process.env.APP_BUILD_PROFILE || "development";
@@ -25,6 +26,7 @@ if (["preview", "production"].includes(appBuildProfile)) {
 const config: ExpoConfig = {
   name: appName,
   slug,
+  owner: expoOwner,
   scheme,
   version: "1.0.0",
   icon: "./assets/images/app-icon.png",
@@ -35,7 +37,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: androidPackage,
-    jsEngine: "jsc",
+    jsEngine: "hermes",
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff"

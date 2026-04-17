@@ -205,6 +205,7 @@ export default function HomeScreen() {
 
   const listedMarkets = useMemo(() => sortMarketsByTime(markets, currentMinutes), [markets, currentMinutes]);
   const isCompactScreen = height < 760;
+  const showHardError = listedMarkets.length === 0 && Boolean(error);
 
   return (
     <View style={styles.page}>
@@ -234,12 +235,12 @@ export default function HomeScreen() {
           <Ionicons color="#16a34a" name="logo-whatsapp" size={18} />
           <Text style={styles.whatsappText}>+91 8446012081</Text>
         </Pressable>
-        {loading ? (
+        {loading && !listedMarkets.length ? (
           <SurfaceCard>
             <ActivityIndicator color={colors.primary} size="large" />
             <Text style={styles.stateText}>Markets load ho rahe hain...</Text>
           </SurfaceCard>
-        ) : error ? (
+        ) : showHardError ? (
           <SurfaceCard>
             <Text style={styles.errorTitle}>Markets load nahi hue</Text>
             <Text style={styles.errorText}>{error}</Text>
@@ -249,6 +250,11 @@ export default function HomeScreen() {
           </SurfaceCard>
         ) : (
           <View style={styles.marketList}>
+            {error ? (
+              <View style={styles.softErrorStrip}>
+                <Text style={styles.softErrorText}>Server abhi respond nahi kar raha. Cached market list dikh rahi hai.</Text>
+              </View>
+            ) : null}
             {listedMarkets.map((market) => {
               const phaseMeta = getMarketPhaseMeta(market, currentMinutes);
               const isClosed = phaseMeta.isClosed;
@@ -490,6 +496,20 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: "center",
     fontWeight: "600"
+  },
+  softErrorStrip: {
+    borderRadius: 12,
+    backgroundColor: "#fff7ed",
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  softErrorText: {
+    color: "#9a3412",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 16
   },
   contentWrap: {
     paddingHorizontal: 16,

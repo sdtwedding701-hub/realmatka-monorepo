@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { AppScreen, SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
 import { api } from "@/lib/api";
@@ -58,10 +59,10 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.page}>
-      <View style={styles.hero}>
-        <Text style={styles.brand}>Real Matka</Text>
+      <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.hero}>
+        <Image source={require("../../assets/images/adaptive-icon.png")} style={styles.logo} resizeMode="contain" />
         <Text style={styles.tagline}>Register with mobile number and password. OTP verification required hai.</Text>
-      </View>
+      </LinearGradient>
 
       <AppScreen padded={false} showPromo={false}>
         <View style={styles.content}>
@@ -294,18 +295,19 @@ const styles = StyleSheet.create({
     paddingTop: 52,
     paddingBottom: 48,
     paddingHorizontal: 22,
-    backgroundColor: "#ffffff"
+    backgroundColor: colors.gradientStart
   },
-  brand: {
-    color: "#111827",
-    fontSize: 30,
-    fontWeight: "900"
+  logo: {
+    width: 280,
+    height: 110,
+    marginTop: 20,
+    marginBottom: 0
   },
   tagline: {
-    marginTop: 10,
     maxWidth: 320,
-    color: "#6b7280",
-    lineHeight: 20
+    color: colors.whiteOverlayTextStrong,
+    lineHeight: 20,
+    marginTop: -14
   },
   content: {
     marginTop: 0,
@@ -345,7 +347,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     minHeight: 48,
     borderRadius: 999,
-    backgroundColor: colors.primary,
+    backgroundColor: "#111827",
     alignItems: "center",
     justifyContent: "center"
   },
@@ -367,7 +369,7 @@ const styles = StyleSheet.create({
     opacity: 0.7
   },
   primaryText: {
-    color: colors.surface,
+    color: "#ffffff",
     fontWeight: "800",
     fontSize: 15
   },
@@ -383,7 +385,7 @@ const styles = StyleSheet.create({
     gap: 10
   },
   link: {
-    color: colors.primary,
+    color: "#111827",
     fontWeight: "700",
     textAlign: "center"
   }

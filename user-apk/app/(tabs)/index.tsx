@@ -181,7 +181,6 @@ export default function HomeScreen() {
     <View style={styles.page}>
       <AppHeader
         title="Real Matka"
-        subtitle={currentUser ? `Welcome ${currentUser.name}` : "Live market updates"}
         rightLabel={`Rs ${walletBalance}`}
       />
       <View style={styles.noticeStrip}>

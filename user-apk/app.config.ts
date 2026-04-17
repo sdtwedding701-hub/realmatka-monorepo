@@ -4,7 +4,7 @@ const appName = process.env.EXPO_PUBLIC_APP_NAME || "Real Matka";
 const slug = process.env.EXPO_PUBLIC_APP_SLUG || "realmatka-app";
 const scheme = process.env.EXPO_PUBLIC_APP_SCHEME || "realmatka";
 const firebaseProjectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "";
-const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "2ac81200-9842-4a66-87ae-9b5daa9b96c2";
+const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "48d51bd1-ae6f-4e26-8a6d-ae7192ef7133";
 const appBuildProfile = process.env.APP_BUILD_PROFILE || "development";
 const productionApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL_PRODUCTION || "https://realmatka-backend.onrender.com";
 const localApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_APP_URL || "";
@@ -25,9 +25,23 @@ const config: ExpoConfig = {
   slug,
   scheme,
   version: "1.0.0",
+  icon: "./assets/images/app-icon.png",
+  splash: {
+    image: "./assets/images/app-icon.png",
+    resizeMode: "contain",
+    backgroundColor: "#ffffff"
+  },
+  android: {
+    jsEngine: "jsc",
+    adaptiveIcon: {
+      foregroundImage: "./assets/images/adaptive-icon.png",
+      backgroundColor: "#ffffff"
+    }
+  },
   web: {
     bundler: "metro",
-    output: "server"
+    output: "server",
+    favicon: "./assets/images/app-icon.png"
   },
   plugins: ["expo-notifications"],
   extra: {

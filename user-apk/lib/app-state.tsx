@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, api, setAuthFailureListener, type BankAccount, type BidEntry, type SessionUser, type WalletEntry } from "@/lib/api";
 import { readStoredMpinConfigured, writeStoredMpinConfigured } from "@/lib/security-storage";
 import { clearStoredSessionToken, readStoredSessionToken, writeStoredSessionToken } from "@/lib/session-storage";
@@ -24,7 +24,7 @@ type AppStateValue = {
   otpLogin: (phone: string, otp: string) => Promise<void>;
   register: (firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode?: string) => Promise<void>;
   logout: () => Promise<void>;
-  reloadSessionData: () => Promise<void>;
+  reloadSessionData: (options?: { force?: boolean }) => Promise<void>;
   updatePassword: (currentPassword: string, password: string, confirmPassword: string) => Promise<void>;
   updateMpin: (pin: string, confirmPin: string) => Promise<void>;
   verifyMpin: (pin: string) => Promise<void>;
@@ -36,6 +36,7 @@ type AppStateValue = {
 };
 
 const AppStateContext = createContext<AppStateValue | null>(null);
+const SESSION_REFRESH_STALE_MS = 15_000;
 
 function ensureMessage(value: unknown, fallback: string) {
   return value instanceof Error ? value.message : fallback;
@@ -70,6 +71,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [bids, setBids] = useState<BidEntry[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [draftBid, setDraftBid] = useState<DraftBid | null>(null);
+  const lastSessionReloadAtRef = useRef(0);
+  const sessionReloadPromiseRef = useRef<Promise<void> | null>(null);
 
   const clearSession = useCallback(async () => {
     setSessionToken("");
@@ -79,6 +82,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setBids([]);
     setBankAccounts([]);
     setDraftBid(null);
+    lastSessionReloadAtRef.current = 0;
+    sessionReloadPromiseRef.current = null;
     await clearStoredSessionToken();
   }, []);
 
@@ -105,6 +110,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setWalletEntries(walletHistory);
       setBids(bidHistory);
       setBankAccounts(bankList);
+      lastSessionReloadAtRef.current = Date.now();
     },
     []
   );
@@ -197,31 +203,47 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, [clearSession, sessionToken]);
 
-  const reloadSessionData = useCallback(async () => {
+  const reloadSessionData = useCallback(async (options?: { force?: boolean }) => {
     if (!sessionToken) {
       return;
     }
 
-    try {
-      const [me, walletHistory, bidHistory, bankList] = await Promise.all([
-        api.me(sessionToken),
-        api.walletHistory(sessionToken),
-        api.bidHistory(sessionToken),
-        api.listBankAccounts(sessionToken)
-      ]);
-
-      const resolvedBalance = typeof me.walletBalance === "number" ? me.walletBalance : walletBalance;
-      setCurrentUser((existing) => mergeUser(existing, me, resolvedBalance));
-      setWalletBalance(resolvedBalance);
-      setWalletEntries(walletHistory);
-      setBids(bidHistory);
-      setBankAccounts(bankList);
-    } catch (error) {
-      if (isAuthFailure(error)) {
-        await clearSession();
-      }
-      throw error;
+    const force = Boolean(options?.force);
+    if (!force && Date.now() - lastSessionReloadAtRef.current < SESSION_REFRESH_STALE_MS) {
+      return;
     }
+
+    if (sessionReloadPromiseRef.current) {
+      return sessionReloadPromiseRef.current;
+    }
+
+    sessionReloadPromiseRef.current = (async () => {
+      try {
+        const [me, walletHistory, bidHistory, bankList] = await Promise.all([
+          api.me(sessionToken),
+          api.walletHistory(sessionToken),
+          api.bidHistory(sessionToken),
+          api.listBankAccounts(sessionToken)
+        ]);
+
+        const resolvedBalance = typeof me.walletBalance === "number" ? me.walletBalance : walletBalance;
+        setCurrentUser((existing) => mergeUser(existing, me, resolvedBalance));
+        setWalletBalance(resolvedBalance);
+        setWalletEntries(walletHistory);
+        setBids(bidHistory);
+        setBankAccounts(bankList);
+        lastSessionReloadAtRef.current = Date.now();
+      } catch (error) {
+        if (isAuthFailure(error)) {
+          await clearSession();
+        }
+        throw error;
+      } finally {
+        sessionReloadPromiseRef.current = null;
+      }
+    })();
+
+    return sessionReloadPromiseRef.current;
   }, [clearSession, sessionToken, walletBalance]);
 
   const updatePassword = useCallback(
@@ -333,7 +355,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         throw error;
       }
       setWalletEntries((existing) => [entry, ...existing]);
-      await reloadSessionData();
+      await reloadSessionData({ force: true });
     },
     [clearSession, reloadSessionData, sessionToken]
   );
@@ -355,7 +377,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       throw error;
     }
     setDraftBid(null);
-    await reloadSessionData();
+    await reloadSessionData({ force: true });
   }, [clearSession, draftBid, reloadSessionData, sessionToken]);
 
   const value = useMemo<AppStateValue>(

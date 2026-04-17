@@ -6,7 +6,13 @@ import { clearPersistedUnlockState, readPersistedUnlockState, writePersistedUnlo
 import { AppChromeProvider } from "@/components/ui";
 import { UniversalBottomTabs } from "@/components/universal-bottom-tabs";
 import { AppStateProvider, useAppState } from "@/lib/app-state";
-import { getNotificationTargetUrl, initializeNotificationBehavior, isExpoGoEnvironment } from "@/lib/push-notifications";
+import {
+  getNotificationTargetUrl,
+  initializeNotificationBehavior,
+  isExpoGoEnvironment,
+  logPushError,
+  registerDeviceForPushNotifications
+} from "@/lib/push-notifications";
 import { colors } from "@/theme/colors";
 
 const WEB_ACTIVE_WINDOW_KEY = "realmatka.active-web-window";
@@ -44,6 +50,7 @@ function RootNavigator() {
   const lastInteractionAtRef = useRef(Date.now());
   const backgroundedAtRef = useRef<number | null>(null);
   const unlockedSessionTokenRef = useRef("");
+  const registeredPushSessionTokenRef = useRef("");
   const webWindowIdRef = useRef(`web_${Math.random().toString(36).slice(2, 10)}`);
 
   useEffect(() => {
@@ -98,6 +105,35 @@ function RootNavigator() {
       responseSubscription?.remove();
     };
   }, [router]);
+
+  useEffect(() => {
+    if (!sessionToken || !currentUser || isExpoGoEnvironment()) {
+      if (!sessionToken) {
+        registeredPushSessionTokenRef.current = "";
+      }
+      return;
+    }
+
+    if (registeredPushSessionTokenRef.current === sessionToken) {
+      return;
+    }
+
+    let active = true;
+
+    void registerDeviceForPushNotifications(sessionToken)
+      .then(() => {
+        if (active) {
+          registeredPushSessionTokenRef.current = sessionToken;
+        }
+      })
+      .catch((error) => {
+        logPushError(error);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [currentUser, sessionToken]);
 
   useEffect(() => {
     if (loading) {

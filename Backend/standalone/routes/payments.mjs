@@ -287,8 +287,8 @@ export async function createOrder(request) {
   const amount = Number(body.amount ?? 0);
   const platform = String(body.platform ?? "web").trim().toLowerCase();
   const amountPaise = roundToPaise(amount);
-  if (amountPaise < 100) {
-    return fail("Minimum deposit is Rs. 1", 400, request);
+  if (amountPaise < 10000) {
+    return fail("Minimum deposit is Rs. 100", 400, request);
   }
 
   const paymentOrderId = `payment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

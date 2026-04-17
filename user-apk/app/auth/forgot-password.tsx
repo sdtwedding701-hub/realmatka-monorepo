@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "expo-router";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { AppScreen, SurfaceCard } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -24,8 +24,8 @@ export default function ForgotPasswordScreen() {
 
   return (
     <View style={styles.page}>
-      <LinearGradient colors={["#172554", "#1d4ed8", "#60a5fa"]} style={styles.hero}>
-        <Text style={styles.brand}>Real Matka</Text>
+      <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.hero}>
+        <Image source={require("../../assets/images/adaptive-icon.png")} style={styles.logo} resizeMode="contain" />
         <Text style={styles.tagline}>Forgot password flow with OTP verification.</Text>
       </LinearGradient>
 
@@ -147,20 +147,20 @@ export default function ForgotPasswordScreen() {
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background },
-  hero: { paddingTop: 64, paddingBottom: 84, paddingHorizontal: 22 },
-  brand: { color: colors.surface, fontSize: 30, fontWeight: "900" },
-  tagline: { marginTop: 10, maxWidth: 320, color: "rgba(255,255,255,0.9)", lineHeight: 20 },
-  content: { marginTop: -42, paddingHorizontal: 16, paddingBottom: 32 },
+  hero: { paddingTop: 52, paddingBottom: 48, paddingHorizontal: 22, backgroundColor: colors.gradientStart },
+  logo: { width: 280, height: 110, marginTop: 20, marginBottom: 0 },
+  tagline: { maxWidth: 320, color: colors.whiteOverlayTextStrong, lineHeight: 20, marginTop: -14 },
+  content: { marginTop: 0, paddingHorizontal: 16, paddingBottom: 32 },
   title: { color: "#111827", fontSize: 24, fontWeight: "800" },
   subtitle: { color: "#64748b", lineHeight: 20 },
   label: { color: "#0f172a", fontWeight: "700" },
   input: { minHeight: 50, borderRadius: 14, borderWidth: 1, borderColor: "#dbe1ea", paddingHorizontal: 14, color: "#111827", backgroundColor: "#f8fafc" },
-  primaryButton: { minHeight: 48, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
-  secondaryButton: { minHeight: 46, borderRadius: 14, backgroundColor: "#dbeafe", alignItems: "center", justifyContent: "center" },
-  primaryText: { color: colors.surface, fontWeight: "800", fontSize: 15 },
-  secondaryText: { color: "#1d4ed8", fontWeight: "800" },
+  primaryButton: { minHeight: 48, borderRadius: 999, backgroundColor: "#111827", alignItems: "center", justifyContent: "center" },
+  secondaryButton: { minHeight: 46, borderRadius: 14, backgroundColor: "#f8fafc", borderWidth: 1, borderColor: "#dbe1ea", alignItems: "center", justifyContent: "center" },
+  primaryText: { color: "#ffffff", fontWeight: "800", fontSize: 15 },
+  secondaryText: { color: "#111827", fontWeight: "800" },
   disabled: { opacity: 0.7 },
   error: { color: "#dc2626", fontWeight: "600" },
   success: { color: "#16a34a", fontWeight: "600" },
-  link: { color: colors.primary, fontWeight: "700", textAlign: "center" }
+  link: { color: "#111827", fontWeight: "700", textAlign: "center" }
 });

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, router } from "expo-router";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
@@ -8,14 +8,38 @@ import { colors } from "@/theme/colors";
 
 export default function LoginScreen() {
   const { login, isAuthenticated, loading } = useAppState();
-  const isWeb = Platform.OS === "web";
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const passwordInputRef = useRef<TextInput | null>(null);
   const normalizedPhone = phone.replace(/[^0-9]/g, "");
   const hasValidPhone = normalizedPhone.length === 10;
   const hasPassword = password.trim().length > 0;
+
+  async function submitLogin() {
+    if (submitting) {
+      return;
+    }
+    if (!hasValidPhone) {
+      setError("Valid 10 digit phone number dalo.");
+      return;
+    }
+    if (!hasPassword) {
+      setError("Password dalo.");
+      return;
+    }
+    try {
+      setSubmitting(true);
+      setError("");
+      await login(normalizedPhone, password.trim());
+      router.replace("/(tabs)");
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "Login failed");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
@@ -25,19 +49,12 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.page}>
-      {isWeb ? (
-        <View style={[styles.hero, styles.heroWeb]}>
-          <Text style={styles.brand}>Real Matka</Text>
-          <Text style={styles.tagline}>Secure login for wallet, bids, charts, and market play.</Text>
-        </View>
-      ) : (
-        <LinearGradient colors={["#1e3a8a", "#2563eb", "#60a5fa"]} style={styles.hero}>
-          <Text style={styles.brand}>Real Matka</Text>
-          <Text style={styles.tagline}>Secure login for wallet, bids, charts, and market play.</Text>
-        </LinearGradient>
-      )}
+      <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.hero}>
+        <Image source={require("../../assets/images/adaptive-icon.png")} style={styles.logo} resizeMode="contain" />
+        <Text style={styles.tagline}>Secure login for wallet, bids, charts, and market play.</Text>
+      </LinearGradient>
 
-      <View style={[styles.content, isWeb && styles.contentWeb]}>
+      <View style={styles.content}>
         <SurfaceCard>
           <Text style={styles.title}>Login</Text>
           <Text style={styles.subtitle}>Use your registered phone number and password to continue.</Text>
@@ -51,8 +68,12 @@ export default function LoginScreen() {
                 setPhone(value.replace(/[^0-9]/g, ""));
                 setError("");
               }}
+              onSubmitEditing={() => {
+                passwordInputRef.current?.focus();
+              }}
               placeholder="Enter phone number"
               placeholderTextColor="#94a3b8"
+              returnKeyType="next"
               style={styles.input}
               value={phone}
             />
@@ -63,9 +84,15 @@ export default function LoginScreen() {
             <TextInput
               onChangeText={setPassword}
               onFocus={() => setError("")}
+              onSubmitEditing={() => {
+                void submitLogin();
+              }}
               placeholder="Enter password"
               placeholderTextColor="#94a3b8"
+              ref={passwordInputRef}
+              returnKeyType="go"
               secureTextEntry
+              submitBehavior="submit"
               style={styles.input}
               value={password}
             />
@@ -74,25 +101,8 @@ export default function LoginScreen() {
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable
-            onPress={async () => {
-              if (!hasValidPhone) {
-                setError("Valid 10 digit phone number dalo.");
-                return;
-              }
-              if (!hasPassword) {
-                setError("Password dalo.");
-                return;
-              }
-              try {
-                setSubmitting(true);
-                setError("");
-                await login(normalizedPhone, password.trim());
-                router.replace("/(tabs)");
-              } catch (loginError) {
-                setError(loginError instanceof Error ? loginError.message : "Login failed");
-              } finally {
-                setSubmitting(false);
-              }
+            onPress={() => {
+              void submitLogin();
             }}
             disabled={submitting || !hasValidPhone || !hasPassword}
             style={[styles.primaryButton, (submitting || !hasValidPhone || !hasPassword) && styles.disabled]}
@@ -123,34 +133,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   hero: {
-    paddingTop: 64,
-    paddingBottom: 84,
-    paddingHorizontal: 22
+    paddingTop: 52,
+    paddingBottom: 48,
+    paddingHorizontal: 22,
+    backgroundColor: colors.gradientStart
   },
-  heroWeb: {
-    backgroundColor: colors.primary,
-    paddingBottom: 44
-  },
-  brand: {
-    color: colors.surface,
-    fontSize: 30,
-    fontWeight: "900"
+  logo: {
+    width: 280,
+    height: 110,
+    marginTop: 20,
+    marginBottom: 0
   },
   tagline: {
-    marginTop: 10,
-    maxWidth: 280,
-    color: "rgba(255,255,255,0.9)",
-    lineHeight: 20
+    maxWidth: 320,
+    color: colors.whiteOverlayTextStrong,
+    lineHeight: 20,
+    marginTop: -14
   },
   content: {
-    marginTop: -42,
+    marginTop: 0,
     paddingHorizontal: 16,
     paddingBottom: 32
-  },
-  contentWeb: {
-    maxWidth: 480,
-    width: "100%",
-    alignSelf: "center"
   },
   title: {
     color: "#111827",
@@ -180,7 +183,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     minHeight: 48,
     borderRadius: 999,
-    backgroundColor: colors.primary,
+    backgroundColor: "#111827",
     alignItems: "center",
     justifyContent: "center"
   },
@@ -188,7 +191,7 @@ const styles = StyleSheet.create({
     opacity: 0.7
   },
   primaryText: {
-    color: colors.surface,
+    color: "#ffffff",
     fontWeight: "800",
     fontSize: 15
   },
@@ -197,7 +200,7 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   link: {
-    color: colors.primary,
+    color: "#111827",
     fontWeight: "700",
     textAlign: "center"
   }

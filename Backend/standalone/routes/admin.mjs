@@ -112,6 +112,46 @@ function roundAmount(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
 
+function isPlaceholderMarketResult(result) {
+  return String(result ?? "").trim() === "***-**-***";
+}
+
+async function sendMarketResultBroadcast(market, result) {
+  const users = await getUsersList();
+  const targets = users.filter(
+    (user) =>
+      user.role !== "admin" &&
+      user.approvalStatus === "Approved" &&
+      !user.blockedAt &&
+      !user.deactivatedAt
+  );
+
+  if (!targets.length) {
+    return { attemptedUsers: 0, pushed: 0, created: 0 };
+  }
+
+  const dispatch = await notifyUsers(
+    targets.map((user) => ({
+      userId: user.id,
+      title: `${market.name} result updated`,
+      body: `${market.name} result: ${result}`,
+      channel: "market",
+      data: {
+        url: `/charts/${market.slug}`,
+        marketSlug: market.slug,
+        marketName: market.name,
+        result
+      }
+    }))
+  );
+
+  return {
+    attemptedUsers: targets.length,
+    pushed: Number(dispatch?.pushed || 0),
+    created: Array.isArray(dispatch?.created) ? dispatch.created.length : 0
+  };
+}
+
 function getBidPotentialPayout(bid) {
   const rate = Number(payoutRates[bid.boardLabel] || 0);
   return roundAmount(Number(bid.points || 0) * rate);
@@ -1203,18 +1243,35 @@ export async function marketUpdate(request) {
     return fail("Result must follow ***-**-***, 123-4*-***, or 123-45-678 format", 400, request);
   }
 
+  const existingMarket = await findMarketBySlug(slug);
+  if (!existingMarket) {
+    return fail("Market not found", 404, request);
+  }
+
   const updated = await updateMarketRecord(slug, { result, status, action, open, close, category });
 
   await syncChartsFromMarketResult(updated);
+  let broadcast = null;
+  const shouldBroadcast =
+    existingMarket.result !== result && !isPlaceholderMarketResult(result);
+
+  if (shouldBroadcast) {
+    try {
+      broadcast = await sendMarketResultBroadcast(updated, result);
+    } catch (error) {
+      console.error("Market result broadcast failed", error);
+    }
+  }
+
   await addAuditLog({
     actorUserId: admin.user.id,
     action: "MARKET_UPDATE",
     entityType: "market",
     entityId: updated.slug,
-    details: JSON.stringify({ result, status, action, open, close, category })
+    details: JSON.stringify({ result, status, action, open, close, category, broadcast })
   });
 
-  return ok({ market: updated }, request);
+  return ok({ market: updated, broadcast }, request);
 }
 
 export async function settleMarket(request) {

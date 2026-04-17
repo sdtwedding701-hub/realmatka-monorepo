@@ -10,7 +10,26 @@ export const metadata = {
   title: "Real Matka | Full Game Rate | All Markets | Download App",
   description:
     "Real Matka landing website with full game rate, app screenshots, all markets, available games, and direct login/register access to the app.",
-  icons: { icon: "/logo.jpg" },
+  icons: {
+    icon: "/app-icon.png",
+    shortcut: "/app-icon.png",
+    apple: "/app-icon.png"
+  },
+  openGraph: {
+    title: "Real Matka | Full Game Rate | All Markets | Download App",
+    description:
+      "Real Matka landing website with full game rate, app screenshots, all markets, available games, and direct login/register access to the app.",
+    url: "https://realmatka.in",
+    siteName: "Real Matka",
+    images: [
+      {
+        url: "/app-icon.png",
+        width: 1024,
+        height: 1024,
+        alt: "Real Matka"
+      }
+    ]
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -8,7 +8,7 @@ import { useAppState } from "@/lib/app-state";
 import { colors } from "@/theme/colors";
 
 const QUICK_AMOUNTS = [100, 200, 500, 1000];
-const MIN_DEPOSIT_AMOUNT = 1;
+const MIN_DEPOSIT_AMOUNT = 100;
 const PAYMENT_STATUS_REFRESH_MS = 10_000;
 
 function statusTone(status: string) {
@@ -24,7 +24,7 @@ function statusTone(status: string) {
 
 export default function AddFundScreen() {
   const { sessionToken, walletBalance, reloadSessionData } = useAppState();
-  const [amount, setAmount] = useState("100");
+  const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [error, setError] = useState("");
@@ -33,6 +33,7 @@ export default function AddFundScreen() {
 
   const numericAmount = Number(amount || 0);
   const hasValidAmount = Number.isFinite(numericAmount) && numericAmount >= MIN_DEPOSIT_AMOUNT;
+  const isMultipleOfHundred = Number.isFinite(numericAmount) && numericAmount % 100 === 0;
   const displayStatus = useMemo(() => pendingOrder?.remoteStatus || pendingOrder?.status || "", [pendingOrder]);
 
   const pollPaymentStatus = useCallback(
@@ -140,7 +141,7 @@ export default function AddFundScreen() {
                 setError("");
                 setSuccessMessage("");
               }}
-              placeholder="Enter amount"
+              placeholder="Enter amount min 100"
               placeholderTextColor={colors.textMuted}
               style={styles.amountInput}
               value={amount}
@@ -165,8 +166,6 @@ export default function AddFundScreen() {
               );
             })}
           </View>
-
-          <Text style={styles.helperText}>Minimum deposit Rs 1 hai. Payment browser ya Razorpay page me open hoga.</Text>
         </SurfaceCard>
 
         {pendingOrder ? (
@@ -246,7 +245,11 @@ export default function AddFundScreen() {
     }
 
     if (!Number.isFinite(numericAmount) || numericAmount < MIN_DEPOSIT_AMOUNT) {
-      setError("Valid deposit amount dalo.");
+      setError(`Minimum deposit is Rs ${MIN_DEPOSIT_AMOUNT}.`);
+      return;
+    }
+    if (!isMultipleOfHundred) {
+      setError("Please enter amount multiple of 100.");
       return;
     }
 

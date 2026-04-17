@@ -2,6 +2,8 @@ import { addWalletEntry, getBankAccountsForUser, getUserBalance, getWalletEntrie
 import { corsPreflight, fail, getJsonBody, getSessionToken, ok, unauthorized } from "../http.mjs";
 import { issueOtp, verifyOtp } from "./auth-otp.mjs";
 
+const MIN_WITHDRAW_AMOUNT = 500;
+
 export function options(request) {
   return corsPreflight(request);
 }
@@ -55,6 +57,9 @@ export async function withdraw(request) {
   if (!Number.isFinite(amount) || amount <= 0) {
     return fail("Valid withdrawal amount is required", 400, request);
   }
+  if (amount < MIN_WITHDRAW_AMOUNT) {
+    return fail(`Minimum withdraw is Rs ${MIN_WITHDRAW_AMOUNT}`, 400, request);
+  }
 
   const bankAccounts = await getBankAccountsForUser(user.id);
   if (!bankAccounts.length) {
@@ -92,6 +97,9 @@ export async function requestWithdrawOtp(request) {
   const amount = Number(body.amount ?? 0);
   if (!Number.isFinite(amount) || amount <= 0) {
     return fail("Valid withdrawal amount is required", 400, request);
+  }
+  if (amount < MIN_WITHDRAW_AMOUNT) {
+    return fail(`Minimum withdraw is Rs ${MIN_WITHDRAW_AMOUNT}`, 400, request);
   }
 
   const bankAccounts = await getBankAccountsForUser(user.id);
@@ -143,6 +151,9 @@ export async function confirmWithdraw(request) {
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return fail("Valid withdrawal amount is required", 400, request);
+  }
+  if (amount < MIN_WITHDRAW_AMOUNT) {
+    return fail(`Minimum withdraw is Rs ${MIN_WITHDRAW_AMOUNT}`, 400, request);
   }
 
   if (!/^[0-9]{6}$/.test(otp)) {

@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Link, router } from "expo-router";
 import { createContext, ReactNode, useContext, useState } from "react";
-import { Modal, Platform, Pressable, RefreshControl, ScrollView, StyleProp, StyleSheet, Switch, Text, TextInput, View, ViewStyle, useWindowDimensions } from "react-native";
+import { Image, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleProp, StyleSheet, Switch, Text, TextInput, View, ViewStyle, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppState } from "@/lib/app-state";
 import { colors } from "@/theme/colors";
@@ -94,6 +94,7 @@ export function AppHeader({
   const { currentUser, walletBalance } = useAppState();
   const chrome = useAppChrome();
   const handleLeftPress = onBackPress ?? onMenuPress ?? chrome?.openDrawer;
+  const showHeaderLogo = title === "Real Matka" && !onBackPress;
 
   return (
     <SafeAreaView edges={["top"]} style={styles.headerSafeArea}>
@@ -104,13 +105,24 @@ export function AppHeader({
         style={styles.header}
       >
         <View style={styles.headerRow}>
-          <Pressable disabled={!handleLeftPress} hitSlop={10} onPress={handleLeftPress} style={styles.headerIcon}>
-            <Ionicons color={colors.surface} name={onBackPress ? "arrow-back" : "menu"} size={22} />
-          </Pressable>
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.headerTitle}>{title}</Text>
-            {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
-          </View>
+          {showHeaderLogo ? (
+            <View style={styles.headerBrandRow}>
+              <Pressable disabled={!handleLeftPress} hitSlop={10} onPress={handleLeftPress} style={styles.headerIcon}>
+                <Ionicons color={colors.surface} name={onBackPress ? "arrow-back" : "menu"} size={22} />
+              </Pressable>
+              <Image source={require("../assets/images/adaptive-icon.png")} style={styles.headerLogo} resizeMode="contain" />
+            </View>
+          ) : (
+            <>
+              <Pressable disabled={!handleLeftPress} hitSlop={10} onPress={handleLeftPress} style={styles.headerIcon}>
+                <Ionicons color={colors.surface} name={onBackPress ? "arrow-back" : "menu"} size={22} />
+              </Pressable>
+              <View style={styles.headerTextWrap}>
+                <Text style={styles.headerTitle}>{title}</Text>
+                {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
+              </View>
+            </>
+          )}
           {showRightMeta ? (
             <>
               <View style={styles.headerBalance}>
@@ -123,7 +135,7 @@ export function AppHeader({
             </>
           ) : null}
         </View>
-        {subtitle ? null : currentUser ? <Text style={styles.headerSubtitle}>Welcome {currentUser.name}</Text> : null}
+        {subtitle ? null : showHeaderLogo ? null : currentUser ? <Text style={styles.headerSubtitle}>Welcome {currentUser.name}</Text> : null}
       </LinearGradient>
     </SafeAreaView>
   );
@@ -300,24 +312,36 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: spacing.lg,
-    paddingTop: 10,
-    paddingBottom: 14
+    paddingTop: 6,
+    paddingBottom: 6
   },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md
   },
+  headerBrandRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 1
+  },
   headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.whiteOverlaySoft
   },
   headerTextWrap: {
     flex: 1
+  },
+  headerLogo: {
+    width: 238,
+    height: 54,
+    marginLeft: 0,
+    marginBottom: 0
   },
   headerTitle: {
     color: colors.surface,

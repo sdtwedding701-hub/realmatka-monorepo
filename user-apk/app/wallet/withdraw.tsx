@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppState } from "@/lib/app-state";
 import { colors } from "@/theme/colors";
 
-const MIN_WITHDRAW_AMOUNT = 1;
+const MIN_WITHDRAW_AMOUNT = 500;
 
 export default function WithdrawScreen() {
   const insets = useSafeAreaInsets();
@@ -23,16 +23,43 @@ export default function WithdrawScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const withdrawAmount = Number(amount || 0);
   const hasValidAmount = Number.isFinite(withdrawAmount) && withdrawAmount >= MIN_WITHDRAW_AMOUNT && withdrawAmount <= walletBalance;
   const hasValidOtp = otp.trim().length === 6;
+  const isMultipleOfHundred = Number.isFinite(withdrawAmount) && withdrawAmount % 100 === 0;
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates?.height ?? 0);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   return (
     <View style={styles.overlay}>
       <Pressable onPress={() => router.back()} style={styles.backdrop} />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 24 : 0} style={styles.keyboardWrap}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 116, 130) }]}>
+        <View
+          style={[
+            styles.sheet,
+            {
+              paddingBottom: Math.max(insets.bottom + 116, 130),
+              marginBottom: keyboardHeight > 0 ? Math.max(keyboardHeight - insets.bottom, 0) : 0
+            }
+          ]}
+        >
           <ScrollView bounces={false} contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.handle} />
             <Text style={styles.title}>Withdraw Fund</Text>
@@ -76,7 +103,7 @@ export default function WithdrawScreen() {
                   setError("");
                   setSuccessMessage("");
                 }}
-                placeholder="Enter amount"
+                placeholder="Enter amount min 500"
                 placeholderTextColor="rgba(100, 116, 139, 0.5)"
                 style={styles.input}
                 value={amount}
@@ -123,7 +150,8 @@ export default function WithdrawScreen() {
               </Pressable>
             )}
 
-            <Text style={styles.simpleInfoText}>Withdraw request ab OTP verify hone ke baad hi submit hogi.</Text>
+            <Text style={styles.simpleInfoText}>Withdrawal limit is 500 to 99999.</Text>
+            <Text style={styles.simpleInfoText}>Withdraw request timing is 11:00 AM to 11:00 PM.</Text>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
@@ -142,7 +170,11 @@ export default function WithdrawScreen() {
     }
 
     if (!Number.isFinite(withdrawAmount) || withdrawAmount < MIN_WITHDRAW_AMOUNT) {
-      setError("Valid withdraw amount dalo.");
+      setError(`Minimum withdraw Rs ${MIN_WITHDRAW_AMOUNT} hai.`);
+      return;
+    }
+    if (!isMultipleOfHundred) {
+      setError("Please enter amount multiple of 100.");
       return;
     }
 
@@ -179,7 +211,11 @@ export default function WithdrawScreen() {
     }
 
     if (!Number.isFinite(withdrawAmount) || withdrawAmount < MIN_WITHDRAW_AMOUNT) {
-      setError("Valid withdraw amount dalo.");
+      setError(`Minimum withdraw Rs ${MIN_WITHDRAW_AMOUNT} hai.`);
+      return;
+    }
+    if (!isMultipleOfHundred) {
+      setError("Please enter amount multiple of 100.");
       return;
     }
 

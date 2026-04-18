@@ -1,5 +1,6 @@
-import { findMarketBySlug, getChartRecord, getChartRecordsForMarkets, listMarkets } from "../stores/market-store.mjs";
+import { findMarketBySlug, getChartRecord, getChartRecordsForMarkets } from "../stores/market-store.mjs";
 import { corsPreflight, fail, ok } from "../http.mjs";
+import { getDecoratedMarketBySlug, getMarketListSnapshot } from "../services/market-snapshot-service.mjs";
 
 export function options(request) {
   return corsPreflight(request);
@@ -44,10 +45,6 @@ function getWeekdayIndex(date) {
 
 function normalizeWeekLabel(label) {
   return String(label ?? "").trim().replace(/\s+/g, " ");
-}
-
-function isPlaceholderResult(result) {
-  return !String(result ?? "").trim() || String(result ?? "").trim() === "***-**-***";
 }
 
 function packPannaCell(open, close) {
@@ -96,80 +93,6 @@ function formatPannaRowsForResponse(rows, market) {
   });
 }
 
-function getCurrentChartRow(rows) {
-  const label = normalizeWeekLabel(getWeekChartLabel(new Date()));
-  return (Array.isArray(rows) ? rows : []).find((row) => normalizeWeekLabel(row?.[0]) === label) ?? null;
-}
-
-function deriveTodayResultFromCharts(market, jodiChart, pannaChart) {
-  if (!isPlaceholderResult(market?.result)) {
-    return String(market.result).trim();
-  }
-
-  const currentDayIndex = getWeekdayIndex(new Date());
-  const jodiRow = getCurrentChartRow(jodiChart?.rows);
-  const pannaRow = getCurrentChartRow(pannaChart?.rows);
-  if (!jodiRow || !pannaRow) {
-    return String(market?.result ?? "").trim();
-  }
-
-  const jodi = String(jodiRow[currentDayIndex + 1] ?? "").trim();
-  const openPanna = String(pannaRow[1 + currentDayIndex * 2] ?? "").trim();
-  const closePanna = String(pannaRow[2 + currentDayIndex * 2] ?? "").trim();
-
-  if (/^[0-9]{3}$/.test(openPanna) && /^[0-9*]{2}$/.test(jodi) && /^[0-9]{3}$/.test(closePanna)) {
-    return `${openPanna}-${jodi}-${closePanna}`;
-  }
-  if (/^[0-9]{3}$/.test(openPanna) && /^[0-9*]{2}$/.test(jodi)) {
-    return `${openPanna}-${jodi}-***`;
-  }
-
-  return String(market?.result ?? "").trim();
-}
-
-async function decorateMarketWithTodayResult(market) {
-  if (!market || !isPlaceholderResult(market.result)) {
-    return market;
-  }
-
-  const [jodiChart, pannaChart] = await Promise.all([
-    getChartRecord(market.slug, "jodi"),
-    getChartRecord(market.slug, "panna")
-  ]);
-
-  return {
-    ...market,
-    result: deriveTodayResultFromCharts(market, jodiChart, pannaChart)
-  };
-}
-
-function buildChartLookup(charts) {
-  const lookup = new Map();
-
-  for (const chart of Array.isArray(charts) ? charts : []) {
-    if (!chart?.marketSlug || !chart?.chartType) {
-      continue;
-    }
-    lookup.set(`${chart.marketSlug}:${chart.chartType}`, chart);
-  }
-
-  return lookup;
-}
-
-function decorateMarketWithLookup(market, chartLookup) {
-  if (!market || !isPlaceholderResult(market.result)) {
-    return market;
-  }
-
-  const jodiChart = chartLookup.get(`${market.slug}:jodi`) ?? null;
-  const pannaChart = chartLookup.get(`${market.slug}:panna`) ?? null;
-
-  return {
-    ...market,
-    result: deriveTodayResultFromCharts(market, jodiChart, pannaChart)
-  };
-}
-
 function normalizeChartBatchTypes(value) {
   return Array.from(
     new Set(
@@ -182,20 +105,7 @@ function normalizeChartBatchTypes(value) {
 }
 
 export async function list(request) {
-  const markets = await listMarkets();
-  const placeholderMarkets = markets.filter((market) => isPlaceholderResult(market?.result));
-
-  if (!placeholderMarkets.length) {
-    return ok(markets, request);
-  }
-
-  const charts = await getChartRecordsForMarkets(
-    placeholderMarkets.map((market) => market.slug),
-    ["jodi", "panna"]
-  );
-  const chartLookup = buildChartLookup(charts);
-
-  return ok(markets.map((market) => decorateMarketWithLookup(market, chartLookup)), request);
+  return ok(await getMarketListSnapshot(), request);
 }
 
 export async function chartBatch(request) {
@@ -246,11 +156,11 @@ export async function chartBatch(request) {
 }
 
 export async function detail(request, params) {
-  const market = await findMarketBySlug(params.slug);
+  const market = await getDecoratedMarketBySlug(params.slug);
   if (!market) {
     return fail("Market not found", 404, request);
   }
-  return ok(await decorateMarketWithTodayResult(market), request);
+  return ok(market, request);
 }
 
 export async function chart(request, params) {

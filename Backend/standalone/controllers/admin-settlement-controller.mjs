@@ -10,6 +10,7 @@ import {
   updateChartData,
   updateMarketData
 } from "../services/admin-settlement-service.mjs";
+import { refreshMarketListSnapshot } from "../services/market-snapshot-service.mjs";
 
 export async function adminChartUpdateController(request, deps) {
   const admin = await requireAdminUser(request);
@@ -30,6 +31,8 @@ export async function adminChartUpdateController(request, deps) {
     entityId: `${slug}:${chartType}`,
     details: JSON.stringify(result.auditDetails)
   });
+
+  await refreshMarketListSnapshot();
 
   return ok(result.updated, request);
 }
@@ -60,6 +63,8 @@ export async function adminMarketUpdateController(request, deps) {
     details: JSON.stringify({ result: resultValue, status, action, open, close, category, broadcast: result.broadcast })
   });
 
+  await refreshMarketListSnapshot();
+
   return ok({ market: result.market, broadcast: result.broadcast }, request);
 }
 
@@ -81,6 +86,8 @@ export async function adminSettleMarketController(request, deps) {
     entityId: result.market.slug,
     details: JSON.stringify(result.settlement)
   });
+
+  await refreshMarketListSnapshot();
 
   return ok({ market: result.market, settlement: result.settlement }, request);
 }
@@ -138,6 +145,7 @@ export async function adminRestoreSnapshotController(request, deps) {
       entityId: "snapshot",
       details: JSON.stringify({ settings: result.data.summary.settings, markets: result.data.summary.markets, charts: result.data.summary.charts, dryRun: false })
     });
+    await refreshMarketListSnapshot();
   }
 
   return ok(result.data, request);

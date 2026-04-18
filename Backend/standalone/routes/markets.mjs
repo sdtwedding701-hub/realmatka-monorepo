@@ -96,6 +96,48 @@ function getChartFilePath(slug) {
   return path.join(projectDataDir, `${slug}.chart.json`);
 }
 
+function isValidJodiCell(value) {
+  const normalized = String(value ?? "").trim();
+  return /^[0-9]{2}$/.test(normalized) || normalized === "--";
+}
+
+function isValidPannaCell(value) {
+  const normalized = String(value ?? "").trim();
+  return (
+    /^[0-9]{3}\/[0-9]{3}$/.test(normalized) ||
+    /^[0-9]{3}-[0-9]{2}-[0-9]{3}$/.test(normalized) ||
+    /^[0-9]{3}\/[0-9]\*\*$/.test(normalized) ||
+    normalized === "---" ||
+    normalized === "***"
+  );
+}
+
+function isStructurallyValidChartRow(chartType, row) {
+  if (!Array.isArray(row) || row.length < 2) {
+    return false;
+  }
+
+  const label = String(row[0] ?? "").trim();
+  if (!label) {
+    return false;
+  }
+
+  const cells = row.slice(1).map((value) => String(value ?? "").trim());
+  if (chartType === "jodi") {
+    return cells.length >= 7 && cells.slice(0, 7).every(isValidJodiCell);
+  }
+
+  if (cells.length >= 7 && cells.slice(0, 7).every(isValidPannaCell)) {
+    return true;
+  }
+
+  return cells.length >= 14 && cells.slice(0, 14).every((value) => /^[0-9]{3}$/.test(value) || value === "---");
+}
+
+function getStructuredChartRows(chartType, rows) {
+  return (Array.isArray(rows) ? rows : []).filter((row) => isStructurallyValidChartRow(chartType, row));
+}
+
 function loadChartRowsFromDataFile(slug, chartType) {
   const filePath = getChartFilePath(slug);
   if (!existsSync(filePath)) {
@@ -116,7 +158,7 @@ function loadChartRowsFromDataFile(slug, chartType) {
 }
 
 function getPreferredChartRows(slug, chartType, rows) {
-  const filteredRows = filterEmptyChartRows(rows);
+  const filteredRows = filterEmptyChartRows(getStructuredChartRows(chartType, rows));
   if (filteredRows.length > 0) {
     return filteredRows;
   }
@@ -224,21 +266,35 @@ export async function chartBatch(request) {
       .map((market) => [market.slug, market])
   );
 
-  const items = charts.map((chart) => {
-    if (chart.chartType === "panna") {
-      return {
+  const chartMap = new Map(charts.map((item) => [`${item.marketSlug}:${item.chartType}`, item]));
+  const items = [];
+
+  for (const marketSlug of marketSlugs) {
+    for (const chartType of chartTypes) {
+      const chart =
+        chartMap.get(`${marketSlug}:${chartType}`) ?? {
+          marketSlug,
+          chartType,
+          rows: buildEmptyChartRows(chartType)
+        };
+
+      if (chartType === "panna") {
+        items.push({
+          ...chart,
+          rows: formatPannaRowsForResponse(
+            getPreferredChartRows(marketSlug, "panna", chart.rows),
+            marketMap.get(marketSlug) ?? null
+          )
+        });
+        continue;
+      }
+
+      items.push({
         ...chart,
-        rows: formatPannaRowsForResponse(
-          getPreferredChartRows(chart.marketSlug, "panna", chart.rows),
-          marketMap.get(chart.marketSlug) ?? null
-        )
-      };
+        rows: getPreferredChartRows(marketSlug, "jodi", chart.rows)
+      });
     }
-    return {
-      ...chart,
-      rows: getPreferredChartRows(chart.marketSlug, "jodi", chart.rows)
-    };
-  });
+  }
 
   return ok({
     items,

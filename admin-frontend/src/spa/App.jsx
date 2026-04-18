@@ -12,6 +12,10 @@ import { SupportChatPage } from "./SupportChatPage.jsx";
 const SUPPORT_CONVERSATIONS_REFRESH_MS = 15_000;
 const SUPPORT_MESSAGES_REFRESH_MS = 15_000;
 
+function isAllowedAdminRole(role) {
+  return ["admin", "super_admin"].includes(String(role || "").toLowerCase());
+}
+
 function getDefaultAdminApiBase() {
   return normalizeAdminApiBase(
     window.ADMIN_DEFAULT_API_BASE ||
@@ -83,7 +87,7 @@ export function App() {
     }
     fetchApi(apiBase, "/api/auth/me", token)
       .then((data) => {
-        if (data.role !== "admin") {
+        if (!isAllowedAdminRole(data.role)) {
           throw new Error("Admin access required");
         }
         setMe(data);

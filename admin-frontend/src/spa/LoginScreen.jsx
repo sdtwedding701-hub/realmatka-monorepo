@@ -2,6 +2,10 @@ import React, { useEffect, useState } from "react";
 import { fetchApi, formatApiError, normalizeAdminApiBase } from "../lib/api.js";
 import { storeAdminSession } from "../lib/session.js";
 
+function isAllowedAdminRole(role) {
+  return ["admin", "super_admin"].includes(String(role || "").toLowerCase());
+}
+
 export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -51,8 +55,8 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
         setMessage(data.provider === "local" ? "2FA code generate ho gaya. OTP enter karo." : "2FA code phone par bhej diya gaya hai.");
         return;
       }
-      if (!["admin", "super_admin"].includes(String(data.user?.role || "").toLowerCase())) {
-        throw new Error("Super admin access required");
+      if (!isAllowedAdminRole(data.user?.role)) {
+        throw new Error("Admin access required");
       }
       storeAdminSession(data.token);
       setToken(data.token);
@@ -80,8 +84,8 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
         method: "POST",
         body: { challengeId: challenge.challengeId, otp: normalizedOtp }
       });
-      if (!["admin", "super_admin"].includes(String(data.user?.role || "").toLowerCase())) {
-        throw new Error("Super admin access required");
+      if (!isAllowedAdminRole(data.user?.role)) {
+        throw new Error("Admin access required");
       }
       storeAdminSession(data.token);
       setChallenge(null);

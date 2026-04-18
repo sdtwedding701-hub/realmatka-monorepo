@@ -991,6 +991,8 @@ function getSqlite() {
     sqlite.prepare(`UPDATE users SET approved_at = ?, signup_bonus_granted = 1, mpin_configured = 1 WHERE id = ?`).run(defaultUser.joinedAt, defaultUser.id);
   }
 
+  syncSqliteAdminAccounts(sqlite);
+
   const walletCount = Number(sqlite.prepare("SELECT COUNT(*) AS count FROM wallet_entries").get().count || 0);
   if (walletCount === 0 && defaultWalletEntry) {
     sqlite.prepare(`
@@ -1258,8 +1260,6 @@ async function findUserByReferralCode(referenceCode) {
       .get(referenceCode)
     );
   }
-
-  syncSqliteAdminAccounts(sqlite);
 
 export async function findUserById(userId) {
   if (isStandalonePostgresEnabled()) {

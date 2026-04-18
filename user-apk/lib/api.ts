@@ -178,7 +178,7 @@ function getApiBaseUrl() {
     return configuredFromEnv;
   }
 
-  return "https://realmatka-backend.onrender.com";
+  return "https://realmatka-monorepo-production.up.railway.app";
 }
 
 export function setAuthFailureListener(listener: AuthFailureListener | null) {

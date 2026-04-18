@@ -622,10 +622,14 @@ async function ensurePostgresBootstrap(pool) {
       if (!usersTableExists) {
         await client.query(postgresSchemaSql);
       }
+      await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMPTZ`);
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMPTZ`);
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ`);
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status_note TEXT`);
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS mpin_configured BOOLEAN NOT NULL DEFAULT FALSE`);
+      await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_bonus_granted BOOLEAN NOT NULL DEFAULT FALSE`);
+      await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by_user_id TEXT`);
       await client.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS game_type TEXT`);
       await client.query(`ALTER TABLE markets ADD COLUMN IF NOT EXISTS result_locked_at TIMESTAMPTZ`);
       await client.query(`ALTER TABLE markets ADD COLUMN IF NOT EXISTS result_locked_by_user_id TEXT REFERENCES users(id)`);

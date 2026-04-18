@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { createSession, findAdminByPhone, findAdminByUserId, findUserByPhone, getAppSettings, requireUserSnapshotByToken, verifyUserPassword } from "../stores/auth-store.mjs";
+import { createAdminSession, createSession, findAdminById, findAdminByPhone, findUserByPhone, getAppSettings, requireAdminByToken, requireUserSnapshotByToken, verifyUserPassword } from "../stores/auth-store.mjs";
 import { issueOtp, verifyOtp } from "../routes/auth-otp.mjs";
 
 const adminTwoFactorChallenges = new Map();
@@ -62,7 +62,7 @@ export async function loginWithPassword(phone, password) {
       const otpState = await issueOtp(adminAccount.adminPhone || adminAccount.phone, "admin_login");
       const challengeId = `admin_2fa_${randomBytes(12).toString("hex")}`;
       adminTwoFactorChallenges.set(challengeId, {
-        userId: adminAccount.userId,
+        adminId: adminAccount.adminId || adminAccount.id,
         phone: adminAccount.adminPhone || adminAccount.phone,
         expiresAt: otpState.expiresAt
       });
@@ -76,7 +76,8 @@ export async function loginWithPassword(phone, password) {
           provider: otpState.provider,
           devCode: otpState.devCode,
           user: {
-            id: adminAccount.userId,
+            id: adminAccount.adminId || adminAccount.id,
+            adminId: adminAccount.adminId || adminAccount.id,
             phone: adminAccount.adminPhone || adminAccount.phone,
             name: adminAccount.adminDisplayName || adminAccount.name,
             role: adminAccount.role
@@ -85,14 +86,14 @@ export async function loginWithPassword(phone, password) {
       };
     }
 
-    const { rawToken } = await createSession(adminAccount.userId);
+    const { rawToken } = await createAdminSession(adminAccount.adminId || adminAccount.id);
     return {
       ok: true,
       data: {
         token: rawToken,
         user: sanitizeSessionUser({
           ...adminAccount,
-          id: adminAccount.userId,
+          id: adminAccount.adminId || adminAccount.id,
           phone: adminAccount.adminPhone || adminAccount.phone,
           name: adminAccount.adminDisplayName || adminAccount.name
         })
@@ -144,10 +145,10 @@ export async function verifyAdminTwoFactorLogin(challengeId, otp) {
     return { ok: false, status: 400, error: "Invalid or expired 2FA code" };
   }
 
-  const user = await findAdminByUserId(challenge.userId);
+  const user = await findAdminById(challenge.adminId);
   adminTwoFactorChallenges.delete(challengeId);
 
-  if (!user || user.userId !== challenge.userId || !["admin", "super_admin"].includes(String(user.role || "").toLowerCase())) {
+  if (!user || user.adminId !== challenge.adminId || !["admin", "super_admin"].includes(String(user.role || "").toLowerCase())) {
     return { ok: false, status: 403, error: "Admin account not available for 2FA completion" };
   }
   if (user.deactivatedAt) {
@@ -160,14 +161,14 @@ export async function verifyAdminTwoFactorLogin(challengeId, otp) {
     return { ok: false, status: 403, error: "Your account is not approved for admin access." };
   }
 
-  const { rawToken } = await createSession(user.userId);
+  const { rawToken } = await createAdminSession(user.adminId);
   return {
     ok: true,
     data: {
       token: rawToken,
       user: sanitizeSessionUser({
         ...user,
-        id: user.userId,
+        id: user.adminId,
         phone: user.adminPhone || user.phone,
         name: user.adminDisplayName || user.name
       })
@@ -176,6 +177,20 @@ export async function verifyAdminTwoFactorLogin(challengeId, otp) {
 }
 
 export async function getCurrentSessionUser(token) {
+  const admin = await requireAdminByToken(token);
+  if (admin) {
+    return {
+      id: admin.adminId,
+      phone: admin.adminPhone || admin.phone,
+      name: admin.adminDisplayName || admin.name,
+      role: admin.role,
+      hasMpin: false,
+      referralCode: "",
+      joinedAt: admin.joinedAt,
+      walletBalance: 0
+    };
+  }
+
   const user = await requireUserSnapshotByToken(token);
   if (!user) {
     return null;

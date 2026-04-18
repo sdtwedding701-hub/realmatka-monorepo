@@ -20,8 +20,10 @@ const supportChatResolvedRetentionMs = Math.max(1, standaloneConfig.supportChatR
 const dbIndexDefinitions = [
   ["idx_users_role_approval_joined_at", "users (role, approval_status, joined_at DESC)"],
   ["idx_admin_accounts_phone", "admin_accounts (phone)"],
+  ["idx_admins_phone", "admins (phone)"],
   ["idx_users_status_flags", "users (blocked_at, deactivated_at)"],
   ["idx_sessions_user_created_at", "sessions (user_id, created_at DESC)"],
+  ["idx_admin_sessions_admin_created_at", "admin_sessions (admin_id, created_at DESC)"],
   ["idx_otp_challenges_phone_purpose_created_at", "otp_challenges (phone, purpose, created_at DESC)"],
   ["idx_otp_challenges_phone_purpose_expires_at", "otp_challenges (phone, purpose, expires_at DESC)"],
   ["idx_wallet_entries_user_created_at", "wallet_entries (user_id, created_at DESC)"],
@@ -52,37 +54,23 @@ function getDefaultSeedAdmin() {
   if (!standaloneConfig.allowDefaultAdminSeed) {
     return null;
   }
-  if (!standaloneConfig.defaultAdminPhone || !standaloneConfig.defaultAdminPassword || !standaloneConfig.defaultAdminMpin) {
+  if (!standaloneConfig.defaultAdminPhone || !standaloneConfig.defaultAdminPassword) {
     return null;
   }
 
   return {
-    id: "user_1",
+    id: "admin_1",
     phone: standaloneConfig.defaultAdminPhone,
     passwordHash: hashSecret(standaloneConfig.defaultAdminPassword),
-    mpinHash: hashSecret(standaloneConfig.defaultAdminMpin),
-    name: standaloneConfig.defaultAdminName,
-    joinedAt: "2025-04-12T10:00:00.000Z",
-    referralCode: standaloneConfig.defaultAdminReferralCode,
+    displayName: standaloneConfig.defaultAdminName,
+    createdAt: "2025-04-12T10:00:00.000Z",
     role: "admin",
-    approvalStatus: "Approved"
+    twoFactorEnabled: true
   };
 }
 
-function getDefaultWalletEntry(seedAdmin) {
-  if (!seedAdmin) {
-    return null;
-  }
-
-  return {
-    id: "wallet_1",
-    userId: seedAdmin.id,
-    type: "DEPOSIT",
-    status: "SUCCESS",
-    amount: 0,
-    beforeBalance: 0,
-    afterBalance: 0
-  };
+function getDefaultWalletEntry() {
+  return null;
 }
 
 function isUserAccountActive(user) {
@@ -327,30 +315,58 @@ function clearCachedAuthSession(tokenHash) {
   authSessionCache.delete(tokenHash);
 }
 
-async function syncPostgresAdminAccounts(client) {
+async function ensureSeedAdminInPostgres(client, seedAdmin) {
+  if (!seedAdmin) {
+    return;
+  }
+
   await client.query(
-    `INSERT INTO admin_accounts (user_id, phone, display_name, two_factor_enabled, created_at, updated_at)
-     SELECT id, phone, name, TRUE, COALESCE(joined_at, NOW()), NOW()
-     FROM users
-     WHERE role IN ('admin', 'super_admin')
-     ON CONFLICT (user_id) DO UPDATE SET
+    `INSERT INTO admins (id, phone, password_hash, display_name, role, two_factor_enabled, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+     ON CONFLICT (id) DO UPDATE SET
        phone = EXCLUDED.phone,
+       password_hash = EXCLUDED.password_hash,
        display_name = EXCLUDED.display_name,
-       updated_at = EXCLUDED.updated_at`
+       role = EXCLUDED.role,
+       two_factor_enabled = EXCLUDED.two_factor_enabled,
+       updated_at = EXCLUDED.updated_at`,
+    [
+      seedAdmin.id,
+      seedAdmin.phone,
+      seedAdmin.passwordHash,
+      seedAdmin.displayName,
+      seedAdmin.role,
+      seedAdmin.twoFactorEnabled,
+      seedAdmin.createdAt
+    ]
   );
 }
 
-function syncSqliteAdminAccounts(db) {
+function ensureSeedAdminInSqlite(db, seedAdmin) {
+  if (!seedAdmin) {
+    return;
+  }
+
   db.prepare(
-    `INSERT INTO admin_accounts (user_id, phone, display_name, two_factor_enabled, created_at, updated_at)
-     SELECT id, phone, name, 1, COALESCE(joined_at, ?), ?
-     FROM users
-     WHERE role IN ('admin', 'super_admin')
-     ON CONFLICT(user_id) DO UPDATE SET
+    `INSERT INTO admins (id, phone, password_hash, display_name, role, two_factor_enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
        phone = excluded.phone,
+       password_hash = excluded.password_hash,
        display_name = excluded.display_name,
+       role = excluded.role,
+       two_factor_enabled = excluded.two_factor_enabled,
        updated_at = excluded.updated_at`
-  ).run(nowIso(), nowIso());
+  ).run(
+    seedAdmin.id,
+    seedAdmin.phone,
+    seedAdmin.passwordHash,
+    seedAdmin.displayName,
+    seedAdmin.role,
+    seedAdmin.twoFactorEnabled ? 1 : 0,
+    seedAdmin.createdAt,
+    seedAdmin.createdAt
+  );
 }
 
 function mapWalletEntryRow(row) {
@@ -642,6 +658,27 @@ async function ensurePostgresBootstrap(pool) {
       await client.query(`ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS gateway_signature TEXT`);
       await client.query(`ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ`);
       await client.query(`
+        CREATE TABLE IF NOT EXISTS admins (
+          id TEXT PRIMARY KEY,
+          phone TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          display_name TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'admin',
+          two_factor_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+          blocked_at TIMESTAMPTZ,
+          deactivated_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL
+        )
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS admin_sessions (
+          token_hash TEXT PRIMARY KEY,
+          admin_id TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL
+        )
+      `);
+      await client.query(`
         CREATE TABLE IF NOT EXISTS chat_conversations (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL REFERENCES users(id),
@@ -682,29 +719,26 @@ async function ensurePostgresBootstrap(pool) {
           updated_at TIMESTAMPTZ NOT NULL
         )
       `);
+      await client.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'admin'`);
+      await client.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT TRUE`);
+      await client.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ`);
+      await client.query(`
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1
+            FROM information_schema.table_constraints
+            WHERE constraint_name = 'audit_logs_actor_user_id_fkey'
+              AND table_name = 'audit_logs'
+          ) THEN
+            ALTER TABLE audit_logs DROP CONSTRAINT audit_logs_actor_user_id_fkey;
+          END IF;
+        END $$;
+      `);
       await ensurePostgresIndexes(client);
 
-      const userCount = Number((await client.query("SELECT COUNT(*)::int AS count FROM users")).rows[0]?.count ?? 0);
-      if (userCount === 0 && defaultUser) {
-        await client.query(
-          `INSERT INTO users (id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, signup_bonus_granted)
-           VALUES ($1, $2, $3, $4, TRUE, $5, $6, $7, $8, $9, $10, TRUE)`,
-          [
-            defaultUser.id,
-            defaultUser.phone,
-            defaultUser.passwordHash,
-            defaultUser.mpinHash,
-            defaultUser.name,
-            defaultUser.joinedAt,
-            defaultUser.referralCode,
-            defaultUser.role,
-            defaultUser.approvalStatus,
-            defaultUser.joinedAt
-          ]
-        );
-      }
-
-      await syncPostgresAdminAccounts(client);
+      await ensureSeedAdminInPostgres(client, defaultUser);
 
       const walletCount = Number((await client.query("SELECT COUNT(*)::int AS count FROM wallet_entries")).rows[0]?.count ?? 0);
       if (walletCount === 0 && defaultWalletEntry) {
@@ -921,6 +955,25 @@ function getSqlite() {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS admins (
+      id TEXT PRIMARY KEY,
+      phone TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'admin',
+      two_factor_enabled INTEGER NOT NULL DEFAULT 1,
+      blocked_at TEXT,
+      deactivated_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS admin_sessions (
+      token_hash TEXT PRIMARY KEY,
+      admin_id TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS markets (
       id TEXT PRIMARY KEY,
       slug TEXT NOT NULL UNIQUE,
@@ -974,28 +1027,12 @@ function getSqlite() {
   ensureSqliteColumn(sqlite, "payment_orders", "verified_at", "TEXT");
   ensureSqliteColumn(sqlite, "chat_conversations", "resolved_at", "TEXT");
   ensureSqliteColumn(sqlite, "admin_accounts", "two_factor_enabled", "INTEGER NOT NULL DEFAULT 1");
+  ensureSqliteColumn(sqlite, "admins", "role", "TEXT NOT NULL DEFAULT 'admin'");
+  ensureSqliteColumn(sqlite, "admins", "two_factor_enabled", "INTEGER NOT NULL DEFAULT 1");
+  ensureSqliteColumn(sqlite, "admins", "blocked_at", "TEXT");
+  ensureSqliteColumn(sqlite, "admins", "deactivated_at", "TEXT");
   ensureSqliteIndexes(sqlite);
-
-  const userCount = Number(sqlite.prepare("SELECT COUNT(*) AS count FROM users").get().count || 0);
-  if (userCount === 0 && defaultUser) {
-    sqlite.prepare(`
-      INSERT INTO users (id, phone, password_hash, mpin_hash, name, joined_at, referral_code, role, approval_status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      defaultUser.id,
-      defaultUser.phone,
-      defaultUser.passwordHash,
-      defaultUser.mpinHash,
-      defaultUser.name,
-      defaultUser.joinedAt,
-      defaultUser.referralCode,
-      defaultUser.role,
-      defaultUser.approvalStatus
-    );
-    sqlite.prepare(`UPDATE users SET approved_at = ?, signup_bonus_granted = 1, mpin_configured = 1 WHERE id = ?`).run(defaultUser.joinedAt, defaultUser.id);
-  }
-
-  syncSqliteAdminAccounts(sqlite);
+  ensureSeedAdminInSqlite(sqlite, defaultUser);
 
   const walletCount = Number(sqlite.prepare("SELECT COUNT(*) AS count FROM wallet_entries").get().count || 0);
   if (walletCount === 0 && defaultWalletEntry) {
@@ -1107,12 +1144,14 @@ export async function revokeSession(token) {
   const tokenHash = hashSecret(token);
   clearCachedAuthSession(tokenHash);
   if (isStandalonePostgresEnabled()) {
-      const pool = await getReadyPgPool();
+    const pool = await getReadyPgPool();
     await pool.query("DELETE FROM sessions WHERE token_hash = $1", [tokenHash]);
+    await pool.query("DELETE FROM admin_sessions WHERE token_hash = $1", [tokenHash]);
     return;
   }
 
   getSqlite().prepare("DELETE FROM sessions WHERE token_hash = ?").run(tokenHash);
+  getSqlite().prepare("DELETE FROM admin_sessions WHERE token_hash = ?").run(tokenHash);
 }
 
 export async function requireUserByToken(token) {

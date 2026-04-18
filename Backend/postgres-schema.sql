@@ -27,9 +27,28 @@ CREATE TABLE admin_accounts (
   updated_at TIMESTAMPTZ NOT NULL
 );
 
+CREATE TABLE admins (
+  id TEXT PRIMARY KEY,
+  phone TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'admin',
+  two_factor_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  blocked_at TIMESTAMPTZ,
+  deactivated_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE sessions (
   token_hash TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE admin_sessions (
+  token_hash TEXT PRIMARY KEY,
+  admin_id TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL
 );
 
@@ -105,7 +124,7 @@ CREATE TABLE charts (
 
 CREATE TABLE audit_logs (
   id TEXT PRIMARY KEY,
-  actor_user_id TEXT NOT NULL REFERENCES users(id),
+  actor_user_id TEXT NOT NULL,
   action TEXT NOT NULL,
   entity_type TEXT NOT NULL,
   entity_id TEXT NOT NULL,
@@ -178,11 +197,17 @@ CREATE INDEX IF NOT EXISTS idx_users_role_approval_joined_at
 CREATE INDEX IF NOT EXISTS idx_admin_accounts_phone
   ON admin_accounts (phone);
 
+CREATE INDEX IF NOT EXISTS idx_admins_phone
+  ON admins (phone);
+
 CREATE INDEX IF NOT EXISTS idx_users_status_flags
   ON users (blocked_at, deactivated_at);
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user_created_at
   ON sessions (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin_created_at
+  ON admin_sessions (admin_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_otp_challenges_phone_purpose_created_at
   ON otp_challenges (phone, purpose, created_at DESC);

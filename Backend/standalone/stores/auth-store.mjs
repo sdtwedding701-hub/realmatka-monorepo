@@ -1,7 +1,10 @@
 import {
+  createAdminSession as createAdminSessionRecord,
   createSession as createSessionRecord,
+  findAdminById as findAdminByIdRecord,
   findUserByPhone as findUserByPhoneRecord,
   getAppSettings as getAppSettingsRecord,
+  requireAdminByToken as requireAdminByTokenRecord,
   requireUserByToken as requireUserByTokenRecord,
   requireUserSnapshotByToken as requireUserSnapshotByTokenRecord,
   verifyCredential
@@ -20,13 +23,16 @@ export async function findAdminByPhone(phone) {
   return findAdminByPhoneRecord(phone);
 }
 
-export async function findAdminByUserId(userId) {
-  const { findAdminByUserId: findAdminByUserIdRecord } = await import("../db/auth-db.mjs");
-  return findAdminByUserIdRecord(userId);
+export async function findAdminById(adminId) {
+  return findAdminByIdRecord(adminId);
 }
 
 export async function createSession(userId) {
   return createSessionRecord(userId);
+}
+
+export async function createAdminSession(adminId) {
+  return createAdminSessionRecord(adminId);
 }
 
 export async function getAppSettings() {
@@ -39,4 +45,8 @@ export async function requireUserSnapshotByToken(token) {
 
 export async function requireUserByToken(token) {
   return requireUserByTokenRecord(token);
+}
+
+export async function requireAdminByToken(token) {
+  return requireAdminByTokenRecord(token);
 }

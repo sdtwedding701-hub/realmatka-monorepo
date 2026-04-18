@@ -23,7 +23,8 @@ export function validateEnvironment() {
     apiUrl: maskUrl(standaloneConfig.apiUrl),
     adminDomain: maskUrl(standaloneConfig.adminDomain),
     otpProvider: String(process.env.OTP_PROVIDER || "local").trim().toLowerCase(),
-    paymentsEnabled: Boolean(process.env.RAZORPAY_KEY_ID?.trim() && process.env.RAZORPAY_KEY_SECRET?.trim())
+    paymentsEnabled: Boolean(process.env.RAZORPAY_KEY_ID?.trim() && process.env.RAZORPAY_KEY_SECRET?.trim()),
+    paymentWebhooksEnabled: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET?.trim())
   };
 
   if (!Number.isFinite(standaloneConfig.port) || standaloneConfig.port <= 0) {
@@ -67,13 +68,17 @@ export function validateEnvironment() {
   const hasRazorpayId = Boolean(process.env.RAZORPAY_KEY_ID?.trim());
   const hasRazorpaySecret = Boolean(process.env.RAZORPAY_KEY_SECRET?.trim());
   const hasRazorpayWebhook = Boolean(process.env.RAZORPAY_WEBHOOK_SECRET?.trim());
-  if ((hasRazorpayId || hasRazorpaySecret || hasRazorpayWebhook) && !(hasRazorpayId && hasRazorpaySecret && hasRazorpayWebhook)) {
-    const message = "Razorpay env is partially configured";
+  if ((hasRazorpayId || hasRazorpaySecret) && !(hasRazorpayId && hasRazorpaySecret)) {
+    const message = "Razorpay key env is partially configured";
     if (isProduction) {
       errors.push(message);
     } else {
       warnings.push(message);
     }
+  }
+
+  if ((hasRazorpayId || hasRazorpaySecret) && !hasRazorpayWebhook) {
+    warnings.push("RAZORPAY_WEBHOOK_SECRET missing, webhook verification route will stay disabled");
   }
 
   if (!/^https?:\/\//i.test(standaloneConfig.apiUrl || "")) {

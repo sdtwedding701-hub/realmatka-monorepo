@@ -1,13 +1,13 @@
 import {
   findUserByPhone,
   hashCredential,
-  requireUserByToken,
   revokeSession,
   updateUserMpin,
   updateUserPassword,
   verifyCredential
 } from "../db.mjs";
-import { corsPreflight, fail, getJsonBody, getSessionToken, ok, unauthorized } from "../http.mjs";
+import { requireAuthenticatedUser } from "../middleware/auth-middleware.mjs";
+import { corsPreflight, fail, getJsonBody, getSessionToken, ok } from "../http.mjs";
 
 export function options(request) {
   return corsPreflight(request);
@@ -19,10 +19,8 @@ export async function logout(request) {
 }
 
 export async function updatePassword(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
 
   const body = await getJsonBody(request);
   const currentPassword = String(body.currentPassword ?? "");
@@ -33,7 +31,7 @@ export async function updatePassword(request) {
     return fail("currentPassword, password, and confirmPassword are required", 400, request);
   }
 
-  const fullUser = await findUserByPhone(user.phone);
+  const fullUser = await findUserByPhone(auth.user.phone);
   if (!fullUser || !verifyCredential(currentPassword, fullUser.passwordHash)) {
     return fail("Current password is incorrect", 400, request);
   }
@@ -46,15 +44,13 @@ export async function updatePassword(request) {
     return fail("Password and confirm password must match", 400, request);
   }
 
-  await updateUserPassword(user.id, hashCredential(password));
+  await updateUserPassword(auth.user.id, hashCredential(password));
   return ok({ success: true }, request);
 }
 
 export async function updateMpin(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
 
   const body = await getJsonBody(request);
   const pin = String(body.pin ?? "");
@@ -72,15 +68,13 @@ export async function updateMpin(request) {
     return fail("PIN and confirm PIN must match", 400, request);
   }
 
-  await updateUserMpin(user.id, hashCredential(pin));
+  await updateUserMpin(auth.user.id, hashCredential(pin));
   return ok({ success: true }, request);
 }
 
 export async function verifyMpin(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
 
   const body = await getJsonBody(request);
   const pin = String(body.pin ?? "");
@@ -89,7 +83,7 @@ export async function verifyMpin(request) {
     return fail("PIN must be exactly 4 digits", 400, request);
   }
 
-  const fullUser = await findUserByPhone(user.phone);
+  const fullUser = await findUserByPhone(auth.user.phone);
   if (!fullUser || !fullUser.hasMpin) {
     return fail("PIN is not set for this account", 400, request);
   }

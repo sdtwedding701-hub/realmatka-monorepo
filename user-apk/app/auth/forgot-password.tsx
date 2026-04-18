@@ -3,7 +3,7 @@ import { Link } from "expo-router";
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { AppScreen, SurfaceCard } from "@/components/ui";
-import { api } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
 import { colors } from "@/theme/colors";
 
 export default function ForgotPasswordScreen() {
@@ -64,7 +64,7 @@ export default function ForgotPasswordScreen() {
                   const response = await api.requestOtp(normalizedPhone, "password_reset");
                   setMessage(response.provider === "twilio" ? "Password reset OTP SMS successfully sent." : "Password reset OTP generated.");
                 } catch (otpError) {
-                  setError(otpError instanceof Error ? otpError.message : "Unable to send OTP");
+                  setError(formatApiError(otpError, "Unable to send OTP"));
                 } finally {
                   setSendingOtp(false);
                 }
@@ -124,7 +124,7 @@ export default function ForgotPasswordScreen() {
                   setPassword("");
                   setConfirmPassword("");
                 } catch (resetError) {
-                  setError(resetError instanceof Error ? resetError.message : "Unable to reset password");
+                  setError(formatApiError(resetError, "Unable to reset password"));
                 } finally {
                   setResettingPassword(false);
                 }

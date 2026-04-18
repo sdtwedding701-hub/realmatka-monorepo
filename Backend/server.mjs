@@ -4,12 +4,16 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
+import { logger } from "./standalone/ops/logger.mjs";
+import { validateEnvironment } from "./standalone/ops/env-validator.mjs";
+import { getHealthSnapshot } from "./standalone/ops/health-service.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const backendRoot = __dirname;
 const workspaceRoot = path.resolve(backendRoot, "..");
+const startedAt = Date.now();
 
 async function loadEnvFile(filePath, { override = false } = {}) {
   try {
@@ -46,6 +50,22 @@ await loadEnvFile(path.join(workspaceRoot, ".env.production"));
 await loadEnvFile(path.join(workspaceRoot, ".env.local"));
 await loadEnvFile(path.join(workspaceRoot, ".env.backend.local"), { override: true });
 
+const envValidation = validateEnvironment();
+if (!envValidation.ok) {
+  logger.error("Backend environment validation failed", {
+    envErrors: envValidation.errors,
+    envWarnings: envValidation.warnings,
+    envSummary: envValidation.summary
+  });
+  throw new Error(`Backend environment validation failed: ${envValidation.errors.join("; ")}`);
+}
+if (envValidation.warnings.length) {
+  logger.warn("Backend environment validation warnings", {
+    envWarnings: envValidation.warnings,
+    envSummary: envValidation.summary
+  });
+}
+
 const distServerDir = path.resolve(backendRoot, process.env.EXPO_SERVER_DIST_DIR || "dist/server");
 const routesManifestPath = path.join(distServerDir, "_expo", "routes.json");
 const port = Number(process.env.PORT || 3000);
@@ -71,6 +91,10 @@ const configuredCorsOrigins = [
   .map((value) => value.trim().replace(/\/$/, ""))
   .filter(Boolean);
 const allowedCorsOrigins = new Set(configuredCorsOrigins);
+
+function createRequestId() {
+  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
 function isAllowedCorsOrigin(origin) {
   if (!origin) {
@@ -167,6 +191,7 @@ const standaloneRoutes = new Map([
   ["/api/admin/audit-logs", { loader: "admin", methods: { OPTIONS: "options", GET: "auditLogs" } }],
   ["/api/admin/bids", { loader: "admin", methods: { OPTIONS: "options", GET: "bidsList" } }],
   ["/api/admin/notifications", { loader: "admin", methods: { OPTIONS: "options", GET: "notificationsList", POST: "notificationsSend" } }],
+  ["/api/admin/notifications-summary", { loader: "admin", methods: { OPTIONS: "options", GET: "notificationsSummary" } }],
   ["/api/admin/settings", { loader: "admin", methods: { OPTIONS: "options", GET: "settingsGet", POST: "settingsUpdate" } }],
   ["/api/admin/chart-update", { loader: "admin", methods: { OPTIONS: "options", POST: "chartUpdate" } }],
   ["/api/admin/market-update", { loader: "admin", methods: { OPTIONS: "options", POST: "marketUpdate" } }],
@@ -176,6 +201,7 @@ const standaloneRoutes = new Map([
   ["/api/admin/reconciliation-summary", { loader: "admin", methods: { OPTIONS: "options", GET: "reconciliationSummary" } }],
   ["/api/admin/monitoring-summary", { loader: "admin", methods: { OPTIONS: "options", GET: "monitoringSummary" } }],
   ["/api/admin/export", { loader: "admin", methods: { OPTIONS: "options", GET: "exportData" } }],
+  ["/api/admin/snapshot-items", { loader: "admin", methods: { OPTIONS: "options", GET: "snapshotItems" } }],
   ["/api/admin/backup-snapshot", { loader: "admin", methods: { OPTIONS: "options", GET: "backupSnapshot", POST: "restoreSnapshot" } }],
   ["/api/admin/dashboard-summary", { loader: "admin", methods: { OPTIONS: "options", GET: "dashboardSummary" } }],
   ["/api/admin/reports-summary", { loader: "admin", methods: { OPTIONS: "options", GET: "reportsSummary" } }],
@@ -284,7 +310,7 @@ async function sendWebResponse(nodeRes, webResponse) {
 
   const body = Readable.fromWeb(webResponse.body);
   body.on("error", (error) => {
-    console.error("Response stream error", error);
+    logger.error("Response stream error", { error });
     if (!nodeRes.headersSent) {
       nodeRes.statusCode = 500;
     }
@@ -309,7 +335,8 @@ function applyCorsHeaders(req, res) {
   }
 
   res.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
-  res.setHeader("access-control-allow-headers", "Content-Type, Authorization");
+  res.setHeader("access-control-allow-headers", "Content-Type, Authorization, X-Request-Id");
+  res.setHeader("access-control-expose-headers", "X-Request-Id");
 }
 
 async function handleApiRequest(req, res) {
@@ -390,6 +417,15 @@ async function handleApiRequest(req, res) {
 }
 
 const server = createServer(async (req, res) => {
+  const requestStartedAt = Date.now();
+  const requestId = createRequestId();
+  req.headers["x-request-id"] = requestId;
+  res.setHeader("x-request-id", requestId);
+  const requestLogger = logger.child({
+    requestId,
+    method: req.method || "GET",
+    path: req.url || "/"
+  });
   try {
     const pathname = new URL(req.url || "/", "http://localhost").pathname;
     applyCorsHeaders(req, res);
@@ -401,11 +437,8 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === "/health") {
-      sendJson(res, 200, {
-        ok: true,
-        service: "realmatka-api",
-        timestamp: new Date().toISOString()
-      });
+      const snapshot = await getHealthSnapshot({ startedAt, routesManifestPath });
+      sendJson(res, snapshot.ok ? 200 : 503, snapshot);
       return;
     }
 
@@ -436,14 +469,32 @@ const server = createServer(async (req, res) => {
       routes: ["/health", "/api/*"]
     });
   } catch (error) {
-    console.error("Unhandled backend request error", error);
+    requestLogger.error("Unhandled backend request error", { error });
     sendJson(res, 500, {
       ok: false,
       error: error instanceof Error ? error.message : "Internal server error"
+    });
+  } finally {
+    requestLogger.info("Request complete", {
+      durationMs: Date.now() - requestStartedAt,
+      statusCode: res.statusCode
     });
   }
 });
 
 server.listen(port, () => {
-  console.log(`Real Matka backend listening on port ${port}`);
+  logger.info("Real Matka backend listening", {
+    port,
+    startedAt: new Date(startedAt).toISOString(),
+    envSummary: envValidation.summary,
+    envWarnings: envValidation.warnings
+  });
+});
+
+process.on("unhandledRejection", (error) => {
+  logger.error("Unhandled promise rejection", { error });
+});
+
+process.on("uncaughtException", (error) => {
+  logger.error("Uncaught exception", { error });
 });

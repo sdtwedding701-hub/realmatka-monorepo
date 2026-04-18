@@ -57,8 +57,38 @@ export async function fetchApi(apiBase, path, token, options = {}) {
     const message = payload?.error || "Request failed";
     const error = new Error(message);
     error.status = response.status;
+    error.requestId = response.headers.get("x-request-id") || "";
     throw error;
   }
 
   return payload.data;
+}
+
+export async function fetchHealth(apiBase) {
+  const normalizedBase = normalizeAdminApiBase(apiBase);
+  let response;
+  try {
+    response = await fetch(`${normalizedBase}/health`);
+  } catch {
+    throw new Error(`API server connect nahi ho raha. API Base URL check karo: ${normalizedBase || apiBase}`);
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.service) {
+    const error = new Error(payload?.error || "Health check failed");
+    error.status = response.status;
+    error.requestId = response.headers.get("x-request-id") || "";
+    throw error;
+  }
+
+  return {
+    ...payload,
+    requestId: response.headers.get("x-request-id") || ""
+  };
+}
+
+export function formatApiError(error, fallback = "Request failed") {
+  const message = error?.message || fallback;
+  const requestId = String(error?.requestId || "").trim();
+  return requestId ? `${message} (Req ID: ${requestId})` : message;
 }

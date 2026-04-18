@@ -4,7 +4,7 @@ import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, TextInp
 import { LinearGradient } from "expo-linear-gradient";
 import { AppScreen, SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
-import { api } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
 import { clearStoredReferralCode, normalizeReferralCode, readStoredReferralCode, writeStoredReferralCode } from "@/lib/referral-storage";
 import { colors } from "@/theme/colors";
 
@@ -136,7 +136,7 @@ export default function RegisterScreen() {
                   const response = await api.requestOtp(normalizedPhone, "register");
                   setSuccess(response.provider === "twilio" ? "Registration OTP SMS successfully sent." : "Registration OTP generated successfully.");
                 } catch (otpError) {
-                  setError(otpError instanceof Error ? otpError.message : "Unable to send registration OTP");
+                  setError(formatApiError(otpError, "Unable to send registration OTP"));
                 } finally {
                   setSendingOtp(false);
                 }
@@ -265,7 +265,7 @@ export default function RegisterScreen() {
                   setConfirmPassword("");
                   setReferenceCode("");
                 } catch (registrationError) {
-                  setError(registrationError instanceof Error ? registrationError.message : "Registration failed");
+                  setError(formatApiError(registrationError, "Registration failed"));
                 } finally {
                   setSubmitting(false);
                 }

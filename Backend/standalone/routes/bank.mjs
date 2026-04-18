@@ -1,24 +1,21 @@
-import { addBankAccount, getBankAccountsForUser, requireUserByToken } from "../db.mjs";
-import { corsPreflight, fail, getJsonBody, getSessionToken, ok, unauthorized } from "../http.mjs";
+import { addBankAccount, getBankAccountsForUser } from "../db.mjs";
+import { requireAuthenticatedUser } from "../middleware/auth-middleware.mjs";
+import { corsPreflight, fail, getJsonBody, ok } from "../http.mjs";
 
 export function options(request) {
   return corsPreflight(request);
 }
 
 export async function list(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
 
-  return ok(await getBankAccountsForUser(user.id), request);
+  return ok(await getBankAccountsForUser(auth.user.id), request);
 }
 
 export async function add(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
 
   const body = await getJsonBody(request);
   const accountNumber = String(body.accountNumber ?? "");
@@ -29,5 +26,5 @@ export async function add(request) {
     return fail("accountNumber, holderName, and ifsc are required", 400, request);
   }
 
-  return ok(await addBankAccount({ userId: user.id, accountNumber, holderName, ifsc }), request);
+  return ok(await addBankAccount({ userId: auth.user.id, accountNumber, holderName, ifsc }), request);
 }

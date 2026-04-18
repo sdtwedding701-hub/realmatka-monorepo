@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppScreen, BackHeader } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
+import { formatApiError } from "@/lib/api";
 import { colors } from "@/theme/colors";
 
 export default function UpdatePinScreen() {
@@ -93,7 +94,7 @@ export default function UpdatePinScreen() {
               setConfirmPin("");
               setMessage("PIN updated successfully.");
             } catch (updateError) {
-              setError(updateError instanceof Error ? updateError.message : "Unable to update PIN");
+              setError(formatApiError(updateError, "Unable to update PIN"));
             } finally {
               setSubmitting(false);
             }

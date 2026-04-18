@@ -4,6 +4,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View 
 import { LinearGradient } from "expo-linear-gradient";
 import { SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
+import { formatApiError } from "@/lib/api";
 import { colors } from "@/theme/colors";
 
 export default function LoginScreen() {
@@ -35,7 +36,7 @@ export default function LoginScreen() {
       await login(normalizedPhone, password.trim());
       router.replace("/(tabs)");
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : "Login failed");
+      setError(formatApiError(loginError, "Login failed"));
     } finally {
       setSubmitting(false);
     }

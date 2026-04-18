@@ -27,11 +27,35 @@ type ChartPayload = {
   rows: string[][];
 };
 
+type NotificationEntry = {
+  id: string;
+  title: string;
+  body: string;
+  channel: string;
+  read: boolean;
+  createdAt: string;
+};
+
+type ChatMessage = {
+  id: string;
+  conversationId: string;
+  senderRole: "user" | "support";
+  senderUserId: string | null;
+  text: string;
+  readByUser: boolean;
+  readByAdmin: boolean;
+  createdAt: string;
+};
+
 const marketCache: { entry: CacheEntry<MarketItem[]> | null } = { entry: null };
 const settingsCache: { entry: CacheEntry<SettingItem[]> | null } = { entry: null };
 const chartCache = new Map<string, CacheEntry<ChartPayload>>();
+const notificationsCache = new Map<string, CacheEntry<NotificationEntry[]>>();
+const chatCache = new Map<string, CacheEntry<ChatMessage[]>>();
 const WEB_MARKET_CACHE_KEY = "realmatka.cachedMarkets";
 const WEB_SETTINGS_CACHE_KEY = "realmatka.cachedSettings";
+const WEB_NOTIFICATIONS_CACHE_KEY = "realmatka.cachedNotifications";
+const WEB_CHAT_CACHE_KEY = "realmatka.cachedChat";
 
 type SecureStoreLike = {
   getItemAsync: (key: string) => Promise<string | null>;
@@ -200,4 +224,92 @@ export function setCachedChart(slug: string, chartType: "jodi" | "panna", value:
     value,
     cachedAt: Date.now()
   });
+}
+
+export function getCachedNotifications(sessionKey: string, maxAgeMs = 5 * 60_000) {
+  const key = `${WEB_NOTIFICATIONS_CACHE_KEY}:${sessionKey}`;
+  if (!notificationsCache.has(key)) {
+    const webEntry = readWebCacheEntry<NotificationEntry[]>(key);
+    if (webEntry) {
+      notificationsCache.set(key, webEntry);
+    }
+  }
+
+  const entry = notificationsCache.get(key);
+  if (!entry) {
+    return null;
+  }
+
+  return Date.now() - entry.cachedAt <= maxAgeMs ? entry.value : null;
+}
+
+export function setCachedNotifications(sessionKey: string, value: NotificationEntry[]) {
+  const key = `${WEB_NOTIFICATIONS_CACHE_KEY}:${sessionKey}`;
+  const entry = {
+    value,
+    cachedAt: Date.now()
+  };
+  notificationsCache.set(key, entry);
+  writeWebCacheEntry(key, entry);
+  void writeNativeCacheEntry(key, entry);
+}
+
+export async function hydrateCachedNotifications(sessionKey: string, maxAgeMs = 30 * 60_000) {
+  const inMemory = getCachedNotifications(sessionKey, maxAgeMs);
+  if (inMemory) {
+    return inMemory;
+  }
+
+  const key = `${WEB_NOTIFICATIONS_CACHE_KEY}:${sessionKey}`;
+  const nativeEntry = await readNativeCacheEntry<NotificationEntry[]>(key);
+  if (!nativeEntry) {
+    return null;
+  }
+
+  notificationsCache.set(key, nativeEntry);
+  return Date.now() - nativeEntry.cachedAt <= maxAgeMs ? nativeEntry.value : null;
+}
+
+export function getCachedChatMessages(sessionKey: string, maxAgeMs = 5 * 60_000) {
+  const key = `${WEB_CHAT_CACHE_KEY}:${sessionKey}`;
+  if (!chatCache.has(key)) {
+    const webEntry = readWebCacheEntry<ChatMessage[]>(key);
+    if (webEntry) {
+      chatCache.set(key, webEntry);
+    }
+  }
+
+  const entry = chatCache.get(key);
+  if (!entry) {
+    return null;
+  }
+
+  return Date.now() - entry.cachedAt <= maxAgeMs ? entry.value : null;
+}
+
+export function setCachedChatMessages(sessionKey: string, value: ChatMessage[]) {
+  const key = `${WEB_CHAT_CACHE_KEY}:${sessionKey}`;
+  const entry = {
+    value,
+    cachedAt: Date.now()
+  };
+  chatCache.set(key, entry);
+  writeWebCacheEntry(key, entry);
+  void writeNativeCacheEntry(key, entry);
+}
+
+export async function hydrateCachedChatMessages(sessionKey: string, maxAgeMs = 30 * 60_000) {
+  const inMemory = getCachedChatMessages(sessionKey, maxAgeMs);
+  if (inMemory) {
+    return inMemory;
+  }
+
+  const key = `${WEB_CHAT_CACHE_KEY}:${sessionKey}`;
+  const nativeEntry = await readNativeCacheEntry<ChatMessage[]>(key);
+  if (!nativeEntry) {
+    return null;
+  }
+
+  chatCache.set(key, nativeEntry);
+  return Date.now() - nativeEntry.cachedAt <= maxAgeMs ? nativeEntry.value : null;
 }

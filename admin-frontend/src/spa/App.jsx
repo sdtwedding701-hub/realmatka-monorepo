@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { fetchApi as baseFetchApi, normalizeAdminApiBase } from "../lib/api.js";
+import { fetchApi as baseFetchApi, fetchHealth, formatApiError, normalizeAdminApiBase } from "../lib/api.js";
 import { clearAdminSession, getAdminSessionExpiry, getAdminToken } from "../lib/session.js";
 import { LoginScreen } from "./LoginScreen.jsx";
 import { AdminShell } from "./AdminShell.jsx";
@@ -90,7 +90,7 @@ export function App() {
         setBootError("");
       })
       .catch((error) => {
-        setBootError(error.message);
+        setBootError(formatApiError(error, "Unable to verify admin session"));
         clearSession();
         setToken("");
       });
@@ -198,17 +198,28 @@ async function fetchApi(apiBase, path, token, options = {}) {
 }
 
 function DashboardPage({ apiBase, token }) {
-  const [state, setState] = useState({ loading: true, error: "", summary: null, reports: null, users: [], monitoring: null });
+  const [state, setState] = useState({ loading: true, error: "", summary: null, reports: null, users: [], monitoring: null, health: null });
 
   useEffect(() => {
     Promise.all([
       fetchApi(apiBase, "/api/admin/dashboard-summary", token),
       fetchApi(apiBase, "/api/admin/reports-summary", token),
       fetchApi(apiBase, "/api/admin/users", token),
-      fetchApi(apiBase, "/api/admin/monitoring-summary", token)
+      fetchApi(apiBase, "/api/admin/monitoring-summary", token),
+      fetchHealth(apiBase)
     ])
-      .then(([summary, reports, users, monitoring]) => setState({ loading: false, error: "", summary, reports, users, monitoring }))
-      .catch((error) => setState({ loading: false, error: error.message, summary: null, reports: null, users: [], monitoring: null }));
+      .then(([summary, reports, users, monitoring, health]) => setState({ loading: false, error: "", summary, reports, users, monitoring, health }))
+      .catch((error) =>
+        setState({
+          loading: false,
+          error: formatApiError(error, "Dashboard load failed"),
+          summary: null,
+          reports: null,
+          users: [],
+          monitoring: null,
+          health: null
+        })
+      );
   }, [apiBase, token]);
 
   if (state.loading) return <PageState title="Dashboard" subtitle="Loading dashboard..." />;
@@ -431,6 +442,17 @@ function DashboardPage({ apiBase, token }) {
       <section className="panel">
         <div className="dashboard-grid">
           <div className="subpanel">
+            <h3>Backend Health</h3>
+            <div className="compact-list">
+              <div className="compact-row"><strong>Status</strong><span>{state.health?.status || "unknown"}</span></div>
+              <div className="compact-row"><strong>Database</strong><span>{state.health?.checks?.database?.status || "-"}</span></div>
+              <div className="compact-row"><strong>Env</strong><span>{state.health?.checks?.env?.status || "-"}</span></div>
+              <div className="compact-row"><strong>Manifest</strong><span>{state.health?.checks?.manifest?.status || "-"}</span></div>
+              <div className="compact-row"><strong>Uptime</strong><span>{state.health?.uptimeSeconds ?? 0}s</span></div>
+              <div className="compact-row"><strong>Request ID</strong><span>{state.health?.requestId || "-"}</span></div>
+            </div>
+          </div>
+          <div className="subpanel">
             <h3>Monitoring Snapshot</h3>
             <div className="compact-list">
               <div className="compact-row"><strong>Blocked Users</strong><span>{state.monitoring?.summary?.blockedUsers ?? 0}</span></div>
@@ -603,7 +625,7 @@ function UsersPage({ apiBase, token, me }) {
   async function loadUsers() {
     fetchApi(apiBase, "/api/admin/users", token)
       .then((users) => setState({ loading: false, error: "", users }))
-      .catch((error) => setState({ loading: false, error: error.message, users: [] }));
+      .catch((error) => setState({ loading: false, error: formatApiError(error, "Users load failed"), users: [] }));
   }
 
   async function submitApproval(userId, action) {
@@ -617,7 +639,7 @@ function UsersPage({ apiBase, token, me }) {
       await loadUsers();
       setMessage(action === "approve" ? "User approved successfully." : "User rejected successfully.");
     } catch (error) {
-      setMessage(error.message || "User approval action failed.");
+      setMessage(formatApiError(error, "User approval action failed."));
     } finally {
       setBusyId("");
     }
@@ -634,7 +656,7 @@ function UsersPage({ apiBase, token, me }) {
       await loadUsers();
       setMessage(`User ${action} action saved.`);
     } catch (error) {
-      setMessage(error.message || "User lifecycle update failed.");
+      setMessage(formatApiError(error, "User lifecycle update failed."));
     } finally {
       setBusyId("");
     }
@@ -646,7 +668,7 @@ function UsersPage({ apiBase, token, me }) {
       const detail = await fetchApi(apiBase, `/api/admin/user-detail?userId=${encodeURIComponent(userId)}`, token);
       setLedgerState({ open: true, loading: false, error: "", detail });
     } catch (error) {
-      setLedgerState({ open: true, loading: false, error: error.message || "Unable to load ledger.", detail: null });
+      setLedgerState({ open: true, loading: false, error: formatApiError(error, "Unable to load ledger."), detail: null });
     }
   }
 
@@ -887,7 +909,7 @@ function RequestsPage({ apiBase, token }) {
       fetchApi(apiBase, "/api/admin/reconciliation-summary", token)
     ])
       .then(([items, pending, reconciliation]) => setState({ loading: false, error: "", items, pending, reconciliation }))
-      .catch((error) => setState({ loading: false, error: error.message, items: [], pending: [], reconciliation: null }));
+      .catch((error) => setState({ loading: false, error: formatApiError(error, "Wallet requests load failed"), items: [], pending: [], reconciliation: null }));
   }
 
   function openAction(item, action) {
@@ -919,7 +941,7 @@ function RequestsPage({ apiBase, token }) {
       await load();
       setMessage(getPayoutSuccessMessage(actionDraft.action));
     } catch (error) {
-      setMessage(error.message || "Payout action failed.");
+      setMessage(formatApiError(error, "Payout action failed."));
     } finally {
       setBusyId("");
     }
@@ -963,7 +985,7 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
           setSelectedSlug(markets[0].slug);
         }
       })
-      .catch((error) => setState({ loading: false, error: error.message, markets: [], auditLogs: [] }));
+      .catch((error) => setState({ loading: false, error: formatApiError(error, "Result engine load failed"), markets: [], auditLogs: [] }));
   }, [apiBase, token, marketStorageKey]);
 
   useEffect(() => {
@@ -1199,7 +1221,7 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
         setMessage("Result published, market updated, and charts refreshed.");
       }
     } catch (error) {
-      setMessage(error.message || "Result publish failed.");
+      setMessage(formatApiError(error, "Result publish failed."));
     } finally {
       setBusy("");
     }
@@ -1255,7 +1277,7 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
         setMessage(`${market.name}: final result publish aur resettle ho gaya.`);
       }
     } catch (error) {
-      setMessage(error.message || `${market.name}: publish failed.`);
+      setMessage(formatApiError(error, `${market.name}: publish failed.`));
     } finally {
       setBusy("");
     }
@@ -1317,7 +1339,7 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
       setState((current) => ({ ...current, auditLogs: result.auditLogs }));
       setMessage("Chart saved successfully.");
     } catch (error) {
-      setMessage(error.message || "Chart save failed.");
+      setMessage(formatApiError(error, "Chart save failed."));
     } finally {
       setBusy("");
     }
@@ -1396,7 +1418,7 @@ function ReportsPage({ apiBase, token }) {
     if (to) params.set("to", to);
     fetchApi(apiBase, `/api/admin/reports-summary${params.toString() ? `?${params.toString()}` : ""}`, token)
       .then((report) => setState({ loading: false, error: "", report }))
-      .catch((error) => setState({ loading: false, error: error.message, report: null }));
+      .catch((error) => setState({ loading: false, error: formatApiError(error, "Reports load failed"), report: null }));
   }, [apiBase, token, from, to]);
 
   if (state.loading) return <PageState title="Reports" subtitle="Loading reports..." />;
@@ -1462,7 +1484,7 @@ function BidsPage({ apiBase, token }) {
   useEffect(() => {
     fetchApi(apiBase, "/api/admin/bids", token)
       .then((bids) => setState({ loading: false, error: "", bids }))
-      .catch((error) => setState({ loading: false, error: error.message, bids: [] }));
+      .catch((error) => setState({ loading: false, error: formatApiError(error, "Bids load failed"), bids: [] }));
   }, [apiBase, token]);
 
   if (state.loading) return <PageState title="All Bids" subtitle="Loading bids..." />;

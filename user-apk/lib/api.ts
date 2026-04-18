@@ -96,6 +96,20 @@ export type PaymentOrder = {
   remoteStatus?: string;
 };
 
+export type HealthSnapshot = {
+  ok: boolean;
+  status: "ok" | "warn" | "error";
+  service: string;
+  timestamp: string;
+  uptimeSeconds: number;
+  requestId?: string;
+  checks?: {
+    env?: { status: string; warnings?: string[]; errors?: string[] };
+    manifest?: { status: string };
+    database?: { status: string; provider?: string };
+  };
+};
+
 type ApiEnvelope<T> = {
   ok: boolean;
   data?: T;
@@ -107,6 +121,7 @@ type AuthFailureListener = (failedToken: string) => void;
 export class ApiError extends Error {
   status: number;
   isAuthError: boolean;
+  requestId?: string;
 
   constructor(message: string, status = 500) {
     super(message);
@@ -204,6 +219,7 @@ async function request<T>(path: string, options: RequestOptions = {}) {
 
     if (!response.ok || !payload?.ok) {
       const error = new ApiError(payload?.error || "Request failed", response.status || 500);
+      error.requestId = response.headers.get("x-request-id") || "";
       const shouldRetry = method === "GET" && response.status >= 500 && attempt < retries;
       if (shouldRetry) {
         attempt += 1;
@@ -218,6 +234,21 @@ async function request<T>(path: string, options: RequestOptions = {}) {
 
     return payload.data as T;
   }
+}
+
+async function healthRequest() {
+  const url = `${getApiBaseUrl()}/health`;
+  const response = await fetch(url);
+  const payload = (await response.json().catch(() => null)) as HealthSnapshot | null;
+  if (!response.ok || !payload?.service) {
+    const error = new ApiError(payload && "error" in payload && typeof (payload as any).error === "string" ? (payload as any).error : "Health check failed", response.status || 500);
+    error.requestId = response.headers.get("x-request-id") || "";
+    throw error;
+  }
+  return {
+    ...payload,
+    requestId: response.headers.get("x-request-id") || ""
+  } as HealthSnapshot;
 }
 
 function queryString(params: Record<string, string | undefined>) {
@@ -415,9 +446,9 @@ export const api = {
     }>("/api/profile/referrals", { token });
   },
 
-  notificationHistory(token: string) {
+  notificationHistory(token: string, limit = 50) {
     return request<Array<{ id: string; title: string; body: string; channel: string; read: boolean; createdAt: string }>>(
-      "/api/notifications/history",
+      `/api/notifications/history${queryString({ limit: String(limit) })}`,
       { token }
     );
   },
@@ -430,7 +461,7 @@ export const api = {
     });
   },
 
-  getSupportConversation(token: string) {
+  getSupportConversation(token: string, limit = 80) {
     return request<{
       conversation: { id: string; status: string };
       messages: Array<{
@@ -443,7 +474,7 @@ export const api = {
         readByAdmin: boolean;
         createdAt: string;
       }>;
-    }>("/api/chat/conversation", { token });
+    }>(`/api/chat/conversation${queryString({ limit: String(limit) })}`, { token });
   },
 
   sendSupportMessage(token: string, text: string) {
@@ -468,5 +499,17 @@ export const api = {
       token,
       body: { referenceId }
     });
+  },
+
+  health() {
+    return healthRequest();
   }
 };
+
+export function formatApiError(error: unknown, fallback = "Request failed") {
+  const message = error instanceof Error ? error.message : fallback;
+  const requestId =
+    error instanceof ApiError ? String(error.requestId || "").trim() : "";
+
+  return requestId ? `${message} (Req ID: ${requestId})` : message;
+}

@@ -3,7 +3,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, AppState, AppStateStatus, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
-import { api, type PaymentOrder } from "@/lib/api";
+import { api, formatApiError, type PaymentOrder } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
 import { colors } from "@/theme/colors";
 
@@ -66,7 +66,7 @@ export default function AddFundScreen() {
 
         return next;
       } catch (statusError) {
-        setError(statusError instanceof Error ? statusError.message : "Payment status check nahi hua.");
+        setError(formatApiError(statusError, "Payment status check nahi hua."));
         return null;
       } finally {
         if (!silent) {
@@ -262,7 +262,7 @@ export default function AddFundScreen() {
       setPendingOrder(order);
       await Linking.openURL(order.redirectUrl);
     } catch (startError) {
-      setError(startError instanceof Error ? startError.message : "Payment start nahi hua.");
+      setError(formatApiError(startError, "Payment start nahi hua."));
     } finally {
       setSubmitting(false);
     }

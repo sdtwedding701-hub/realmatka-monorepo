@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackHeader } from "@/components/ui";
-import { api } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
+import { getCachedChatMessages, hydrateCachedChatMessages, setCachedChatMessages } from "@/lib/content-cache";
 import { colors } from "@/theme/colors";
 
 type ChatMessage = {
@@ -19,7 +20,8 @@ type ChatMessage = {
   createdAt: string;
 };
 
-const CHAT_REFRESH_INTERVAL_MS = 15_000;
+const CHAT_REFRESH_INTERVAL_MS = 30_000;
+const CHAT_WINDOW_SIZE = 80;
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
@@ -28,10 +30,11 @@ export default function ChatScreen() {
   const [draft, setDraft] = useState("");
   const [focused, setFocused] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => (sessionToken ? getCachedChatMessages(sessionToken) ?? [] : []));
+  const [loading, setLoading] = useState(() => !(sessionToken && getCachedChatMessages(sessionToken)?.length));
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const inFlightRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -54,10 +57,21 @@ export default function ChatScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!sessionToken) {
+        setMessages([]);
+        setLoading(false);
         return;
       }
 
       let active = true;
+
+      void (async () => {
+        const cached = await hydrateCachedChatMessages(sessionToken);
+        if (active && cached?.length) {
+          setMessages(cached);
+          setLoading(false);
+        }
+      })();
+
       void loadConversation(true);
 
       const interval = setInterval(() => {
@@ -157,20 +171,30 @@ export default function ChatScreen() {
       return;
     }
 
-    try {
-      if (showLoader) {
-        setLoading(true);
-      }
-      const next = await api.getSupportConversation(sessionToken);
-      setMessages(next.messages);
-      setError("");
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Support chat load nahi hua.");
-    } finally {
-      if (showLoader) {
-        setLoading(false);
-      }
+    if (inFlightRef.current) {
+      return inFlightRef.current;
     }
+
+    inFlightRef.current = (async () => {
+      try {
+        if (showLoader && !messages.length) {
+          setLoading(true);
+        }
+        const next = await api.getSupportConversation(sessionToken, CHAT_WINDOW_SIZE);
+        setMessages(next.messages);
+        setCachedChatMessages(sessionToken, next.messages);
+        setError("");
+      } catch (loadError) {
+        setError(formatApiError(loadError, "Support chat load nahi hua."));
+      } finally {
+        inFlightRef.current = null;
+        if (showLoader && !messages.length) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return inFlightRef.current;
   }
 
   async function handleSend() {
@@ -186,7 +210,7 @@ export default function ChatScreen() {
       await api.sendSupportMessage(sessionToken, text);
       await loadConversation(false);
     } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : "Message send nahi hua.");
+      setError(formatApiError(sendError, "Message send nahi hua."));
     } finally {
       setSending(false);
     }

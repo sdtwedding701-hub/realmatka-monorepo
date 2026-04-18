@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppScreen, BackHeader } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
+import { formatApiError } from "@/lib/api";
 import { colors } from "@/theme/colors";
 
 export default function ResetPasswordScreen() {
@@ -48,7 +49,7 @@ export default function ResetPasswordScreen() {
               setConfirmPassword("");
               setMessage("Password updated successfully.");
             } catch (updateError) {
-              setError(updateError instanceof Error ? updateError.message : "Unable to update password");
+              setError(formatApiError(updateError, "Unable to update password"));
             } finally {
               setSubmitting(false);
             }

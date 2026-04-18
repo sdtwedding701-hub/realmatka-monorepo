@@ -1,0 +1,17 @@
+import {
+  addSupportChatMessage as addSupportChatMessageRecord,
+  getSupportConversationBundleForUser as getSupportConversationBundleForUserRecord,
+  getSupportConversationDetailsForAdmin as getSupportConversationDetailsForAdminRecord,
+  listSupportConversations as listSupportConversationsRecord,
+  markSupportMessagesReadByAdmin as markSupportMessagesReadByAdminRecord,
+  markSupportMessagesReadByUser as markSupportMessagesReadByUserRecord,
+  updateSupportConversationStatus as updateSupportConversationStatusRecord
+} from "../db/chat-db.mjs";
+
+export const addSupportChatMessage = addSupportChatMessageRecord;
+export const getSupportConversationBundleForUser = getSupportConversationBundleForUserRecord;
+export const getSupportConversationDetailsForAdmin = getSupportConversationDetailsForAdminRecord;
+export const listSupportConversations = listSupportConversationsRecord;
+export const markSupportMessagesReadByAdmin = markSupportMessagesReadByAdminRecord;
+export const markSupportMessagesReadByUser = markSupportMessagesReadByUserRecord;
+export const updateSupportConversationStatus = updateSupportConversationStatusRecord;

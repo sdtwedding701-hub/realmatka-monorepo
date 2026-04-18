@@ -1,0 +1,323 @@
+import { addWalletEntry, getBankAccountsForUser, getUserBalance, getWalletAdminRequestItems, getWalletEntriesForUser } from "../stores/wallet-store.mjs";
+import { getBidsForUser, listAllBids } from "../stores/bids-store.mjs";
+import {
+  clearWalletEntriesForUser,
+  completeWalletRequest,
+  findUserById,
+  findUserByPhone,
+  getAuditLogs,
+  getUsersList,
+  getUserAdminSummaries,
+  rejectWalletRequest,
+  resolveWalletApprovalRequest,
+  updateUserAccountStatus,
+  updateUserApprovalStatus,
+  updateWalletEntryAdmin
+} from "../stores/admin-store.mjs";
+
+function roundAmount(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function buildUserLedgerSummary(walletEntries, bids, walletBalance) {
+  const totals = {
+    deposits: 0,
+    withdraws: 0,
+    bidPlaced: 0,
+    bidWins: 0,
+    adminCredits: 0,
+    adminDebits: 0
+  };
+
+  for (const entry of walletEntries) {
+    const amount = Number(entry.amount || 0);
+    const type = String(entry.type || "").toUpperCase();
+    if (type === "DEPOSIT" && entry.status === "SUCCESS") totals.deposits += amount;
+    if (type === "WITHDRAW" && entry.status === "SUCCESS") totals.withdraws += amount;
+    if (type === "BID_PLACED" && entry.status === "SUCCESS") totals.bidPlaced += amount;
+    if (type === "BID_WIN" && entry.status === "SUCCESS") totals.bidWins += amount;
+    if (type === "ADMIN_CREDIT" && entry.status === "SUCCESS") totals.adminCredits += amount;
+    if (type === "ADMIN_DEBIT" && entry.status === "SUCCESS") totals.adminDebits += amount;
+  }
+
+  return {
+    walletBalance: roundAmount(walletBalance),
+    deposits: roundAmount(totals.deposits),
+    withdraws: roundAmount(totals.withdraws),
+    bidPlaced: roundAmount(totals.bidPlaced),
+    bidWins: roundAmount(totals.bidWins),
+    adminCredits: roundAmount(totals.adminCredits),
+    adminDebits: roundAmount(totals.adminDebits),
+    totalBids: bids.length,
+    wonBids: bids.filter((bid) => bid.status === "Won").length,
+    lostBids: bids.filter((bid) => bid.status === "Lost").length,
+    pendingBids: bids.filter((bid) => bid.status === "Pending").length
+  };
+}
+
+export async function getAdminUsersOverview() {
+  const usersList = await getUserAdminSummaries();
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  return usersList.map((user) => ({
+    ...user,
+    activityState: user.lastActivity && new Date(user.lastActivity).getTime() >= sevenDaysAgo ? "Active" : "Inactive"
+  }));
+}
+
+export async function getAdminUserDetail(userId) {
+  const user = await findUserById(userId);
+  if (!user) {
+    return { ok: false, status: 404, error: "User not found" };
+  }
+
+  const [walletEntries, bids, bankAccounts, walletBalance] = await Promise.all([
+    getWalletEntriesForUser(userId, 120),
+    getBidsForUser(userId, 120),
+    getBankAccountsForUser(userId),
+    getUserBalance(userId)
+  ]);
+
+  return {
+    ok: true,
+    data: {
+      user: {
+        id: user.id,
+        name: user.name,
+        phone: user.phone,
+        role: user.role,
+        referralCode: user.referralCode,
+        joinedAt: user.joinedAt,
+        approvalStatus: user.approvalStatus,
+        approvedAt: user.approvedAt,
+        rejectedAt: user.rejectedAt,
+        blockedAt: user.blockedAt,
+        deactivatedAt: user.deactivatedAt,
+        statusNote: user.statusNote,
+        signupBonusGranted: user.signupBonusGranted,
+        walletBalance,
+        referredByUserId: user.referredByUserId
+      },
+      summary: buildUserLedgerSummary(walletEntries, bids, walletBalance),
+      bids,
+      walletEntries,
+      bankAccounts
+    }
+  };
+}
+
+export async function changeUserApproval(userId, action) {
+  const nextStatus = action === "approve" ? "Approved" : action === "reject" ? "Rejected" : null;
+  if (!userId || !nextStatus) {
+    return { ok: false, status: 400, error: "userId and valid action are required" };
+  }
+  const updatedUser = await updateUserApprovalStatus(userId, nextStatus);
+  if (!updatedUser) {
+    return { ok: false, status: 404, error: "User not found" };
+  }
+  return { ok: true, data: updatedUser, meta: { action: nextStatus === "Approved" ? "USER_APPROVED" : "USER_REJECTED" } };
+}
+
+export async function getAdminWalletRequests(history = false) {
+  return getWalletAdminRequestItems({ history });
+}
+
+export async function handleWalletRequestAction(body) {
+  const requestId = String(body.requestId ?? "");
+  const action = String(body.action ?? "");
+  const note = String(body.note ?? "").trim();
+  const referenceId = String(body.referenceId ?? "").trim();
+  const proofUrl = String(body.proofUrl ?? "").trim();
+
+  if (!requestId || !["approve", "reject", "complete", "annotate"].includes(action)) {
+    return { ok: false, status: 400, error: "requestId and valid action are required" };
+  }
+
+  if (action === "complete" || action === "annotate") {
+    const baseUpdated =
+      action === "complete"
+        ? await completeWalletRequest(requestId)
+        : await updateWalletEntryAdmin(requestId, { note, referenceId, proofUrl });
+    const updated = baseUpdated
+      ? await updateWalletEntryAdmin(baseUpdated.id, { note, referenceId, proofUrl })
+      : null;
+    if (!updated) {
+      return { ok: false, status: 404, error: "Wallet request not found" };
+    }
+    return {
+      ok: true,
+      data: { request: updated, settlementEntry: null },
+      meta: {
+        action: action === "complete" ? "WALLET_REQUEST_COMPLETED" : "WALLET_REQUEST_ANNOTATED",
+        details: {
+          type: updated.type,
+          amount: updated.amount,
+          status: updated.status,
+          referenceId: updated.referenceId || null,
+          proofUrl: updated.proofUrl || null,
+          note: updated.note || null
+        }
+      }
+    };
+  }
+
+  if (action === "reject") {
+    const baseRejected = await rejectWalletRequest(requestId);
+    const updated = baseRejected
+      ? await updateWalletEntryAdmin(baseRejected.id, { note, referenceId, proofUrl })
+      : null;
+    if (!updated) {
+      return { ok: false, status: 404, error: "Wallet request not found" };
+    }
+    return {
+      ok: true,
+      data: { request: updated, settlementEntry: null },
+      meta: {
+        action: "WALLET_REQUEST_REJECTED",
+        details: {
+          type: updated.type,
+          amount: updated.amount,
+          status: updated.status,
+          referenceId: updated.referenceId || null,
+          proofUrl: updated.proofUrl || null,
+          note: updated.note || null
+        }
+      }
+    };
+  }
+
+  const resolved = await resolveWalletApprovalRequest(requestId, action);
+  if (!resolved?.request) {
+    return { ok: false, status: 404, error: "Wallet request not found" };
+  }
+  const patchedRequest = await updateWalletEntryAdmin(resolved.request.id, { note, referenceId, proofUrl });
+  return {
+    ok: true,
+    data: { request: patchedRequest || resolved.request, settlementEntry: resolved.settlementEntry },
+    meta: {
+      action: action === "approve" ? "WALLET_REQUEST_APPROVED" : "WALLET_REQUEST_REJECTED",
+      details: {
+        type: resolved.request.type,
+        amount: resolved.request.amount,
+        settlementEntryId: resolved.settlementEntry?.id ?? null,
+        referenceId: referenceId || null,
+        proofUrl: proofUrl || null,
+        note: note || null
+      }
+    }
+  };
+}
+
+export async function changeUserStatus(userId, action, note) {
+  if (!userId || !["block", "unblock", "deactivate", "activate"].includes(action)) {
+    return { ok: false, status: 400, error: "userId and valid action are required" };
+  }
+  const updatedUser = await updateUserAccountStatus(userId, action, note);
+  if (!updatedUser) {
+    return { ok: false, status: 404, error: "User not found" };
+  }
+  return {
+    ok: true,
+    data: updatedUser,
+    meta: {
+      action: `USER_${action.toUpperCase()}`,
+      details: {
+        blockedAt: updatedUser.blockedAt,
+        deactivatedAt: updatedUser.deactivatedAt,
+        statusNote: updatedUser.statusNote
+      }
+    }
+  };
+}
+
+export async function createWalletAdjustment(body) {
+  const userId = String(body.userId ?? "");
+  const mode = String(body.mode ?? "").toLowerCase();
+  const note = String(body.note ?? "").trim();
+  const amount = roundAmount(Number(body.amount ?? 0));
+
+  if (!userId || !["credit", "debit"].includes(mode) || amount <= 0) {
+    return { ok: false, status: 400, error: "userId, mode, and positive amount are required" };
+  }
+
+  const user = await findUserById(userId);
+  if (!user) {
+    return { ok: false, status: 404, error: "User not found" };
+  }
+
+  const beforeBalance = await getUserBalance(userId);
+  if (mode === "debit" && amount > beforeBalance) {
+    return { ok: false, status: 400, error: "Insufficient user balance for debit" };
+  }
+
+  const entry = await addWalletEntry({
+    userId,
+    type: mode === "credit" ? "ADMIN_CREDIT" : "ADMIN_DEBIT",
+    status: "SUCCESS",
+    amount,
+    beforeBalance,
+    afterBalance: mode === "credit" ? beforeBalance + amount : beforeBalance - amount
+  });
+
+  return {
+    ok: true,
+    data: { entry },
+    meta: {
+      action: mode === "credit" ? "WALLET_CREDIT" : "WALLET_DEBIT",
+      entityType: "wallet_entry",
+      entityId: entry.id,
+      details: { userId, amount, note: note || null }
+    }
+  };
+}
+
+export async function cleanupWalletTestDataForUser(body) {
+  const userId = String(body.userId ?? "").trim();
+  const phone = String(body.phone ?? "").trim();
+  const types = Array.isArray(body.types) ? body.types : ["WITHDRAW"];
+
+  const targetUser = userId ? await findUserById(userId) : phone ? await findUserByPhone(phone) : null;
+  if (!targetUser) {
+    return { ok: false, status: 404, error: "Target user not found" };
+  }
+
+  const result = await clearWalletEntriesForUser(targetUser.id, types);
+  return {
+    ok: true,
+    data: {
+      userId: targetUser.id,
+      phone: targetUser.phone,
+      deletedCount: result.deletedCount,
+      balance: result.balance
+    },
+    meta: {
+      action: "WALLET_TEST_DATA_CLEANUP",
+      entityType: "wallet_entry",
+      entityId: targetUser.id,
+      details: {
+        userId: targetUser.id,
+        phone: targetUser.phone,
+        types,
+        deletedCount: result.deletedCount,
+        balance: result.balance
+      }
+    }
+  };
+}
+
+export async function getAdminBidsList() {
+  const bids = await listAllBids();
+  const users = await getUsersList();
+  const usersById = new Map(users.map((user) => [user.id, user]));
+
+  return bids.map((bid) => {
+    const user = usersById.get(bid.userId) ?? null;
+    return {
+      ...bid,
+      user: user ? { id: user.id, name: user.name, phone: user.phone } : null
+    };
+  });
+}
+
+export async function getAdminAuditLogs(limit = 100) {
+  return getAuditLogs(limit);
+}

@@ -2,7 +2,7 @@ import { Link } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppHeader, AppScreen } from "@/components/ui";
-import { api } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
 import { getCachedMarkets, setCachedMarkets } from "@/lib/content-cache";
 import { colors } from "@/theme/colors";
 
@@ -84,7 +84,7 @@ export default function ChartsScreen() {
       setMarkets(nextMarkets);
       setCachedMarkets(nextMarkets);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load charts");
+      setError(formatApiError(loadError, "Unable to load charts"));
     } finally {
       if (showLoader) {
         setLoading(false);

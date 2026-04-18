@@ -1,15 +1,14 @@
-import { getReferralOverview, getUserBalance, requireUserByToken, updateUserProfile } from "../db.mjs";
-import { corsPreflight, fail, getJsonBody, getSessionToken, normalizeIndianPhone, ok, unauthorized } from "../http.mjs";
+import { getReferralOverview, getUserBalance, updateUserProfile } from "../db.mjs";
+import { requireAuthenticatedUser } from "../middleware/auth-middleware.mjs";
+import { corsPreflight, fail, getJsonBody, normalizeIndianPhone, ok } from "../http.mjs";
 
 export function options(request) {
   return corsPreflight(request);
 }
 
 export async function update(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
 
   const body = await getJsonBody(request);
   const name = String(body.name ?? "").trim();
@@ -19,7 +18,7 @@ export async function update(request) {
     return fail("name and phone are required", 400, request);
   }
 
-  const updated = await updateUserProfile(user.id, { name, phone });
+  const updated = await updateUserProfile(auth.user.id, { name, phone });
   if (!updated) {
     return fail("User not found", 404, request);
   }
@@ -38,16 +37,14 @@ export async function update(request) {
 }
 
 export async function referrals(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
 
-  const overview = await getReferralOverview(user.id);
+  const overview = await getReferralOverview(auth.user.id);
 
   return ok(
     {
-      referralCode: user.referralCode,
+      referralCode: auth.user.referralCode,
       referredCount: overview.referredCount,
       referralIncomeTotal: overview.referralIncomeTotal,
       referredUsers: overview.referredUsers

@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+const ADMIN_CONVERSATION_PAGE_SIZE = 50;
+const ADMIN_CHAT_WINDOW_SIZE = 100;
+const ADMIN_CHAT_WINDOW_STEP = 100;
+
 export function SupportChatPage({
   apiBase,
   token,
@@ -20,35 +24,53 @@ export function SupportChatPage({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [conversations, setConversations] = useState([]);
+  const [conversationMeta, setConversationMeta] = useState({ total: 0, offset: 0, limit: ADMIN_CONVERSATION_PAGE_SIZE, hasMore: false });
   const [selectedId, setSelectedId] = useState("");
   const [messages, setMessages] = useState([]);
+  const [messageWindowSize, setMessageWindowSize] = useState(ADMIN_CHAT_WINDOW_SIZE);
+  const [messageMeta, setMessageMeta] = useState({ totalCount: 0, hasOlder: false, limit: ADMIN_CHAT_WINDOW_SIZE });
+  const [olderBusy, setOlderBusy] = useState(false);
+  const [listBusy, setListBusy] = useState(false);
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
   const [inboxFilter, setInboxFilter] = useState("all");
   const messagesRef = useRef(null);
 
   function normalizeConversationListResponse(data) {
-    if (Array.isArray(data)) {
-      return data;
-    }
-    if (Array.isArray(data?.conversations)) {
-      return data.conversations;
-    }
-    return [];
+    const items = Array.isArray(data) ? data : Array.isArray(data?.conversations) ? data.conversations : Array.isArray(data?.items) ? data.items : [];
+    const pagination = data?.pagination || {};
+    return {
+      items,
+      pagination: {
+        total: Number(pagination.total || items.length || 0),
+        offset: Number(pagination.offset || 0),
+        limit: Number(pagination.limit || ADMIN_CONVERSATION_PAGE_SIZE),
+        hasMore: Boolean(pagination.hasMore)
+      }
+    };
   }
 
   useEffect(() => {
     let active = true;
+    const normalizedSearch = search.trim();
 
-    async function loadConversations(showLoader = false, preferredConversationId = "") {
+    async function loadConversations(showLoader = false, preferredConversationId = "", options = {}) {
       if (showLoader) {
         setLoading(true);
       }
       try {
-        const data = await fetchApi(apiBase, "/api/admin/chat-conversations", token);
+        const query = new URLSearchParams({
+          limit: String(options.limit || ADMIN_CONVERSATION_PAGE_SIZE),
+          offset: String(options.offset || 0),
+          filter: options.filter || inboxFilter,
+          search: options.search ?? normalizedSearch
+        });
+        const data = await fetchApi(apiBase, `/api/admin/chat-conversations?${query.toString()}`, token);
         if (!active) return;
-        const nextConversations = normalizeConversationListResponse(data);
+        const normalizedResponse = normalizeConversationListResponse(data);
+        const nextConversations = normalizedResponse.items;
         setConversations(nextConversations);
+        setConversationMeta(normalizedResponse.pagination);
         setSelectedId((current) => {
           if (preferredConversationId && nextConversations.some((conversation) => conversation.id === preferredConversationId)) {
             return preferredConversationId;
@@ -69,33 +91,42 @@ export function SupportChatPage({
       }
     }
 
-    loadConversations(true);
-    const timer = window.setInterval(() => loadConversations(false), supportConversationsRefreshMs);
+    loadConversations(true, "", { limit: ADMIN_CONVERSATION_PAGE_SIZE, offset: 0, filter: inboxFilter, search: normalizedSearch });
+    const timer = window.setInterval(
+      () => loadConversations(false, selectedId, { limit: conversationMeta.limit || ADMIN_CONVERSATION_PAGE_SIZE, offset: 0, filter: inboxFilter, search: normalizedSearch }),
+      supportConversationsRefreshMs
+    );
 
     return () => {
       active = false;
       window.clearInterval(timer);
     };
-  }, [apiBase, fetchApi, supportConversationsRefreshMs, token]);
+  }, [apiBase, conversationMeta.limit, fetchApi, inboxFilter, search, selectedId, supportConversationsRefreshMs, token]);
 
   useEffect(() => {
     if (!selectedId) {
       setMessages([]);
+      setMessageMeta({ totalCount: 0, hasOlder: false, limit: ADMIN_CHAT_WINDOW_SIZE });
       setLoading(false);
       return;
     }
 
     let active = true;
 
-    async function loadMessages(showLoader = false) {
+    async function loadMessages(showLoader = false, limitOverride = messageWindowSize) {
       if (showLoader) {
         setLoading(true);
       }
       try {
-        const query = new URLSearchParams({ conversationId: selectedId });
+        const query = new URLSearchParams({ conversationId: selectedId, limit: String(limitOverride) });
         const data = await fetchApi(apiBase, `/api/admin/chat-messages?${query.toString()}`, token);
         if (!active) return;
         setMessages(Array.isArray(data.messages) ? data.messages : []);
+        setMessageMeta({
+          totalCount: Number(data.pagination?.totalCount || (Array.isArray(data.messages) ? data.messages.length : 0)),
+          hasOlder: Boolean(data.pagination?.hasOlder),
+          limit: Number(data.pagination?.limit || limitOverride || ADMIN_CHAT_WINDOW_SIZE)
+        });
         setConversations((current) =>
           current.map((conversation) =>
             conversation.id === selectedId
@@ -118,14 +149,14 @@ export function SupportChatPage({
       }
     }
 
-    loadMessages(true);
-    const timer = window.setInterval(() => loadMessages(false), supportMessagesRefreshMs);
+    loadMessages(true, messageWindowSize);
+    const timer = window.setInterval(() => loadMessages(false, messageWindowSize), supportMessagesRefreshMs);
 
     return () => {
       active = false;
       window.clearInterval(timer);
     };
-  }, [apiBase, fetchApi, selectedId, supportMessagesRefreshMs, token]);
+  }, [apiBase, fetchApi, messageWindowSize, selectedId, supportMessagesRefreshMs, token]);
 
   useEffect(() => {
     const viewport = messagesRef.current;
@@ -181,6 +212,59 @@ export function SupportChatPage({
     }
   }
 
+  async function handleLoadOlder() {
+    if (!selectedId || olderBusy || !messageMeta.hasOlder) return;
+    const nextLimit = Math.min(messageWindowSize + ADMIN_CHAT_WINDOW_STEP, Math.max(messageWindowSize + ADMIN_CHAT_WINDOW_STEP, messageMeta.totalCount));
+    setOlderBusy(true);
+    setNotice("");
+    try {
+      const query = new URLSearchParams({ conversationId: selectedId, limit: String(nextLimit) });
+      const data = await fetchApi(apiBase, `/api/admin/chat-messages?${query.toString()}`, token);
+      setMessages(Array.isArray(data.messages) ? data.messages : []);
+      setMessageWindowSize(nextLimit);
+      setMessageMeta({
+        totalCount: Number(data.pagination?.totalCount || (Array.isArray(data.messages) ? data.messages.length : 0)),
+        hasOlder: Boolean(data.pagination?.hasOlder),
+        limit: Number(data.pagination?.limit || nextLimit)
+      });
+      setError("");
+      setNotice("Older messages loaded.");
+    } catch (loadError) {
+      setError(loadError.message || "Unable to load older messages.");
+      setNotice("");
+    } finally {
+      setOlderBusy(false);
+    }
+  }
+
+  async function handleLoadMoreConversations() {
+    if (listBusy || !conversationMeta.hasMore) return;
+    setListBusy(true);
+    setNotice("");
+    try {
+      const query = new URLSearchParams({
+        limit: String(conversationMeta.limit || ADMIN_CONVERSATION_PAGE_SIZE),
+        offset: String((conversationMeta.offset || 0) + (conversationMeta.limit || ADMIN_CONVERSATION_PAGE_SIZE)),
+        filter: inboxFilter,
+        search: search.trim()
+      });
+      const data = await fetchApi(apiBase, `/api/admin/chat-conversations?${query.toString()}`, token);
+      const normalizedResponse = normalizeConversationListResponse(data);
+      setConversations((current) => [
+        ...current,
+        ...normalizedResponse.items.filter((item) => !current.some((existing) => existing.id === item.id))
+      ]);
+      setConversationMeta(normalizedResponse.pagination);
+      setError("");
+      setNotice("Older conversations loaded.");
+    } catch (loadError) {
+      setError(loadError.message || "Unable to load more conversations.");
+      setNotice("");
+    } finally {
+      setListBusy(false);
+    }
+  }
+
   async function handleStatusChange(status) {
     if (!selectedId || statusBusy) return;
     setStatusBusy(true);
@@ -214,29 +298,15 @@ export function SupportChatPage({
   }
 
   const selectedConversation = conversations.find((conversation) => conversation.id === selectedId) || null;
-  const filteredConversations = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return [...conversations]
-      .filter((conversation) => {
-        const matchesSearch =
-          !q ||
-          String(conversation.userName || "").toLowerCase().includes(q) ||
-          String(conversation.userPhone || "").toLowerCase().includes(q) ||
-          String(conversation.lastMessagePreview || "").toLowerCase().includes(q);
-        const matchesFilter =
-          inboxFilter === "all" ||
-          (inboxFilter === "unread" && Number(conversation.unreadForAdmin || 0) > 0) ||
-          (inboxFilter === "waiting" && isOlderThanMinutes(conversation.lastMessageAt || conversation.updatedAt, 15)) ||
-          (inboxFilter === "recent" && !isOlderThanMinutes(conversation.lastMessageAt || conversation.updatedAt, 60)) ||
-          (inboxFilter === "resolved" && String(conversation.status || "").toUpperCase() === "RESOLVED");
-        return matchesSearch && matchesFilter;
-      })
-      .sort((left, right) => {
+  const filteredConversations = useMemo(
+    () =>
+      [...conversations].sort((left, right) => {
         const unreadDelta = Number(right.unreadForAdmin || 0) - Number(left.unreadForAdmin || 0);
         if (unreadDelta !== 0) return unreadDelta;
         return new Date(right.lastMessageAt || right.updatedAt || 0).getTime() - new Date(left.lastMessageAt || left.updatedAt || 0).getTime();
-      });
-  }, [conversations, inboxFilter, isOlderThanMinutes, search]);
+      }),
+    [conversations]
+  );
   const unreadCount = conversations.reduce((sum, conversation) => sum + Number(conversation.unreadForAdmin || 0), 0);
   const waitingCount = conversations.filter((conversation) => isOlderThanMinutes(conversation.lastMessageAt || conversation.updatedAt, 15)).length;
   const recentCount = conversations.filter((conversation) => !isOlderThanMinutes(conversation.lastMessageAt || conversation.updatedAt, 60)).length;
@@ -288,7 +358,7 @@ export function SupportChatPage({
           <div className="support-list">
             <div className="support-list-head">
               <h3>Conversations</h3>
-              <span>{filteredConversations.length} shown</span>
+              <span>{filteredConversations.length} loaded / {conversationMeta.total || filteredConversations.length} total</span>
             </div>
             <label className="support-search">
               <span>Search Inbox</span>
@@ -321,6 +391,8 @@ export function SupportChatPage({
                     className={`support-item${conversation.id === selectedId ? " active" : ""}`}
                     onClick={() => {
                       setSelectedId(conversation.id);
+                      setMessageWindowSize(ADMIN_CHAT_WINDOW_SIZE);
+                      setMessageMeta({ totalCount: 0, hasOlder: false, limit: ADMIN_CHAT_WINDOW_SIZE });
                       setNotice("");
                     }}
                   >
@@ -341,6 +413,13 @@ export function SupportChatPage({
             ) : (
               <p className="message">{conversations.length ? "Current search me koi conversation match nahi hui." : "Abhi tak koi support conversation start nahi hui."}</p>
             )}
+            {conversationMeta.hasMore ? (
+              <div className="actions" style={{ marginTop: 12 }}>
+                <button type="button" className="secondary" disabled={listBusy} onClick={() => void handleLoadMoreConversations()}>
+                  {listBusy ? "Loading..." : `Load More (${Math.max((conversationMeta.total || 0) - conversations.length, 0)} left)`}
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="support-thread">
@@ -372,8 +451,8 @@ export function SupportChatPage({
                     <strong>{formatRelativeAge(selectedConversation.lastMessageAt || selectedConversation.updatedAt)}</strong>
                   </div>
                   <div className="support-thread-stat">
-                    <span>Messages</span>
-                    <strong>{messages.length}</strong>
+                    <span>Loaded / Total</span>
+                    <strong>{messages.length} / {messageMeta.totalCount || messages.length}</strong>
                   </div>
                   <div className="support-thread-stat">
                     <span>Unread on admin</span>
@@ -386,6 +465,13 @@ export function SupportChatPage({
                 </div>
 
                 <div className="support-messages" ref={messagesRef}>
+                  {messageMeta.hasOlder ? (
+                    <div className="actions" style={{ marginBottom: 12 }}>
+                      <button type="button" className="secondary" onClick={() => void handleLoadOlder()} disabled={olderBusy}>
+                        {olderBusy ? "Loading..." : `Load Older (${Math.max((messageMeta.totalCount || 0) - messages.length, 0)} left)`}
+                      </button>
+                    </div>
+                  ) : null}
                   {messages.length ? messages.map((message) => {
                     const isAdmin = message.senderRole === "support" || message.senderRole === "admin";
                     return (

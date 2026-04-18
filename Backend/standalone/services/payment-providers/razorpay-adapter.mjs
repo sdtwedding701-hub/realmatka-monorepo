@@ -1,0 +1,96 @@
+import { createHmac } from "node:crypto";
+import { standaloneConfig } from "../../config.mjs";
+
+const razorpayKeyId = process.env.RAZORPAY_KEY_ID?.trim() || "";
+const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET?.trim() || "";
+const razorpayWebhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim() || "";
+
+function roundToPaise(amount) {
+  return Math.round(Number(amount || 0) * 100);
+}
+
+function getRazorpayAuthHeader() {
+  return `Basic ${Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64")}`;
+}
+
+export function isRazorpayEnabled() {
+  return Boolean(razorpayKeyId && razorpayKeySecret);
+}
+
+export async function createRazorpayPaymentLink({ amount, receipt, paymentOrderId, user }) {
+  const amountPaise = roundToPaise(amount);
+  const appReturnBase = (standaloneConfig.appUrl || "https://play.realmatka.in").replace(/\/$/, "");
+  const callbackUrl = `${appReturnBase}/wallet/payment-success?referenceId=${encodeURIComponent(receipt)}&amount=${encodeURIComponent(
+    (amountPaise / 100).toFixed(2)
+  )}`;
+
+  const response = await fetch("https://api.razorpay.com/v1/payment_links", {
+    method: "POST",
+    headers: {
+      Authorization: getRazorpayAuthHeader(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      amount: amountPaise,
+      currency: "INR",
+      upi_link: true,
+      reference_id: receipt,
+      description: "Real Matka Wallet Deposit",
+      callback_url: callbackUrl,
+      callback_method: "get",
+      customer: {
+        name: user?.name || "Real Matka User",
+        contact: user?.phone ? `+91${user.phone}` : undefined
+      },
+      notes: {
+        paymentOrderId,
+        userId: user?.id || ""
+      }
+    })
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.id || !payload?.short_url) {
+    throw new Error(payload?.error?.description || payload?.description || "Unable to create Razorpay payment link");
+  }
+
+  return payload;
+}
+
+export async function fetchRazorpayPaymentLinkStatus(paymentLinkId) {
+  if (!paymentLinkId || !isRazorpayEnabled()) {
+    return null;
+  }
+
+  const response = await fetch(`https://api.razorpay.com/v1/payment_links/${encodeURIComponent(paymentLinkId)}`, {
+    method: "GET",
+    headers: {
+      Authorization: getRazorpayAuthHeader(),
+      "Content-Type": "application/json"
+    }
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.id) {
+    throw new Error(payload?.error?.description || payload?.description || "Unable to fetch Razorpay payment link status");
+  }
+
+  return payload;
+}
+
+export function verifyRazorpaySignature({ orderId, paymentId, signature }) {
+  const expected = createHmac("sha256", razorpayKeySecret).update(`${orderId}|${paymentId}`).digest("hex");
+  return expected === signature;
+}
+
+export function verifyRazorpayWebhookSignature(rawBody, signature) {
+  if (!razorpayWebhookSecret || !signature) {
+    return false;
+  }
+  const expected = createHmac("sha256", razorpayWebhookSecret).update(rawBody).digest("hex");
+  return expected === signature;
+}
+
+export function getRazorpayWebhookSecret() {
+  return razorpayWebhookSecret;
+}

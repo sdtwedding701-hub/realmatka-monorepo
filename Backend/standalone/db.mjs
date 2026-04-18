@@ -1009,70 +1009,39 @@ async function getReadyPgPool() {
   return pool;
 }
 
-export async function findUserByPhone(phone) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, role, referral_code, joined_at, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id
-       FROM users
-       WHERE phone = $1
-       LIMIT 1`,
-      [phone]
-    );
-    return mapUserRow(result.rows[0]);
-  }
+export {
+  getPgPool as __internalGetPgPool,
+  getReadyPgPool as __internalGetReadyPgPool,
+  getSqlite as __internalGetSqlite,
+  mapAppSettingRow as __internalMapAppSettingRow,
+  mapAuditLogRow as __internalMapAuditLogRow,
+  mapBidRow as __internalMapBidRow,
+  mapChatConversationRow as __internalMapChatConversationRow,
+  mapChatMessageRow as __internalMapChatMessageRow,
+  mapMarketRow as __internalMapMarketRow,
+  mapNotificationDeviceRow as __internalMapNotificationDeviceRow,
+  mapUserRow as __internalMapUserRow,
+  mapWalletEntryRow as __internalMapWalletEntryRow,
+  clearCachedAuthSession as __internalClearCachedAuthSession,
+  cacheActiveUserByTokenHash as __internalCacheActiveUserByTokenHash,
+  getCachedActiveUserByTokenHash as __internalGetCachedActiveUserByTokenHash,
+  findSupportSenderUserId as __internalFindSupportSenderUserId,
+  isUserAccountActive as __internalIsUserAccountActive,
+  nowIso as __internalNowIso,
+  sessionTtlMs as __internalSessionTtlMs,
+  supportChatResolvedRetentionMs as __internalSupportChatResolvedRetentionMs,
+  toIso as __internalToIso,
+  toBool as __internalToBool
+};
 
-  const row = getSqlite()
-    .prepare(
-      `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, role, referral_code, joined_at, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id
-       FROM users
-       WHERE phone = ?
-       LIMIT 1`
-    )
-    .get(phone);
-  return mapUserRow(row);
+export async function findUserByPhone(phone) {
+  const { findUserByPhone: findUserByPhoneFromAuthDb } = await import("./db/auth-db.mjs");
+  return findUserByPhoneFromAuthDb(phone);
 }
 
 export async function createSession(userId) {
-  const rawToken = randomBytes(24).toString("hex");
-  const tokenHash = hashSecret(rawToken);
-  const createdAt = nowIso();
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      await client.query(`DELETE FROM sessions WHERE user_id = $1`, [userId]);
-      await client.query(
-        `INSERT INTO sessions (token_hash, user_id, created_at)
-         VALUES ($1, $2, $3)`,
-        [tokenHash, userId, createdAt]
-      );
-      await client.query("COMMIT");
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
-  } else {
-    const sqlite = getSqlite();
-    sqlite.exec("BEGIN");
-    try {
-      sqlite.prepare(`DELETE FROM sessions WHERE user_id = ?`).run(userId);
-      sqlite
-        .prepare(`INSERT INTO sessions (token_hash, user_id, created_at) VALUES (?, ?, ?)`)
-        .run(tokenHash, userId, createdAt);
-      sqlite.exec("COMMIT");
-    } catch (error) {
-      sqlite.exec("ROLLBACK");
-      throw error;
-    }
-  }
-
-  clearCachedAuthSession(tokenHash);
-  return { rawToken, tokenHash, createdAt };
+  const { createSession: createSessionFromAuthDb } = await import("./db/auth-db.mjs");
+  return createSessionFromAuthDb(userId);
 }
 
 export async function revokeSession(token) {
@@ -1092,183 +1061,18 @@ export async function revokeSession(token) {
 }
 
 export async function requireUserByToken(token) {
-  if (!token) {
-    return null;
-  }
-
-  const tokenHash = hashSecret(token);
-  const cachedUser = getCachedActiveUserByTokenHash(tokenHash);
-  if (cachedUser) {
-    return cachedUser;
-  }
-  const minCreatedAt = new Date(Date.now() - sessionTtlMs).toISOString();
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT u.id, u.phone, u.password_hash, u.mpin_hash, u.mpin_configured, u.name, u.role, u.referral_code, u.joined_at, u.approval_status, u.approved_at, u.rejected_at, u.blocked_at, u.deactivated_at, u.status_note, u.signup_bonus_granted, u.referred_by_user_id
-       FROM sessions s
-       JOIN users u ON u.id = s.user_id
-       WHERE s.token_hash = $1 AND s.created_at >= $2
-       LIMIT 1`,
-      [tokenHash, minCreatedAt]
-    );
-    const user = mapUserRow(result.rows[0]);
-    const activeUser = isUserAccountActive(user) ? user : null;
-    if (activeUser) {
-      cacheActiveUserByTokenHash(tokenHash, activeUser);
-    } else {
-      clearCachedAuthSession(tokenHash);
-    }
-    return activeUser;
-  }
-
-  const row = getSqlite()
-    .prepare(
-      `SELECT u.id, u.phone, u.password_hash, u.mpin_hash, u.mpin_configured, u.name, u.role, u.referral_code, u.joined_at, u.approval_status, u.approved_at, u.rejected_at, u.blocked_at, u.deactivated_at, u.status_note, u.signup_bonus_granted, u.referred_by_user_id
-       FROM sessions s
-       JOIN users u ON u.id = s.user_id
-       WHERE s.token_hash = ? AND s.created_at >= ?
-       LIMIT 1`
-    )
-    .get(tokenHash, minCreatedAt);
-  const user = mapUserRow(row);
-  const activeUser = isUserAccountActive(user) ? user : null;
-  if (activeUser) {
-    cacheActiveUserByTokenHash(tokenHash, activeUser);
-  } else {
-    clearCachedAuthSession(tokenHash);
-  }
-  return activeUser;
+  const { requireUserByToken: requireUserByTokenFromAuthDb } = await import("./db/auth-db.mjs");
+  return requireUserByTokenFromAuthDb(token);
 }
 
 export async function requireUserSnapshotByToken(token) {
-  if (!token) {
-    return null;
-  }
-
-  const tokenHash = hashSecret(token);
-  const minCreatedAt = new Date(Date.now() - sessionTtlMs).toISOString();
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT
-         u.id,
-         u.phone,
-         u.password_hash,
-         u.mpin_hash,
-         u.mpin_configured,
-         u.name,
-         u.role,
-         u.referral_code,
-         u.joined_at,
-         u.approval_status,
-         u.approved_at,
-         u.rejected_at,
-         u.blocked_at,
-         u.deactivated_at,
-         u.status_note,
-         u.signup_bonus_granted,
-         u.referred_by_user_id,
-         COALESCE((
-           SELECT we.after_balance
-           FROM wallet_entries we
-           WHERE we.user_id = u.id
-           ORDER BY we.created_at DESC, we.id DESC
-           LIMIT 1
-         ), 0) AS wallet_balance
-       FROM sessions s
-       JOIN users u ON u.id = s.user_id
-       WHERE s.token_hash = $1 AND s.created_at >= $2
-       LIMIT 1`,
-      [tokenHash, minCreatedAt]
-    );
-
-    const user = mapUserRow(result.rows[0]);
-    if (!isUserAccountActive(user)) {
-      clearCachedAuthSession(tokenHash);
-      return null;
-    }
-
-    cacheActiveUserByTokenHash(tokenHash, user);
-    return {
-      ...user,
-      walletBalance: Number(result.rows[0]?.wallet_balance ?? 0)
-    };
-  }
-
-  const row = getSqlite()
-    .prepare(
-      `SELECT
-         u.id,
-         u.phone,
-         u.password_hash,
-         u.mpin_hash,
-         u.mpin_configured,
-         u.name,
-         u.role,
-         u.referral_code,
-         u.joined_at,
-         u.approval_status,
-         u.approved_at,
-         u.rejected_at,
-         u.blocked_at,
-         u.deactivated_at,
-         u.status_note,
-         u.signup_bonus_granted,
-         u.referred_by_user_id,
-         COALESCE((
-           SELECT we.after_balance
-           FROM wallet_entries we
-           WHERE we.user_id = u.id
-           ORDER BY we.created_at DESC, we.id DESC
-           LIMIT 1
-         ), 0) AS wallet_balance
-       FROM sessions s
-       JOIN users u ON u.id = s.user_id
-       WHERE s.token_hash = ? AND s.created_at >= ?
-       LIMIT 1`
-    )
-    .get(tokenHash, minCreatedAt);
-
-  const user = mapUserRow(row);
-  if (!isUserAccountActive(user)) {
-    clearCachedAuthSession(tokenHash);
-    return null;
-  }
-
-  cacheActiveUserByTokenHash(tokenHash, user);
-  return {
-    ...user,
-    walletBalance: Number(row?.wallet_balance ?? 0)
-  };
+  const { requireUserSnapshotByToken: requireUserSnapshotByTokenFromAuthDb } = await import("./db/auth-db.mjs");
+  return requireUserSnapshotByTokenFromAuthDb(token);
 }
 
 export async function getUserBalance(userId) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT after_balance
-       FROM wallet_entries
-       WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [userId]
-    );
-    return Number(result.rows[0]?.after_balance ?? 0);
-  }
-
-  const row = getSqlite()
-    .prepare(
-      `SELECT after_balance
-       FROM wallet_entries
-       WHERE user_id = ?
-       ORDER BY created_at DESC
-       LIMIT 1`
-    )
-    .get(userId);
-  return Number(row?.after_balance ?? 0);
+  const { getUserBalance: getUserBalanceFromWalletDb } = await import("./db/wallet-db.mjs");
+  return getUserBalanceFromWalletDb(userId);
 }
 
 export async function updateUserPassword(userId, passwordHash) {
@@ -1622,314 +1426,13 @@ export async function getUserAdminSummaries() {
 }
 
 export async function getReportsSummaryData(from, to) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const [
-      walletTotalsResult,
-      bidTotalsResult,
-      payoutTotalsResult,
-      loginTotalsResult,
-      activeUsersResult,
-      userReportsResult,
-      marketReportsResult,
-      collectionSeriesResult,
-      payoutSeriesResult
-    ] = await Promise.all([
-      pool.query(
-        `SELECT
-           COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status = ANY(ARRAY['SUCCESS', 'BACKOFFICE']) THEN amount ELSE 0 END), 0) AS deposits_success,
-           COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status = 'INITIATED' THEN amount ELSE 0 END), 0) AS deposits_pending,
-           COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = ANY(ARRAY['SUCCESS', 'BACKOFFICE']) THEN amount ELSE 0 END), 0) AS withdraws_success,
-           COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'INITIATED' THEN amount ELSE 0 END), 0) AS withdraws_pending,
-           COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'REJECTED' THEN amount ELSE 0 END), 0) AS withdraws_rejected
-         FROM wallet_entries
-         WHERE created_at >= $1 AND created_at <= $2`,
-        [from, to]
-      ),
-      pool.query(
-        `SELECT
-           COUNT(*)::int AS bets_count,
-           COALESCE(SUM(points), 0) AS bets_amount
-         FROM bids
-         WHERE created_at >= $1 AND created_at <= $2`,
-        [from, to]
-      ),
-      pool.query(
-        `SELECT COALESCE(SUM(amount), 0) AS payout_amount
-         FROM wallet_entries
-         WHERE type = 'BID_WIN'
-           AND created_at >= $1
-           AND created_at <= $2`,
-        [from, to]
-      ),
-      pool.query(
-        `SELECT COUNT(*)::int AS login_count
-         FROM sessions
-         WHERE created_at >= $1 AND created_at <= $2`,
-        [from, to]
-      ),
-      pool.query(
-        `SELECT COUNT(DISTINCT user_id)::int AS active_users
-         FROM (
-           SELECT user_id FROM bids WHERE created_at >= $1 AND created_at <= $2
-           UNION
-           SELECT user_id FROM wallet_entries WHERE created_at >= $1 AND created_at <= $2
-           UNION
-           SELECT user_id FROM sessions WHERE created_at >= $1 AND created_at <= $2
-         ) active_users`,
-        [from, to]
-      ),
-      pool.query(
-        `SELECT
-           b.user_id,
-           u.name AS user_name,
-           u.phone AS user_phone,
-           COUNT(*)::int AS bids_count,
-           COALESCE(SUM(b.points), 0) AS bet_amount,
-           COALESCE(SUM(b.payout), 0) AS payout_amount
-         FROM bids b
-         LEFT JOIN users u ON u.id = b.user_id
-         WHERE b.created_at >= $1 AND b.created_at <= $2
-         GROUP BY b.user_id, u.name, u.phone
-         ORDER BY bet_amount DESC`,
-        [from, to]
-      ),
-      pool.query(
-        `SELECT
-           market,
-           COUNT(*)::int AS bets_count,
-           COALESCE(SUM(points), 0) AS bets_amount,
-           COALESCE(SUM(payout), 0) AS payout_amount
-         FROM bids
-         WHERE created_at >= $1 AND created_at <= $2
-         GROUP BY market
-         ORDER BY bets_amount DESC`,
-        [from, to]
-      ),
-      pool.query(
-        `SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, COALESCE(SUM(points), 0) AS collection
-         FROM bids
-         WHERE created_at >= $1 AND created_at <= $2
-         GROUP BY 1`,
-        [from, to]
-      ),
-      pool.query(
-        `SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, COALESCE(SUM(amount), 0) AS payout
-         FROM wallet_entries
-         WHERE type = 'BID_WIN'
-           AND created_at >= $1
-           AND created_at <= $2
-         GROUP BY 1`,
-        [from, to]
-      )
-    ]);
-
-    const walletTotals = walletTotalsResult.rows[0] ?? {};
-    const bidTotals = bidTotalsResult.rows[0] ?? {};
-    const payoutTotals = payoutTotalsResult.rows[0] ?? {};
-    const loginTotals = loginTotalsResult.rows[0] ?? {};
-    const activeUsers = activeUsersResult.rows[0] ?? {};
-    const dailySeriesMap = new Map();
-
-    for (const row of collectionSeriesResult.rows) {
-      dailySeriesMap.set(row.date, {
-        date: row.date,
-        collection: Number(row.collection ?? 0),
-        payout: 0
-      });
-    }
-    for (const row of payoutSeriesResult.rows) {
-      const existing = dailySeriesMap.get(row.date) ?? { date: row.date, collection: 0, payout: 0 };
-      existing.payout = Number(row.payout ?? 0);
-      dailySeriesMap.set(row.date, existing);
-    }
-
-    const betsAmount = Number(bidTotals.bets_amount ?? 0);
-    const payoutAmount = Number(payoutTotals.payout_amount ?? 0);
-
-    return {
-      totals: {
-        depositsSuccess: Number(walletTotals.deposits_success ?? 0),
-        depositsPending: Number(walletTotals.deposits_pending ?? 0),
-        withdrawsSuccess: Number(walletTotals.withdraws_success ?? 0),
-        withdrawsPending: Number(walletTotals.withdraws_pending ?? 0),
-        withdrawsRejected: Number(walletTotals.withdraws_rejected ?? 0),
-        betsCount: Number(bidTotals.bets_count ?? 0),
-        betsAmount,
-        payoutAmount,
-        loginCount: Number(loginTotals.login_count ?? 0),
-        activeUsers: Number(activeUsers.active_users ?? 0),
-        collectionVsPayoutDelta: betsAmount - payoutAmount
-      },
-      userReports: userReportsResult.rows.map((row) => ({
-        userId: row.user_id,
-        userName: row.user_name ?? "Unknown",
-        userPhone: row.user_phone ?? "",
-        bidsCount: Number(row.bids_count ?? 0),
-        betAmount: Number(row.bet_amount ?? 0),
-        payoutAmount: Number(row.payout_amount ?? 0)
-      })),
-      marketReports: marketReportsResult.rows.map((row) => ({
-        market: row.market,
-        betsCount: Number(row.bets_count ?? 0),
-        betsAmount: Number(row.bets_amount ?? 0),
-        payoutAmount: Number(row.payout_amount ?? 0)
-      })),
-      dailySeries: Array.from(dailySeriesMap.values()).sort((a, b) => a.date.localeCompare(b.date))
-    };
-  }
-
-  const sqlite = getSqlite();
-  const walletTotals = sqlite.prepare(
-    `SELECT
-       COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status IN ('SUCCESS', 'BACKOFFICE') THEN amount ELSE 0 END), 0) AS deposits_success,
-       COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status = 'INITIATED' THEN amount ELSE 0 END), 0) AS deposits_pending,
-       COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status IN ('SUCCESS', 'BACKOFFICE') THEN amount ELSE 0 END), 0) AS withdraws_success,
-       COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'INITIATED' THEN amount ELSE 0 END), 0) AS withdraws_pending,
-       COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'REJECTED' THEN amount ELSE 0 END), 0) AS withdraws_rejected
-     FROM wallet_entries
-     WHERE created_at >= ? AND created_at <= ?`
-  ).get(from, to);
-  const bidTotals = sqlite.prepare(
-    `SELECT
-       COUNT(*) AS bets_count,
-       COALESCE(SUM(points), 0) AS bets_amount
-     FROM bids
-     WHERE created_at >= ? AND created_at <= ?`
-  ).get(from, to);
-  const payoutTotals = sqlite.prepare(
-    `SELECT COALESCE(SUM(amount), 0) AS payout_amount
-     FROM wallet_entries
-     WHERE type = 'BID_WIN'
-       AND created_at >= ?
-       AND created_at <= ?`
-  ).get(from, to);
-  const loginTotals = sqlite.prepare(
-    `SELECT COUNT(*) AS login_count
-     FROM sessions
-     WHERE created_at >= ? AND created_at <= ?`
-  ).get(from, to);
-  const activeUsers = sqlite.prepare(
-    `SELECT COUNT(DISTINCT user_id) AS active_users
-     FROM (
-       SELECT user_id FROM bids WHERE created_at >= ? AND created_at <= ?
-       UNION
-       SELECT user_id FROM wallet_entries WHERE created_at >= ? AND created_at <= ?
-       UNION
-       SELECT user_id FROM sessions WHERE created_at >= ? AND created_at <= ?
-     ) active_users`
-  ).get(from, to, from, to, from, to);
-  const userReports = sqlite.prepare(
-    `SELECT
-       b.user_id,
-       u.name AS user_name,
-       u.phone AS user_phone,
-       COUNT(*) AS bids_count,
-       COALESCE(SUM(b.points), 0) AS bet_amount,
-       COALESCE(SUM(b.payout), 0) AS payout_amount
-     FROM bids b
-     LEFT JOIN users u ON u.id = b.user_id
-     WHERE b.created_at >= ? AND b.created_at <= ?
-     GROUP BY b.user_id, u.name, u.phone
-     ORDER BY bet_amount DESC`
-  ).all(from, to);
-  const marketReports = sqlite.prepare(
-    `SELECT
-       market,
-       COUNT(*) AS bets_count,
-       COALESCE(SUM(points), 0) AS bets_amount,
-       COALESCE(SUM(payout), 0) AS payout_amount
-     FROM bids
-     WHERE created_at >= ? AND created_at <= ?
-     GROUP BY market
-     ORDER BY bets_amount DESC`
-  ).all(from, to);
-  const collectionSeries = sqlite.prepare(
-    `SELECT substr(created_at, 1, 10) AS date, COALESCE(SUM(points), 0) AS collection
-     FROM bids
-     WHERE created_at >= ? AND created_at <= ?
-     GROUP BY substr(created_at, 1, 10)`
-  ).all(from, to);
-  const payoutSeries = sqlite.prepare(
-    `SELECT substr(created_at, 1, 10) AS date, COALESCE(SUM(amount), 0) AS payout
-     FROM wallet_entries
-     WHERE type = 'BID_WIN'
-       AND created_at >= ?
-       AND created_at <= ?
-     GROUP BY substr(created_at, 1, 10)`
-  ).all(from, to);
-
-  const dailySeriesMap = new Map();
-  for (const row of collectionSeries) {
-    dailySeriesMap.set(row.date, { date: row.date, collection: Number(row.collection ?? 0), payout: 0 });
-  }
-  for (const row of payoutSeries) {
-    const existing = dailySeriesMap.get(row.date) ?? { date: row.date, collection: 0, payout: 0 };
-    existing.payout = Number(row.payout ?? 0);
-    dailySeriesMap.set(row.date, existing);
-  }
-
-  const betsAmount = Number(bidTotals?.bets_amount ?? 0);
-  const payoutAmount = Number(payoutTotals?.payout_amount ?? 0);
-
-  return {
-    totals: {
-      depositsSuccess: Number(walletTotals?.deposits_success ?? 0),
-      depositsPending: Number(walletTotals?.deposits_pending ?? 0),
-      withdrawsSuccess: Number(walletTotals?.withdraws_success ?? 0),
-      withdrawsPending: Number(walletTotals?.withdraws_pending ?? 0),
-      withdrawsRejected: Number(walletTotals?.withdraws_rejected ?? 0),
-      betsCount: Number(bidTotals?.bets_count ?? 0),
-      betsAmount,
-      payoutAmount,
-      loginCount: Number(loginTotals?.login_count ?? 0),
-      activeUsers: Number(activeUsers?.active_users ?? 0),
-      collectionVsPayoutDelta: betsAmount - payoutAmount
-    },
-    userReports: userReports.map((row) => ({
-      userId: row.user_id,
-      userName: row.user_name ?? "Unknown",
-      userPhone: row.user_phone ?? "",
-      bidsCount: Number(row.bids_count ?? 0),
-      betAmount: Number(row.bet_amount ?? 0),
-      payoutAmount: Number(row.payout_amount ?? 0)
-    })),
-    marketReports: marketReports.map((row) => ({
-      market: row.market,
-      betsCount: Number(row.bets_count ?? 0),
-      betsAmount: Number(row.bets_amount ?? 0),
-      payoutAmount: Number(row.payout_amount ?? 0)
-    })),
-    dailySeries: Array.from(dailySeriesMap.values()).sort((a, b) => a.date.localeCompare(b.date))
-  };
+  const { getReportsSummaryData: getReportsSummaryDataFromAdminReportsDb } = await import("./db/admin-reports-db.mjs");
+  return getReportsSummaryDataFromAdminReportsDb(from, to);
 }
 
 export async function getWalletEntriesForUser(userId, limit = 50) {
-  const normalizedLimit = Math.max(1, Math.min(500, Number(limit) || 50));
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at
-         FROM wallet_entries
-         WHERE user_id = $1
-         ORDER BY created_at DESC
-         LIMIT $2`,
-      [userId, normalizedLimit]
-    );
-    return result.rows.map((row) => mapWalletEntryRow(row));
-  }
-
-  const rows = getSqlite()
-    .prepare(
-      `SELECT id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at
-       FROM wallet_entries
-       WHERE user_id = ?
-       ORDER BY created_at DESC
-       LIMIT ?`
-    )
-    .all(userId, normalizedLimit);
-
-  return rows.map((row) => mapWalletEntryRow(row));
+  const { getWalletEntriesForUser: getWalletEntriesForUserFromWalletDb } = await import("./db/wallet-db.mjs");
+  return getWalletEntriesForUserFromWalletDb(userId, limit);
 }
 
 function getWalletEntryBalanceDelta(entry) {
@@ -1989,32 +1492,8 @@ export async function rebalanceWalletEntriesForUser(userId) {
 }
 
 export async function clearWalletEntriesForUser(userId, types = []) {
-  const normalizedTypes = Array.from(
-    new Set((Array.isArray(types) ? types : []).map((item) => String(item || "").trim().toUpperCase()).filter(Boolean))
-  );
-
-  if (!normalizedTypes.length) {
-    return { deletedCount: 0, balance: await getUserBalance(userId) };
-  }
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `DELETE FROM wallet_entries
-       WHERE user_id = $1 AND type = ANY($2::text[])`,
-      [userId, normalizedTypes]
-    );
-    const balance = await rebalanceWalletEntriesForUser(userId);
-    return { deletedCount: Number(result.rowCount || 0), balance };
-  }
-
-  const db = getSqlite();
-  const placeholders = normalizedTypes.map(() => "?").join(", ");
-  const result = db
-    .prepare(`DELETE FROM wallet_entries WHERE user_id = ? AND type IN (${placeholders})`)
-    .run(userId, ...normalizedTypes);
-  const balance = await rebalanceWalletEntriesForUser(userId);
-  return { deletedCount: Number(result.changes || 0), balance };
+  const { clearWalletEntriesForUser: clearWalletEntriesForUserFromWalletDb } = await import("./db/wallet-db.mjs");
+  return clearWalletEntriesForUserFromWalletDb(userId, types);
 }
 
 export async function getReferralOverview(userId) {
@@ -2084,94 +1563,13 @@ export async function getReferralOverview(userId) {
 }
 
 export async function getBidsForUser(userId, limit = 50) {
-  const normalizedLimit = Math.max(1, Math.min(500, Number(limit) || 50));
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
-       FROM bids
-       WHERE user_id = $1
-       ORDER BY created_at DESC, id DESC
-       LIMIT $2`,
-      [userId, normalizedLimit]
-    );
-    return result.rows.map((row) => ({
-      id: row.id,
-      market: row.market,
-      boardLabel: row.board_label,
-      gameType: row.game_type ?? row.board_label,
-      sessionType: row.session_type,
-      digit: row.digit,
-      points: Number(row.points),
-      status: row.status,
-      payout: Number(row.payout ?? 0),
-      settledAt: row.settled_at ? (row.settled_at instanceof Date ? row.settled_at.toISOString() : String(row.settled_at)) : null,
-      settledResult: row.settled_result ?? null,
-      createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at)
-    }));
-  }
-
-  const rows = getSqlite()
-    .prepare(
-      `SELECT id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
-       FROM bids
-       WHERE user_id = ?
-       ORDER BY created_at DESC, id DESC
-       LIMIT ?`
-    )
-    .all(userId, normalizedLimit);
-
-  return rows.map((row) => ({
-    id: row.id,
-    market: row.market,
-    boardLabel: row.board_label,
-    gameType: row.game_type ?? row.board_label,
-    sessionType: row.session_type,
-    digit: row.digit,
-    points: Number(row.points),
-    status: row.status,
-    payout: Number(row.payout ?? 0),
-    settledAt: row.settled_at ?? null,
-    settledResult: row.settled_result ?? null,
-    createdAt: row.created_at
-  }));
+  const { getBidsForUser: getBidsForUserFromBidsDb } = await import("./db/bids-db.mjs");
+  return getBidsForUserFromBidsDb(userId, limit);
 }
 
 export async function getBankAccountsForUser(userId) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, account_number, holder_name, ifsc, created_at
-       FROM bank_accounts
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
-      [userId]
-    );
-    return result.rows.map((row) => ({
-      id: row.id,
-      accountNumber: row.account_number,
-      holderName: row.holder_name,
-      ifsc: row.ifsc,
-      createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at)
-    }));
-  }
-
-  const rows = getSqlite()
-    .prepare(
-      `SELECT id, account_number, holder_name, ifsc, created_at
-       FROM bank_accounts
-       WHERE user_id = ?
-       ORDER BY created_at DESC`
-    )
-    .all(userId);
-
-  return rows.map((row) => ({
-    id: row.id,
-    accountNumber: row.account_number,
-    holderName: row.holder_name,
-    ifsc: row.ifsc,
-    createdAt: row.created_at
-  }));
+  const { getBankAccountsForUser: getBankAccountsForUserFromWalletDb } = await import("./db/wallet-db.mjs");
+  return getBankAccountsForUserFromWalletDb(userId);
 }
 
 export async function addBankAccount({ userId, accountNumber, holderName, ifsc }) {
@@ -2198,26 +1596,8 @@ export async function addBankAccount({ userId, accountNumber, holderName, ifsc }
 }
 
 export async function addWalletEntry({ userId, type, status, amount, beforeBalance, afterBalance, referenceId = "", proofUrl = "", note = "" }) {
-  const id = `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const createdAt = nowIso();
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = getPgPool();
-    await pool.query(
-      `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [id, userId, type, status, amount, beforeBalance, afterBalance, referenceId || null, proofUrl || null, note || null, createdAt]
-    );
-  } else {
-    getSqlite()
-      .prepare(
-        `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(id, userId, type, status, amount, beforeBalance, afterBalance, referenceId || null, proofUrl || null, note || null, createdAt);
-  }
-
-  return { id, userId, type, status, amount, beforeBalance, afterBalance, referenceId, proofUrl, note, createdAt };
+  const { addWalletEntry: addWalletEntryFromWalletDb } = await import("./db/wallet-db.mjs");
+  return addWalletEntryFromWalletDb({ userId, type, status, amount, beforeBalance, afterBalance, referenceId, proofUrl, note });
 }
 
 export async function applyReferralLossCommission({ userId, lostAmount, bidId, market = "", boardLabel = "" }) {
@@ -2294,238 +1674,43 @@ export async function applyReferralLossCommission({ userId, lostAmount, bidId, m
 }
 
 export async function addBid({ userId, market, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult }) {
-  const id = `bid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const createdAt = nowIso();
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = getPgPool();
-    await pool.query(
-      `INSERT INTO bids (id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-      [id, userId, market, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult, createdAt]
-    );
-  } else {
-    getSqlite()
-      .prepare(
-        `INSERT INTO bids (id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(id, userId, market, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult, createdAt);
-  }
-
-  return { id, userId, market, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult, createdAt };
+  const { addBid: addBidFromBidsDb } = await import("./db/bids-db.mjs");
+  return addBidFromBidsDb({ userId, market, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult });
 }
 
 export async function listMarkets() {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, slug, name, result, status, action, open_time, close_time, category, result_locked_at, result_locked_by_user_id
-       FROM markets
-       ORDER BY id ASC`
-    );
-    return sortMarketsByOpenTime(result.rows.map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      name: row.name,
-      result: row.result,
-      status: row.status,
-      action: row.action,
-      open: row.open_time,
-      close: row.close_time,
-      category: row.category,
-      resultLockedAt: row.result_locked_at ? (row.result_locked_at instanceof Date ? row.result_locked_at.toISOString() : String(row.result_locked_at)) : null,
-      resultLockedByUserId: row.result_locked_by_user_id ?? null
-    })));
-  }
-
-  const rows = getSqlite()
-    .prepare(
-      `SELECT id, slug, name, result, status, action, open_time, close_time, category, result_locked_at, result_locked_by_user_id
-       FROM markets
-       ORDER BY id ASC`
-    )
-    .all();
-  return sortMarketsByOpenTime(rows.map((row) => ({
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    result: row.result,
-    status: row.status,
-    action: row.action,
-    open: row.open_time,
-    close: row.close_time,
-    category: row.category,
-    resultLockedAt: row.result_locked_at || null,
-    resultLockedByUserId: row.result_locked_by_user_id || null
-  })));
+  const { listMarkets: listMarketsFromMarketDb } = await import("./db/market-db.mjs");
+  return listMarketsFromMarketDb();
 }
 
 export async function findMarketBySlug(slug) {
-  const markets = await listMarkets();
-  return markets.find((item) => item.slug === slug) ?? null;
+  const { findMarketBySlug: findMarketBySlugFromMarketDb } = await import("./db/market-db.mjs");
+  return findMarketBySlugFromMarketDb(slug);
 }
 
 export async function getChartRecord(slug, chartType) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT market_slug, chart_type, rows_json
-       FROM charts
-       WHERE market_slug = $1 AND chart_type = $2
-       LIMIT 1`,
-      [slug, chartType]
-    );
-    const row = result.rows[0];
-    return row
-      ? { marketSlug: row.market_slug, chartType: row.chart_type, rows: normalizeChartRowsForStorage(chartType, toChartRows(row.rows_json)) }
-      : null;
-  }
-
-  const row = getSqlite()
-    .prepare(
-      `SELECT market_slug, chart_type, rows_json
-       FROM charts
-       WHERE market_slug = ? AND chart_type = ?
-       LIMIT 1`
-    )
-    .get(slug, chartType);
-  return row
-    ? { marketSlug: row.market_slug, chartType: row.chart_type, rows: normalizeChartRowsForStorage(chartType, toChartRows(row.rows_json)) }
-    : null;
+  const { getChartRecord: getChartRecordFromMarketDb } = await import("./db/market-db.mjs");
+  return getChartRecordFromMarketDb(slug, chartType);
 }
 
 export async function getChartRecordsForMarkets(slugs, chartTypes = ["jodi", "panna"]) {
-  const normalizedSlugs = Array.from(
-    new Set((Array.isArray(slugs) ? slugs : []).map((value) => String(value ?? "").trim()).filter(Boolean))
-  );
-  const normalizedChartTypes = Array.from(
-    new Set((Array.isArray(chartTypes) ? chartTypes : []).map((value) => String(value ?? "").trim()).filter(Boolean))
-  );
-
-  if (!normalizedSlugs.length || !normalizedChartTypes.length) {
-    return [];
-  }
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT market_slug, chart_type, rows_json
-       FROM charts
-       WHERE market_slug = ANY($1::text[]) AND chart_type = ANY($2::text[])`,
-      [normalizedSlugs, normalizedChartTypes]
-    );
-    return result.rows.map((row) => ({
-      marketSlug: row.market_slug,
-      chartType: row.chart_type,
-      rows: normalizeChartRowsForStorage(row.chart_type, toChartRows(row.rows_json))
-    }));
-  }
-
-  const slugPlaceholders = normalizedSlugs.map(() => "?").join(", ");
-  const chartTypePlaceholders = normalizedChartTypes.map(() => "?").join(", ");
-  const rows = getSqlite()
-    .prepare(
-      `SELECT market_slug, chart_type, rows_json
-       FROM charts
-       WHERE market_slug IN (${slugPlaceholders}) AND chart_type IN (${chartTypePlaceholders})`
-    )
-    .all(...normalizedSlugs, ...normalizedChartTypes);
-
-  return rows.map((row) => ({
-    marketSlug: row.market_slug,
-    chartType: row.chart_type,
-    rows: normalizeChartRowsForStorage(row.chart_type, toChartRows(row.rows_json))
-  }));
+  const { getChartRecordsForMarkets: getChartRecordsForMarketsFromMarketDb } = await import("./db/market-db.mjs");
+  return getChartRecordsForMarketsFromMarketDb(slugs, chartTypes);
 }
 
 export async function upsertChartRecord(marketSlug, chartType, rows) {
-  const normalizedRows = normalizeChartRowsForStorage(chartType, rows);
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `INSERT INTO charts (market_slug, chart_type, rows_json)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (market_slug, chart_type) DO UPDATE SET rows_json = EXCLUDED.rows_json
-       RETURNING market_slug, chart_type, rows_json`,
-      [marketSlug, chartType, JSON.stringify(normalizedRows)]
-    );
-    const row = result.rows[0];
-    return row
-      ? { marketSlug: row.market_slug, chartType: row.chart_type, rows: normalizeChartRowsForStorage(chartType, toChartRows(row.rows_json)) }
-      : null;
-  }
-
-  const db = getSqlite();
-  db.prepare(
-    `INSERT INTO charts (market_slug, chart_type, rows_json)
-     VALUES (?, ?, ?)
-     ON CONFLICT(market_slug, chart_type) DO UPDATE SET rows_json = excluded.rows_json`
-  ).run(marketSlug, chartType, JSON.stringify(normalizedRows));
-
-  return getChartRecord(marketSlug, chartType);
+  const { upsertChartRecord: upsertChartRecordFromMarketDb } = await import("./db/market-db.mjs");
+  return upsertChartRecordFromMarketDb(marketSlug, chartType, rows);
 }
 
 export async function updateMarketRecord(slug, updates) {
-  const current = await findMarketBySlug(slug);
-  if (!current) {
-    return null;
-  }
-
-  const next = {
-    result: updates.result?.trim() || current.result,
-    status: updates.status?.trim() || current.status,
-    action: updates.action?.trim() || current.action,
-    open: updates.open?.trim() || current.open,
-    close: updates.close?.trim() || current.close,
-    category: updates.category || current.category,
-    resultLockedAt: Object.hasOwn(updates, "resultLockedAt") ? (updates.resultLockedAt || null) : (current.resultLockedAt || null),
-    resultLockedByUserId: Object.hasOwn(updates, "resultLockedByUserId") ? (updates.resultLockedByUserId || null) : (current.resultLockedByUserId || null)
-  };
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = getPgPool();
-    await pool.query(
-      `UPDATE markets
-       SET result = $1, status = $2, action = $3, open_time = $4, close_time = $5, category = $6, result_locked_at = $7, result_locked_by_user_id = $8
-       WHERE slug = $9`,
-      [next.result, next.status, next.action, next.open, next.close, next.category, next.resultLockedAt, next.resultLockedByUserId, slug]
-    );
-  } else {
-    getSqlite()
-      .prepare(
-        `UPDATE markets
-         SET result = ?, status = ?, action = ?, open_time = ?, close_time = ?, category = ?, result_locked_at = ?, result_locked_by_user_id = ?
-         WHERE slug = ?`
-      )
-      .run(next.result, next.status, next.action, next.open, next.close, next.category, next.resultLockedAt, next.resultLockedByUserId, slug);
-  }
-
-  return findMarketBySlug(slug);
+  const { updateMarketRecord: updateMarketRecordFromMarketDb } = await import("./db/market-db.mjs");
+  return updateMarketRecordFromMarketDb(slug, updates);
 }
 
 export async function getBidsForMarket(marketName) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
-       FROM bids
-       WHERE market = $1
-       ORDER BY created_at ASC, id ASC`,
-      [marketName]
-    );
-    return result.rows.map((row) => mapBidRow(row));
-  }
-
-  return getSqlite()
-    .prepare(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
-       FROM bids
-       WHERE market = ?
-       ORDER BY created_at ASC, id ASC`
-    )
-    .all(marketName)
-    .map((row) => mapBidRow(row));
+  const { getBidsForMarket: getBidsForMarketFromBidsDb } = await import("./db/bids-db.mjs");
+  return getBidsForMarketFromBidsDb(marketName);
 }
 
 export async function updateBidSettlement(bidId, status, payout, settledResult) {
@@ -2561,129 +1746,18 @@ export async function updateBidSettlement(bidId, status, payout, settledResult) 
 }
 
 export async function listNotificationsForUser(userId) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = getPgPool();
-    const result = await pool.query(
-      `SELECT id, title, body, channel, read, created_at
-       FROM notifications
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
-      [userId]
-    );
-    return result.rows.map((row) => ({
-      id: row.id,
-      title: row.title,
-      body: row.body,
-      channel: row.channel,
-      read: Boolean(row.read),
-      createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at)
-    }));
-  }
-
-  const rows = getSqlite()
-    .prepare(
-      `SELECT id, title, body, channel, read, created_at
-       FROM notifications
-       WHERE user_id = ?
-       ORDER BY created_at DESC`
-    )
-    .all(userId);
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    body: row.body,
-    channel: row.channel,
-    read: Boolean(row.read),
-    createdAt: row.created_at
-  }));
+  const { listNotificationsForUser: listNotificationsForUserFromNotificationDb } = await import("./db/notification-db.mjs");
+  return listNotificationsForUserFromNotificationDb(userId);
 }
 
 export async function registerNotificationDevice(userId, platform, token) {
-  const createdAt = nowIso();
-  const updatedAt = createdAt;
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = getPgPool();
-    const existing = await pool.query(
-      `SELECT id, user_id, platform, token, enabled, created_at, updated_at
-       FROM notification_devices
-       WHERE user_id = $1 AND token = $2
-       LIMIT 1`,
-      [userId, token]
-    );
-    const current = mapNotificationDeviceRow(existing.rows[0]);
-    if (current) {
-      await pool.query(
-        `UPDATE notification_devices
-         SET platform = $1, enabled = TRUE, updated_at = $2
-         WHERE id = $3`,
-        [platform, updatedAt, current.id]
-      );
-      return { ...current, platform, enabled: true, updatedAt };
-    }
-
-    const id = `device_${Date.now()}`;
-    await pool.query(
-      `INSERT INTO notification_devices (id, user_id, platform, token, enabled, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, TRUE, $5, $5)`,
-      [id, userId, platform, token, createdAt]
-    );
-    return { id, userId, platform, token, enabled: true, createdAt, updatedAt };
-  }
-
-  const existing = mapNotificationDeviceRow(
-    getSqlite()
-      .prepare(
-        `SELECT id, user_id, platform, token, enabled, created_at, updated_at
-         FROM notification_devices
-         WHERE user_id = ? AND token = ?
-         LIMIT 1`
-      )
-      .get(userId, token)
-  );
-  if (existing) {
-    getSqlite()
-      .prepare(
-        `UPDATE notification_devices
-         SET platform = ?, enabled = 1, updated_at = ?
-         WHERE id = ?`
-      )
-      .run(platform, updatedAt, existing.id);
-    return { ...existing, platform, enabled: true, updatedAt };
-  }
-
-  const id = `device_${Date.now()}`;
-  getSqlite()
-    .prepare(
-      `INSERT INTO notification_devices (id, user_id, platform, token, enabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`
-    )
-    .run(id, userId, platform, token, createdAt, updatedAt);
-
-  return { id, userId, platform, token, enabled: true, createdAt, updatedAt };
+  const { registerNotificationDevice: registerNotificationDeviceFromNotificationDb } = await import("./db/notification-db.mjs");
+  return registerNotificationDeviceFromNotificationDb(userId, platform, token);
 }
 
 export async function createNotification({ userId, title, body, channel = "general" }) {
-  const id = `notification_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const createdAt = nowIso();
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    await pool.query(
-      `INSERT INTO notifications (id, user_id, title, body, channel, read, created_at)
-       VALUES ($1, $2, $3, $4, $5, FALSE, $6)`,
-      [id, userId, title, body, channel, createdAt]
-    );
-  } else {
-    getSqlite()
-      .prepare(
-        `INSERT INTO notifications (id, user_id, title, body, channel, read, created_at)
-         VALUES (?, ?, ?, ?, ?, 0, ?)`
-      )
-      .run(id, userId, title, body, channel, createdAt);
-  }
-
-  return { id, userId, title, body, channel, read: false, createdAt };
+  const { createNotification: createNotificationFromNotificationDb } = await import("./db/notification-db.mjs");
+  return createNotificationFromNotificationDb({ userId, title, body, channel });
 }
 
 export async function listEnabledNotificationDevicesByUserIds(userIds) {
@@ -2792,130 +1866,18 @@ async function touchChatConversation(conversationId, timestamp) {
 }
 
 export async function updateSupportConversationStatus(conversationId, status) {
-  const nextStatus = String(status || "").trim().toUpperCase();
-  if (!conversationId || !["OPEN", "PENDING", "RESOLVED"].includes(nextStatus)) {
-    throw new Error("Valid conversationId and status are required");
-  }
-
-  const updatedAt = nowIso();
-  const resolvedAt = nextStatus === "RESOLVED" ? updatedAt : null;
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `UPDATE chat_conversations
-       SET status = $1, updated_at = $2, resolved_at = $3
-       WHERE id = $4
-       RETURNING id, user_id, status, created_at, updated_at, last_message_at, resolved_at`,
-      [nextStatus, updatedAt, resolvedAt, conversationId]
-    );
-    return mapChatConversationRow(result.rows[0]);
-  }
-
-  const sqlite = getSqlite();
-  sqlite
-    .prepare(
-      `UPDATE chat_conversations
-       SET status = ?, updated_at = ?, resolved_at = ?
-       WHERE id = ?`
-    )
-    .run(nextStatus, updatedAt, resolvedAt, conversationId);
-
-  return findChatConversationById(conversationId);
+  const { updateSupportConversationStatus: updateSupportConversationStatusFromChatDb } = await import("./db/chat-db.mjs");
+  return updateSupportConversationStatusFromChatDb(conversationId, status);
 }
 
 export async function getOrCreateSupportConversation(userId) {
-  const existing = await findChatConversationByUserId(userId);
-  if (existing) {
-    return existing;
-  }
-
-  const timestamp = nowIso();
-  const conversation = {
-    id: `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    userId,
-    status: "OPEN",
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    lastMessageAt: timestamp,
-    resolvedAt: null
-  };
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    await pool.query(
-      `INSERT INTO chat_conversations (id, user_id, status, created_at, updated_at, last_message_at, resolved_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [conversation.id, conversation.userId, conversation.status, conversation.createdAt, conversation.updatedAt, conversation.lastMessageAt, conversation.resolvedAt]
-    );
-  } else {
-    getSqlite()
-      .prepare(
-        `INSERT INTO chat_conversations (id, user_id, status, created_at, updated_at, last_message_at, resolved_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(conversation.id, conversation.userId, conversation.status, conversation.createdAt, conversation.updatedAt, conversation.lastMessageAt, conversation.resolvedAt);
-  }
-
-  await addSupportChatMessage({
-    conversationId: conversation.id,
-    senderRole: "support",
-    senderUserId: await findSupportSenderUserId(),
-    text: "Namaste. Wallet, withdraw, market result, bonus, ya bid issue ke liye yahan message bhejiye. Support team jaldi reply karegi.",
-    readByUser: true,
-    readByAdmin: true
-  });
-
-  return findChatConversationById(conversation.id);
+  const { getOrCreateSupportConversation: getOrCreateSupportConversationFromChatDb } = await import("./db/chat-db.mjs");
+  return getOrCreateSupportConversationFromChatDb(userId);
 }
 
 export async function cleanupResolvedSupportConversations() {
-  const cutoffIso = new Date(Date.now() - supportChatResolvedRetentionMs).toISOString();
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    await pool.query(
-      `DELETE FROM chat_messages
-       WHERE conversation_id IN (
-         SELECT id
-         FROM chat_conversations
-         WHERE status = 'RESOLVED'
-           AND resolved_at IS NOT NULL
-           AND resolved_at < $1
-       )`,
-      [cutoffIso]
-    );
-    await pool.query(
-      `DELETE FROM chat_conversations
-       WHERE status = 'RESOLVED'
-         AND resolved_at IS NOT NULL
-         AND resolved_at < $1`,
-      [cutoffIso]
-    );
-    return;
-  }
-
-  const sqlite = getSqlite();
-  sqlite
-    .prepare(
-      `DELETE FROM chat_messages
-       WHERE conversation_id IN (
-         SELECT id
-         FROM chat_conversations
-         WHERE status = 'RESOLVED'
-           AND resolved_at IS NOT NULL
-           AND resolved_at < ?
-       )`
-    )
-    .run(cutoffIso);
-  sqlite
-    .prepare(
-      `DELETE FROM chat_conversations
-       WHERE status = 'RESOLVED'
-         AND resolved_at IS NOT NULL
-         AND resolved_at < ?`
-    )
-    .run(cutoffIso);
+  const { cleanupResolvedSupportConversations: cleanupResolvedSupportConversationsFromChatDb } = await import("./db/chat-db.mjs");
+  return cleanupResolvedSupportConversationsFromChatDb();
 }
 
 export async function addSupportChatMessage({
@@ -2926,317 +1888,55 @@ export async function addSupportChatMessage({
   readByUser,
   readByAdmin
 }) {
-  const trimmedText = String(text || "").trim();
-  if (!trimmedText) {
-    throw new Error("Message text is required");
-  }
-
-  if (senderRole === "user") {
-    await updateSupportConversationStatus(conversationId, "OPEN");
-  }
-
-  const createdAt = nowIso();
-  const message = {
-    id: `chat_msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+  const { addSupportChatMessage: addSupportChatMessageFromChatDb } = await import("./db/chat-db.mjs");
+  return addSupportChatMessageFromChatDb({
     conversationId,
     senderRole,
     senderUserId,
-    text: trimmedText,
-    readByUser: typeof readByUser === "boolean" ? readByUser : senderRole !== "support",
-    readByAdmin: typeof readByAdmin === "boolean" ? readByAdmin : senderRole !== "user",
-    createdAt
-  };
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    await pool.query(
-      `INSERT INTO chat_messages (id, conversation_id, sender_role, sender_user_id, text, read_by_user, read_by_admin, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [message.id, message.conversationId, message.senderRole, message.senderUserId, message.text, message.readByUser, message.readByAdmin, message.createdAt]
-    );
-  } else {
-    getSqlite()
-      .prepare(
-        `INSERT INTO chat_messages (id, conversation_id, sender_role, sender_user_id, text, read_by_user, read_by_admin, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
-        message.id,
-        message.conversationId,
-        message.senderRole,
-        message.senderUserId,
-        message.text,
-        message.readByUser ? 1 : 0,
-        message.readByAdmin ? 1 : 0,
-        message.createdAt
-      );
-  }
-
-  await touchChatConversation(conversationId, createdAt);
-  return message;
+    text,
+    readByUser,
+    readByAdmin
+  });
 }
 
 export async function getSupportMessages(conversationId) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, conversation_id, sender_role, sender_user_id, text, read_by_user, read_by_admin, created_at
-       FROM chat_messages
-       WHERE conversation_id = $1
-       ORDER BY created_at ASC, id ASC`,
-      [conversationId]
-    );
-    return result.rows.map((row) => mapChatMessageRow(row));
-  }
-
-  return getSqlite()
-    .prepare(
-      `SELECT id, conversation_id, sender_role, sender_user_id, text, read_by_user, read_by_admin, created_at
-       FROM chat_messages
-       WHERE conversation_id = ?
-       ORDER BY created_at ASC, id ASC`
-    )
-    .all(conversationId)
-    .map((row) => mapChatMessageRow(row));
+  const { getSupportMessages: getSupportMessagesFromChatDb } = await import("./db/chat-db.mjs");
+  return getSupportMessagesFromChatDb(conversationId);
 }
 
 export async function markSupportMessagesReadByUser(conversationId) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    await pool.query(
-      `UPDATE chat_messages
-       SET read_by_user = TRUE
-       WHERE conversation_id = $1
-         AND sender_role = 'support'
-         AND read_by_user = FALSE`,
-      [conversationId]
-    );
-    return;
-  }
-
-  getSqlite()
-    .prepare(
-      `UPDATE chat_messages
-       SET read_by_user = 1
-       WHERE conversation_id = ?
-         AND sender_role = 'support'
-         AND read_by_user = 0`
-    )
-    .run(conversationId);
+  const { markSupportMessagesReadByUser: markSupportMessagesReadByUserFromChatDb } = await import("./db/chat-db.mjs");
+  return markSupportMessagesReadByUserFromChatDb(conversationId);
 }
 
 export async function markSupportMessagesReadByAdmin(conversationId) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    await pool.query(
-      `UPDATE chat_messages
-       SET read_by_admin = TRUE
-       WHERE conversation_id = $1
-         AND sender_role = 'user'
-         AND read_by_admin = FALSE`,
-      [conversationId]
-    );
-    return;
-  }
-
-  getSqlite()
-    .prepare(
-      `UPDATE chat_messages
-       SET read_by_admin = 1
-       WHERE conversation_id = ?
-         AND sender_role = 'user'
-         AND read_by_admin = 0`
-    )
-    .run(conversationId);
+  const { markSupportMessagesReadByAdmin: markSupportMessagesReadByAdminFromChatDb } = await import("./db/chat-db.mjs");
+  return markSupportMessagesReadByAdminFromChatDb(conversationId);
 }
 
 export async function getSupportConversationBundleForUser(userId) {
-  await cleanupResolvedSupportConversations();
-  const conversation = await getOrCreateSupportConversation(userId);
-  const messages = await getSupportMessages(conversation.id);
-  return { conversation, messages };
+  const { getSupportConversationBundleForUser: getSupportConversationBundleForUserFromChatDb } = await import("./db/chat-db.mjs");
+  return getSupportConversationBundleForUserFromChatDb(userId);
 }
 
 export async function listSupportConversations() {
-  await cleanupResolvedSupportConversations();
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT
-         c.id,
-         c.user_id,
-         c.status,
-         c.created_at,
-         c.updated_at,
-         c.last_message_at,
-         c.resolved_at,
-         u.name AS user_name,
-         u.phone AS user_phone,
-         lm.text AS last_message_text,
-         COALESCE(uc.unread_for_admin, 0) AS unread_for_admin
-       FROM chat_conversations c
-       JOIN users u ON u.id = c.user_id
-       LEFT JOIN (
-         SELECT DISTINCT ON (conversation_id)
-           conversation_id,
-           text
-         FROM chat_messages
-         ORDER BY conversation_id, created_at DESC, id DESC
-       ) lm ON lm.conversation_id = c.id
-       LEFT JOIN (
-         SELECT conversation_id, COUNT(*)::int AS unread_for_admin
-         FROM chat_messages
-         WHERE sender_role = 'user'
-           AND read_by_admin = FALSE
-         GROUP BY conversation_id
-       ) uc ON uc.conversation_id = c.id
-       ORDER BY c.last_message_at DESC, c.id DESC`
-    );
-    return result.rows.map((row) => ({
-      ...mapChatConversationRow(row),
-      userName: row.user_name,
-      userPhone: row.user_phone,
-      lastMessagePreview: row.last_message_text ?? "",
-      lastMessageText: row.last_message_text ?? "",
-      unreadForAdmin: Number(row.unread_for_admin ?? 0)
-    }));
-  }
-
-  return getSqlite()
-    .prepare(
-      `SELECT
-         c.id,
-         c.user_id,
-         c.status,
-         c.created_at,
-         c.updated_at,
-         c.last_message_at,
-         c.resolved_at,
-         u.name AS user_name,
-         u.phone AS user_phone,
-         (
-           SELECT text
-           FROM chat_messages
-           WHERE conversation_id = c.id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) AS last_message_text,
-         (
-           SELECT COUNT(*)
-           FROM chat_messages
-           WHERE conversation_id = c.id
-             AND sender_role = 'user'
-             AND read_by_admin = 0
-         ) AS unread_for_admin
-       FROM chat_conversations c
-       JOIN users u ON u.id = c.user_id
-       ORDER BY c.last_message_at DESC, c.id DESC`
-    )
-    .all()
-    .map((row) => ({
-      ...mapChatConversationRow(row),
-      userName: row.user_name,
-      userPhone: row.user_phone,
-      lastMessagePreview: row.last_message_text ?? "",
-      lastMessageText: row.last_message_text ?? "",
-      unreadForAdmin: Number(row.unread_for_admin ?? 0)
-    }));
+  const { listSupportConversations: listSupportConversationsFromChatDb } = await import("./db/chat-db.mjs");
+  return listSupportConversationsFromChatDb();
 }
 
 export async function getSupportConversationSummary() {
-  await cleanupResolvedSupportConversations();
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT
-         COUNT(*)::int AS conversations_count,
-         COALESCE((
-           SELECT COUNT(*)::int
-           FROM chat_messages
-           WHERE sender_role = 'user'
-             AND read_by_admin = FALSE
-         ), 0) AS unread_for_admin`
-    );
-    return {
-      conversationsCount: Number(result.rows[0]?.conversations_count ?? 0),
-      unreadForAdmin: Number(result.rows[0]?.unread_for_admin ?? 0)
-    };
-  }
-
-  const row = getSqlite()
-    .prepare(
-      `SELECT
-         (SELECT COUNT(*) FROM chat_conversations) AS conversations_count,
-         (SELECT COUNT(*) FROM chat_messages WHERE sender_role = 'user' AND read_by_admin = 0) AS unread_for_admin`
-    )
-    .get();
-  return {
-    conversationsCount: Number(row?.conversations_count ?? 0),
-    unreadForAdmin: Number(row?.unread_for_admin ?? 0)
-  };
+  const { getSupportConversationSummary: getSupportConversationSummaryFromChatDb } = await import("./db/chat-db.mjs");
+  return getSupportConversationSummaryFromChatDb();
 }
 
 export async function getSupportConversationDetailsForAdmin(conversationId) {
-  await cleanupResolvedSupportConversations();
-  const conversation = await findChatConversationById(conversationId);
-  if (!conversation) {
-    return null;
-  }
-
-  const user = await findUserById(conversation.userId);
-  const messages = await getSupportMessages(conversation.id);
-
-  return {
-    conversation,
-    user: user
-      ? {
-          id: user.id,
-          name: user.name,
-          phone: user.phone
-        }
-      : null,
-    messages
-  };
+  const { getSupportConversationDetailsForAdmin: getSupportConversationDetailsForAdminFromChatDb } = await import("./db/chat-db.mjs");
+  return getSupportConversationDetailsForAdminFromChatDb(conversationId);
 }
 
 export async function listAllNotifications(limit = 200) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, user_id, title, body, channel, read, created_at
-       FROM notifications
-       ORDER BY created_at DESC
-       LIMIT $1`,
-      [limit]
-    );
-    return result.rows.map((row) => ({
-      id: row.id,
-      userId: row.user_id,
-      title: row.title,
-      body: row.body,
-      channel: row.channel,
-      read: Boolean(row.read),
-      createdAt: toIso(row.created_at)
-    }));
-  }
-
-  return getSqlite()
-    .prepare(
-      `SELECT id, user_id, title, body, channel, read, created_at
-       FROM notifications
-       ORDER BY created_at DESC
-       LIMIT ?`
-    )
-    .all(limit)
-    .map((row) => ({
-      id: row.id,
-      userId: row.user_id,
-      title: row.title,
-      body: row.body,
-      channel: row.channel,
-      read: Boolean(row.read),
-      createdAt: toIso(row.created_at)
-    }));
+  const { listAllNotifications: listAllNotificationsFromNotificationDb } = await import("./db/notification-db.mjs");
+  return listAllNotificationsFromNotificationDb(limit);
 }
 
 export async function getAppSettings() {
@@ -3316,642 +2016,28 @@ export async function updateUserAccountStatus(userId, action, note = "") {
 }
 
 export async function listAllBids(limit = 300) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
-       FROM bids
-       ORDER BY created_at DESC, id DESC
-       LIMIT $1`,
-      [limit]
-    );
-    return result.rows.map((row) => mapBidRow(row));
-  }
-
-  return getSqlite()
-    .prepare(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
-       FROM bids
-       ORDER BY created_at DESC, id DESC
-       LIMIT ?`
-    )
-    .all(limit)
-    .map((row) => mapBidRow(row));
+  const { listAllBids: listAllBidsFromBidsDb } = await import("./db/bids-db.mjs");
+  return listAllBidsFromBidsDb(limit);
 }
 
 export async function getDashboardSummaryData(startOfToday, dateKeys = []) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const [
-      totalsResult,
-      todayWalletResult,
-      todayBidsResult,
-      todaySessionsResult,
-      todayActiveUsersResult,
-      topUsersResult,
-      recentBidsResult,
-      recentRequestsResult,
-      collectionSeriesResult,
-      payoutSeriesResult,
-      activeTrendResult,
-      supportSummary
-    ] = await Promise.all([
-      pool.query(
-        `SELECT
-           COUNT(*)::int AS users,
-           COUNT(*) FILTER (WHERE approval_status = 'Approved')::int AS approved_users,
-           COUNT(*) FILTER (WHERE approval_status = 'Pending')::int AS pending_users
-         FROM users
-         WHERE role = 'user'`
-      ),
-      pool.query(
-        `SELECT
-           COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status = ANY(ARRAY['SUCCESS', 'BACKOFFICE']) THEN amount ELSE 0 END), 0) AS deposit_amount,
-           COUNT(*) FILTER (WHERE type = 'DEPOSIT' AND status = 'INITIATED')::int AS deposit_requests,
-           COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = ANY(ARRAY['SUCCESS', 'BACKOFFICE']) THEN amount ELSE 0 END), 0) AS withdraw_amount,
-           COUNT(*) FILTER (WHERE type = 'WITHDRAW' AND status = 'INITIATED')::int AS withdraw_requests,
-           COALESCE(SUM(CASE WHEN type = 'SIGNUP_BONUS' AND status = 'SUCCESS' THEN amount ELSE 0 END), 0) AS signup_bonus_amount,
-           COUNT(*) FILTER (WHERE status = 'INITIATED' AND type IN ('DEPOSIT', 'WITHDRAW'))::int AS pending_wallet_requests,
-           COUNT(*) FILTER (WHERE status = 'INITIATED' AND type = 'DEPOSIT')::int AS pending_deposits,
-           COUNT(*) FILTER (WHERE status = 'INITIATED' AND type = 'WITHDRAW')::int AS pending_withdraws
-         FROM wallet_entries
-         WHERE created_at >= $1`,
-        [startOfToday]
-      ),
-      pool.query(
-        `SELECT
-           COUNT(*)::int AS bets_count,
-           COALESCE(SUM(points), 0) AS bets_amount
-         FROM bids
-         WHERE created_at >= $1`,
-        [startOfToday]
-      ),
-      pool.query(
-        `SELECT COUNT(*)::int AS login_count
-         FROM sessions s
-         JOIN users u ON u.id = s.user_id
-         WHERE s.created_at >= $1
-           AND u.role = 'user'`,
-        [startOfToday]
-      ),
-      pool.query(
-        `SELECT COUNT(DISTINCT user_id)::int AS active_users
-         FROM (
-          SELECT s.user_id
-          FROM sessions s
-          JOIN users u ON u.id = s.user_id
-          WHERE s.created_at >= $1
-            AND u.role = 'user'
-           UNION
-          SELECT b.user_id
-          FROM bids b
-          JOIN users u ON u.id = b.user_id
-          WHERE b.created_at >= $1
-            AND u.role = 'user'
-           UNION
-          SELECT we.user_id
-          FROM wallet_entries we
-          JOIN users u ON u.id = we.user_id
-          WHERE we.created_at >= $1
-            AND u.role = 'user'
-         ) active_users`,
-        [startOfToday]
-      ),
-      pool.query(
-        `SELECT
-           u.id,
-           u.name,
-           u.phone,
-           COALESCE(balance.after_balance, 0) AS balance
-         FROM users u
-         LEFT JOIN LATERAL (
-           SELECT after_balance
-         FROM wallet_entries
-         WHERE user_id = u.id
-         ORDER BY created_at DESC, id DESC
-         LIMIT 1
-         ) balance ON TRUE
-         WHERE u.approval_status = 'Approved'
-           AND u.role = 'user'
-         ORDER BY u.joined_at DESC, u.id DESC
-         LIMIT 5`
-      ),
-      pool.query(
-        `SELECT
-           b.id,
-           b.market,
-           b.board_label,
-           b.digit,
-           b.points,
-           b.status,
-           b.created_at,
-           u.name AS user_name,
-           u.phone AS user_phone
-         FROM bids b
-         LEFT JOIN users u ON u.id = b.user_id
-         ORDER BY b.created_at DESC, b.id DESC
-         LIMIT 8`
-      ),
-      pool.query(
-        `SELECT
-           we.id,
-           we.type,
-           we.amount,
-           we.created_at,
-           u.name AS user_name,
-           u.phone AS user_phone
-         FROM wallet_entries we
-         LEFT JOIN users u ON u.id = we.user_id
-         WHERE we.status = 'INITIATED'
-           AND we.type IN ('DEPOSIT', 'WITHDRAW')
-         ORDER BY we.created_at DESC, we.id DESC
-         LIMIT 8`
-      ),
-      pool.query(
-        `SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, COALESCE(SUM(points), 0) AS collection
-         FROM bids
-         WHERE created_at >= $1
-         GROUP BY 1`,
-        [dateKeys[0] ? `${dateKeys[0]}T00:00:00.000Z` : startOfToday]
-      ),
-      pool.query(
-        `SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, COALESCE(SUM(amount), 0) AS payout
-         FROM wallet_entries
-         WHERE created_at >= $1
-           AND type = 'BID_WIN'
-           AND status = ANY(ARRAY['SUCCESS', 'BACKOFFICE'])
-         GROUP BY 1`,
-        [dateKeys[0] ? `${dateKeys[0]}T00:00:00.000Z` : startOfToday]
-      ),
-      pool.query(
-        `SELECT date, COUNT(DISTINCT user_id)::int AS users
-         FROM (
-          SELECT to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, s.user_id
-          FROM sessions s
-          JOIN users u ON u.id = s.user_id
-          WHERE s.created_at >= $1
-            AND u.role = 'user'
-           UNION
-          SELECT to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, b.user_id
-          FROM bids b
-          JOIN users u ON u.id = b.user_id
-          WHERE b.created_at >= $1
-            AND u.role = 'user'
-           UNION
-          SELECT to_char(we.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, we.user_id
-          FROM wallet_entries we
-          JOIN users u ON u.id = we.user_id
-          WHERE we.created_at >= $1
-            AND u.role = 'user'
-         ) activity
-         GROUP BY date`,
-        [dateKeys[0] ? `${dateKeys[0]}T00:00:00.000Z` : startOfToday]
-      ),
-      getSupportConversationSummary()
-    ]);
-
-    const marketsResult = await pool.query(
-      `SELECT
-         COUNT(*)::int AS markets,
-         COUNT(*) FILTER (WHERE LOWER(action) NOT LIKE '%closed%')::int AS live_markets,
-         COUNT(*) FILTER (WHERE result = '***-**-***')::int AS placeholder_results
-       FROM markets`
-    );
-    const devicesResult = await pool.query(`SELECT COUNT(*)::int AS device_registrations FROM notification_devices`);
-
-    const totals = totalsResult.rows[0] ?? {};
-    const todayWallet = todayWalletResult.rows[0] ?? {};
-    const todayBids = todayBidsResult.rows[0] ?? {};
-    const todaySessions = todaySessionsResult.rows[0] ?? {};
-    const todayActiveUsers = todayActiveUsersResult.rows[0] ?? {};
-    const markets = marketsResult.rows[0] ?? {};
-    const devices = devicesResult.rows[0] ?? {};
-
-    const collectionMap = new Map(collectionSeriesResult.rows.map((row) => [row.date, Number(row.collection ?? 0)]));
-    const payoutMap = new Map(payoutSeriesResult.rows.map((row) => [row.date, Number(row.payout ?? 0)]));
-    const activeMap = new Map(activeTrendResult.rows.map((row) => [row.date, Number(row.users ?? 0)]));
-
-    return {
-      totals: {
-        users: Number(totals.users ?? 0),
-        approvedUsers: Number(totals.approved_users ?? 0),
-        pendingUsers: Number(totals.pending_users ?? 0),
-        pendingWalletRequests: Number(todayWallet.pending_wallet_requests ?? 0),
-        markets: Number(markets.markets ?? 0),
-        liveMarkets: Number(markets.live_markets ?? 0),
-        deviceRegistrations: Number(devices.device_registrations ?? 0),
-        supportConversations: Number(supportSummary.conversationsCount ?? 0)
-      },
-      today: {
-        depositAmount: Number(todayWallet.deposit_amount ?? 0),
-        depositRequests: Number(todayWallet.deposit_requests ?? 0),
-        withdrawAmount: Number(todayWallet.withdraw_amount ?? 0),
-        withdrawRequests: Number(todayWallet.withdraw_requests ?? 0),
-        signupBonusAmount: Number(todayWallet.signup_bonus_amount ?? 0),
-        betsCount: Number(todayBids.bets_count ?? 0),
-        betsAmount: Number(todayBids.bets_amount ?? 0),
-        loginCount: Number(todaySessions.login_count ?? 0),
-        activeUsers: Number(todayActiveUsers.active_users ?? 0)
-      },
-      trends: {
-        collectionVsPayout: dateKeys.map((date) => ({
-          date,
-          collection: collectionMap.get(date) ?? 0,
-          payout: payoutMap.get(date) ?? 0
-        })),
-        activeUsersTrend: dateKeys.map((date) => ({
-          date,
-          users: activeMap.get(date) ?? 0
-        }))
-      },
-      pendingWork: {
-        userApprovals: Number(totals.pending_users ?? 0),
-        walletApprovals: Number(todayWallet.pending_wallet_requests ?? 0),
-        pendingDeposits: Number(todayWallet.pending_deposits ?? 0),
-        pendingWithdraws: Number(todayWallet.pending_withdraws ?? 0),
-        supportUnread: Number(supportSummary.unreadForAdmin ?? 0)
-      },
-      topUsers: topUsersResult.rows.map((row) => ({
-        id: row.id,
-        name: row.name,
-        phone: row.phone,
-        balance: Number(row.balance ?? 0)
-      })),
-      recentBids: recentBidsResult.rows.map((row) => ({
-        id: row.id,
-        market: row.market,
-        boardLabel: row.board_label,
-        digit: row.digit,
-        points: Number(row.points ?? 0),
-        status: row.status,
-        createdAt: toIso(row.created_at),
-        userName: row.user_name ?? "Unknown",
-        userPhone: row.user_phone ?? ""
-      })),
-      recentRequests: recentRequestsResult.rows.map((row) => ({
-        id: row.id,
-        type: row.type,
-        amount: Number(row.amount ?? 0),
-        createdAt: toIso(row.created_at),
-        userName: row.user_name ?? "Unknown",
-        userPhone: row.user_phone ?? ""
-      })),
-      placeholderResults: Number(markets.placeholder_results ?? 0)
-    };
-  }
-
-  const sqlite = getSqlite();
-  const seriesFrom = dateKeys[0] ? `${dateKeys[0]}T00:00:00.000Z` : startOfToday;
-  const totals = sqlite.prepare(
-    `SELECT
-       COUNT(*) AS users,
-       SUM(CASE WHEN approval_status = 'Approved' THEN 1 ELSE 0 END) AS approved_users,
-       SUM(CASE WHEN approval_status = 'Pending' THEN 1 ELSE 0 END) AS pending_users
-     FROM users
-     WHERE role = 'user'`
-  ).get();
-  const todayWallet = sqlite.prepare(
-    `SELECT
-       COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status IN ('SUCCESS', 'BACKOFFICE') THEN amount ELSE 0 END), 0) AS deposit_amount,
-       SUM(CASE WHEN type = 'DEPOSIT' AND status = 'INITIATED' THEN 1 ELSE 0 END) AS deposit_requests,
-       COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status IN ('SUCCESS', 'BACKOFFICE') THEN amount ELSE 0 END), 0) AS withdraw_amount,
-       SUM(CASE WHEN type = 'WITHDRAW' AND status = 'INITIATED' THEN 1 ELSE 0 END) AS withdraw_requests,
-       COALESCE(SUM(CASE WHEN type = 'SIGNUP_BONUS' AND status = 'SUCCESS' THEN amount ELSE 0 END), 0) AS signup_bonus_amount,
-       SUM(CASE WHEN status = 'INITIATED' AND type IN ('DEPOSIT', 'WITHDRAW') THEN 1 ELSE 0 END) AS pending_wallet_requests,
-       SUM(CASE WHEN status = 'INITIATED' AND type = 'DEPOSIT' THEN 1 ELSE 0 END) AS pending_deposits,
-       SUM(CASE WHEN status = 'INITIATED' AND type = 'WITHDRAW' THEN 1 ELSE 0 END) AS pending_withdraws
-     FROM wallet_entries
-     WHERE created_at >= ?`
-  ).get(startOfToday);
-  const todayBids = sqlite.prepare(
-    `SELECT COUNT(*) AS bets_count, COALESCE(SUM(points), 0) AS bets_amount
-     FROM bids
-     WHERE created_at >= ?`
-  ).get(startOfToday);
-  const todaySessions = sqlite.prepare(
-    `SELECT COUNT(*) AS login_count
-     FROM sessions s
-     JOIN users u ON u.id = s.user_id
-     WHERE s.created_at >= ?
-       AND u.role = 'user'`
-  ).get(startOfToday);
-  const todayActiveUsers = sqlite.prepare(
-    `SELECT COUNT(DISTINCT user_id) AS active_users
-     FROM (
-       SELECT s.user_id
-       FROM sessions s
-       JOIN users u ON u.id = s.user_id
-       WHERE s.created_at >= ?
-         AND u.role = 'user'
-       UNION
-       SELECT b.user_id
-       FROM bids b
-       JOIN users u ON u.id = b.user_id
-       WHERE b.created_at >= ?
-         AND u.role = 'user'
-       UNION
-       SELECT we.user_id
-       FROM wallet_entries we
-       JOIN users u ON u.id = we.user_id
-       WHERE we.created_at >= ?
-         AND u.role = 'user'
-     ) active_users`
-  ).get(startOfToday, startOfToday, startOfToday);
-  const markets = sqlite.prepare(
-    `SELECT
-       COUNT(*) AS markets,
-       SUM(CASE WHEN LOWER(action) NOT LIKE '%closed%' THEN 1 ELSE 0 END) AS live_markets,
-       SUM(CASE WHEN result = '***-**-***' THEN 1 ELSE 0 END) AS placeholder_results
-     FROM markets`
-  ).get();
-  const devices = sqlite.prepare(`SELECT COUNT(*) AS device_registrations FROM notification_devices`).get();
-  const topUsers = sqlite.prepare(
-    `SELECT
-       u.id,
-       u.name,
-       u.phone,
-       COALESCE((
-         SELECT after_balance
-         FROM wallet_entries we
-         WHERE we.user_id = u.id
-         ORDER BY created_at DESC, id DESC
-         LIMIT 1
-       ), 0) AS balance
-     FROM users u
-     WHERE u.approval_status = 'Approved'
-       AND u.role = 'user'
-     ORDER BY u.joined_at DESC, u.id DESC
-     LIMIT 5`
-  ).all();
-  const recentBids = sqlite.prepare(
-    `SELECT
-       b.id,
-       b.market,
-       b.board_label,
-       b.digit,
-       b.points,
-       b.status,
-       b.created_at,
-       u.name AS user_name,
-       u.phone AS user_phone
-     FROM bids b
-     LEFT JOIN users u ON u.id = b.user_id
-     ORDER BY b.created_at DESC, b.id DESC
-     LIMIT 8`
-  ).all();
-  const recentRequests = sqlite.prepare(
-    `SELECT
-       we.id,
-       we.type,
-       we.amount,
-       we.created_at,
-       u.name AS user_name,
-       u.phone AS user_phone
-     FROM wallet_entries we
-     LEFT JOIN users u ON u.id = we.user_id
-     WHERE we.status = 'INITIATED'
-       AND we.type IN ('DEPOSIT', 'WITHDRAW')
-     ORDER BY we.created_at DESC, we.id DESC
-     LIMIT 8`
-  ).all();
-  const collectionSeries = sqlite.prepare(
-    `SELECT substr(created_at, 1, 10) AS date, COALESCE(SUM(points), 0) AS collection
-     FROM bids
-     WHERE created_at >= ?
-     GROUP BY substr(created_at, 1, 10)`
-  ).all(seriesFrom);
-  const payoutSeries = sqlite.prepare(
-    `SELECT substr(created_at, 1, 10) AS date, COALESCE(SUM(amount), 0) AS payout
-     FROM wallet_entries
-     WHERE created_at >= ?
-       AND type = 'BID_WIN'
-       AND status IN ('SUCCESS', 'BACKOFFICE')
-     GROUP BY substr(created_at, 1, 10)`
-  ).all(seriesFrom);
-  const activeTrend = sqlite.prepare(
-    `SELECT date, COUNT(DISTINCT user_id) AS users
-     FROM (
-       SELECT substr(s.created_at, 1, 10) AS date, s.user_id
-       FROM sessions s
-       JOIN users u ON u.id = s.user_id
-       WHERE s.created_at >= ?
-         AND u.role = 'user'
-       UNION
-       SELECT substr(b.created_at, 1, 10) AS date, b.user_id
-       FROM bids b
-       JOIN users u ON u.id = b.user_id
-       WHERE b.created_at >= ?
-         AND u.role = 'user'
-       UNION
-       SELECT substr(we.created_at, 1, 10) AS date, we.user_id
-       FROM wallet_entries we
-       JOIN users u ON u.id = we.user_id
-       WHERE we.created_at >= ?
-         AND u.role = 'user'
-     ) activity
-     GROUP BY date`
-  ).all(seriesFrom, seriesFrom, seriesFrom);
-  const supportSummary = await getSupportConversationSummary();
-
-  const collectionMap = new Map(collectionSeries.map((row) => [row.date, Number(row.collection ?? 0)]));
-  const payoutMap = new Map(payoutSeries.map((row) => [row.date, Number(row.payout ?? 0)]));
-  const activeMap = new Map(activeTrend.map((row) => [row.date, Number(row.users ?? 0)]));
-
-  return {
-    totals: {
-      users: Number(totals?.users ?? 0),
-      approvedUsers: Number(totals?.approved_users ?? 0),
-      pendingUsers: Number(totals?.pending_users ?? 0),
-      pendingWalletRequests: Number(todayWallet?.pending_wallet_requests ?? 0),
-      markets: Number(markets?.markets ?? 0),
-      liveMarkets: Number(markets?.live_markets ?? 0),
-      deviceRegistrations: Number(devices?.device_registrations ?? 0),
-      supportConversations: Number(supportSummary.conversationsCount ?? 0)
-    },
-    today: {
-      depositAmount: Number(todayWallet?.deposit_amount ?? 0),
-      depositRequests: Number(todayWallet?.deposit_requests ?? 0),
-      withdrawAmount: Number(todayWallet?.withdraw_amount ?? 0),
-      withdrawRequests: Number(todayWallet?.withdraw_requests ?? 0),
-      signupBonusAmount: Number(todayWallet?.signup_bonus_amount ?? 0),
-      betsCount: Number(todayBids?.bets_count ?? 0),
-      betsAmount: Number(todayBids?.bets_amount ?? 0),
-      loginCount: Number(todaySessions?.login_count ?? 0),
-      activeUsers: Number(todayActiveUsers?.active_users ?? 0)
-    },
-    trends: {
-      collectionVsPayout: dateKeys.map((date) => ({ date, collection: collectionMap.get(date) ?? 0, payout: payoutMap.get(date) ?? 0 })),
-      activeUsersTrend: dateKeys.map((date) => ({ date, users: activeMap.get(date) ?? 0 }))
-    },
-    pendingWork: {
-      userApprovals: Number(totals?.pending_users ?? 0),
-      walletApprovals: Number(todayWallet?.pending_wallet_requests ?? 0),
-      pendingDeposits: Number(todayWallet?.pending_deposits ?? 0),
-      pendingWithdraws: Number(todayWallet?.pending_withdraws ?? 0),
-      supportUnread: Number(supportSummary.unreadForAdmin ?? 0)
-    },
-    topUsers: topUsers.map((row) => ({ id: row.id, name: row.name, phone: row.phone, balance: Number(row.balance ?? 0) })),
-    recentBids: recentBids.map((row) => ({
-      id: row.id,
-      market: row.market,
-      boardLabel: row.board_label,
-      digit: row.digit,
-      points: Number(row.points ?? 0),
-      status: row.status,
-      createdAt: toIso(row.created_at),
-      userName: row.user_name ?? "Unknown",
-      userPhone: row.user_phone ?? ""
-    })),
-    recentRequests: recentRequests.map((row) => ({
-      id: row.id,
-      type: row.type,
-      amount: Number(row.amount ?? 0),
-      createdAt: toIso(row.created_at),
-      userName: row.user_name ?? "Unknown",
-      userPhone: row.user_phone ?? ""
-    })),
-    placeholderResults: Number(markets?.placeholder_results ?? 0)
-  };
+  const { getDashboardSummaryData: getDashboardSummaryDataFromAdminDashboardDb } = await import("./db/admin-dashboard-db.mjs");
+  return getDashboardSummaryDataFromAdminDashboardDb(startOfToday, dateKeys);
 }
 
 export async function getMonitoringSummaryData() {
-  const [supportSummary, auditLogs] = await Promise.all([getSupportConversationSummary(), getAuditLogs(50)]);
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const [usersResult, walletResult, marketsResult] = await Promise.all([
-      pool.query(
-        `SELECT
-           COUNT(*) FILTER (WHERE blocked_at IS NOT NULL)::int AS blocked_users,
-           COUNT(*) FILTER (WHERE deactivated_at IS NOT NULL)::int AS deactivated_users
-         FROM users
-         WHERE role = 'user'`
-      ),
-      pool.query(
-        `SELECT
-           COUNT(*) FILTER (WHERE type = 'WITHDRAW' AND status = 'INITIATED')::int AS pending_withdraws,
-           COUNT(*) FILTER (WHERE type = 'DEPOSIT' AND status = 'INITIATED')::int AS pending_deposits
-         FROM wallet_entries`
-      ),
-      pool.query(
-        `SELECT COUNT(*) FILTER (WHERE result = '***-**-***')::int AS placeholder_results
-         FROM markets`
-      )
-    ]);
-
-    return {
-      blockedUsers: Number(usersResult.rows[0]?.blocked_users ?? 0),
-      deactivatedUsers: Number(usersResult.rows[0]?.deactivated_users ?? 0),
-      pendingWithdraws: Number(walletResult.rows[0]?.pending_withdraws ?? 0),
-      pendingDeposits: Number(walletResult.rows[0]?.pending_deposits ?? 0),
-      placeholderResults: Number(marketsResult.rows[0]?.placeholder_results ?? 0),
-      supportUnread: Number(supportSummary.unreadForAdmin ?? 0),
-      supportConversations: Number(supportSummary.conversationsCount ?? 0),
-      auditEvents: auditLogs.length,
-      recentAuditFlags: auditLogs.filter((item) => item.action.includes("REJECTED") || item.action.includes("RESET")).slice(0, 12)
-    };
-  }
-
-  const sqlite = getSqlite();
-  const users = sqlite.prepare(
-    `SELECT
-       SUM(CASE WHEN blocked_at IS NOT NULL THEN 1 ELSE 0 END) AS blocked_users,
-       SUM(CASE WHEN deactivated_at IS NOT NULL THEN 1 ELSE 0 END) AS deactivated_users
-     FROM users
-     WHERE role = 'user'`
-  ).get();
-  const wallet = sqlite.prepare(
-    `SELECT
-       SUM(CASE WHEN type = 'WITHDRAW' AND status = 'INITIATED' THEN 1 ELSE 0 END) AS pending_withdraws,
-       SUM(CASE WHEN type = 'DEPOSIT' AND status = 'INITIATED' THEN 1 ELSE 0 END) AS pending_deposits
-     FROM wallet_entries`
-  ).get();
-  const markets = sqlite.prepare(
-    `SELECT SUM(CASE WHEN result = '***-**-***' THEN 1 ELSE 0 END) AS placeholder_results
-     FROM markets`
-  ).get();
-
-  return {
-    blockedUsers: Number(users?.blocked_users ?? 0),
-    deactivatedUsers: Number(users?.deactivated_users ?? 0),
-    pendingWithdraws: Number(wallet?.pending_withdraws ?? 0),
-    pendingDeposits: Number(wallet?.pending_deposits ?? 0),
-    placeholderResults: Number(markets?.placeholder_results ?? 0),
-    supportUnread: Number(supportSummary.unreadForAdmin ?? 0),
-    supportConversations: Number(supportSummary.conversationsCount ?? 0),
-    auditEvents: auditLogs.length,
-    recentAuditFlags: auditLogs.filter((item) => item.action.includes("REJECTED") || item.action.includes("RESET")).slice(0, 12)
-  };
-}
-
-async function findPaymentOrderById(paymentOrderId) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = getPgPool();
-    const result = await pool.query(
-      `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
-       FROM payment_orders
-       WHERE id = $1
-       LIMIT 1`,
-      [paymentOrderId]
-    );
-    return mapPaymentOrderRow(result.rows[0]);
-  }
-
-  return mapPaymentOrderRow(
-    getSqlite()
-      .prepare(
-        `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
-         FROM payment_orders
-         WHERE id = ?
-         LIMIT 1`
-      )
-      .get(paymentOrderId)
-  );
-}
-
-async function findPaymentOrderByReference(reference) {
-  if (!reference) {
-    return null;
-  }
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = getPgPool();
-    const result = await pool.query(
-      `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
-       FROM payment_orders
-       WHERE reference = $1
-       LIMIT 1`,
-      [reference]
-    );
-    return mapPaymentOrderRow(result.rows[0]);
-  }
-
-  return mapPaymentOrderRow(
-    getSqlite()
-      .prepare(
-        `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
-         FROM payment_orders
-         WHERE reference = ?
-         LIMIT 1`
-      )
-      .get(reference)
-  );
+  const { getMonitoringSummaryData: getMonitoringSummaryDataFromAdminMonitoringDb } = await import("./db/admin-monitoring-db.mjs");
+  return getMonitoringSummaryDataFromAdminMonitoringDb();
 }
 
 export async function findPaymentOrderByReferenceForUser(userId, reference) {
-  const order = await findPaymentOrderByReference(reference);
-  if (!order || order.userId !== userId) {
-    return null;
-  }
-  return order;
+  const { findPaymentOrderByReferenceForUser: findPaymentOrderByReferenceForUserFromPaymentDb } = await import("./db/payment-db.mjs");
+  return findPaymentOrderByReferenceForUserFromPaymentDb(userId, reference);
 }
 
 export async function findPaymentOrderForCheckout(paymentOrderId, checkoutToken) {
-  const order = await findPaymentOrderById(paymentOrderId);
-  if (!order || !checkoutToken || order.checkoutToken !== checkoutToken) {
-    return null;
-  }
-  return order;
+  const { findPaymentOrderForCheckout: findPaymentOrderForCheckoutFromPaymentDb } = await import("./db/payment-db.mjs");
+  return findPaymentOrderForCheckoutFromPaymentDb(paymentOrderId, checkoutToken);
 }
 
 export async function createPaymentOrder({
@@ -3964,219 +2050,32 @@ export async function createPaymentOrder({
   gatewayOrderId = null,
   redirectUrl = null
 }) {
-  const createdAt = nowIso();
-  const status = "PENDING";
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = getPgPool();
-    await pool.query(
-      `INSERT INTO payment_orders (id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, redirect_url, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
-      [id, userId, provider, amount, status, reference, checkoutToken, gatewayOrderId, redirectUrl, createdAt]
-    );
-  } else {
-    getSqlite()
-      .prepare(
-        `INSERT INTO payment_orders (id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, redirect_url, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(id, userId, provider, amount, status, reference, checkoutToken, gatewayOrderId, redirectUrl, createdAt, createdAt);
-  }
-
-  return findPaymentOrderById(id);
-}
-
-export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gatewayPaymentId, gatewaySignature }) {
-  const verifiedAt = nowIso();
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = getPgPool();
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      const existingResult = await client.query(
-        `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
-         FROM payment_orders
-         WHERE id = $1
-         FOR UPDATE`,
-        [paymentOrderId]
-      );
-      const existing = existingResult.rows[0];
-      if (!existing) {
-        await client.query("ROLLBACK");
-        return null;
-      }
-      if (existing.gateway_order_id && existing.gateway_order_id !== gatewayOrderId) {
-        throw new Error("Gateway order mismatch");
-      }
-      if (existing.status !== "SUCCESS") {
-        const currentBalance = Number(
-          (
-            await client.query(
-              `SELECT COALESCE(
-                 (
-                   SELECT after_balance
-                   FROM wallet_entries
-                   WHERE user_id = $1
-                   ORDER BY created_at DESC, id DESC
-                   LIMIT 1
-                 ),
-                 0
-               ) AS balance`,
-              [existing.user_id]
-            )
-          ).rows[0]?.balance ?? 0
-        );
-        const nextBalance = currentBalance + Number(existing.amount);
-        await client.query(
-          `UPDATE payment_orders
-           SET status = 'SUCCESS',
-               gateway_order_id = $2,
-               gateway_payment_id = $3,
-               gateway_signature = $4,
-               verified_at = $5,
-               updated_at = $5
-           WHERE id = $1`,
-          [paymentOrderId, gatewayOrderId, gatewayPaymentId, gatewaySignature, verifiedAt]
-        );
-        await client.query(
-          `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, note, created_at)
-           VALUES ($1, $2, 'DEPOSIT', 'SUCCESS', $3, $4, $5, $6, $7, $8)`,
-          [
-            `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            existing.user_id,
-            Number(existing.amount),
-            currentBalance,
-            nextBalance,
-            gatewayPaymentId,
-            `Razorpay payment ${gatewayPaymentId}`,
-            verifiedAt
-          ]
-        );
-      }
-      await client.query("COMMIT");
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
-
-    return findPaymentOrderById(paymentOrderId);
-  }
-
-  const db = getSqlite();
-  db.exec("BEGIN");
-  try {
-    const existing = db
-      .prepare(
-        `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
-         FROM payment_orders
-         WHERE id = ?
-         LIMIT 1`
-      )
-      .get(paymentOrderId);
-    if (!existing) {
-      db.exec("ROLLBACK");
-      return null;
-    }
-    if (existing.gateway_order_id && existing.gateway_order_id !== gatewayOrderId) {
-      throw new Error("Gateway order mismatch");
-    }
-    if (existing.status !== "SUCCESS") {
-      const currentBalance = Number(
-        db
-          .prepare(
-            `SELECT COALESCE(
-               (
-                 SELECT after_balance
-                 FROM wallet_entries
-                 WHERE user_id = ?
-                 ORDER BY created_at DESC, id DESC
-                 LIMIT 1
-               ),
-               0
-             ) AS balance`
-          )
-          .get(existing.user_id)?.balance ?? 0
-      );
-      const nextBalance = currentBalance + Number(existing.amount);
-      db.prepare(
-        `UPDATE payment_orders
-         SET status = 'SUCCESS',
-             gateway_order_id = ?,
-             gateway_payment_id = ?,
-             gateway_signature = ?,
-             verified_at = ?,
-             updated_at = ?
-         WHERE id = ?`
-      ).run(gatewayOrderId, gatewayPaymentId, gatewaySignature, verifiedAt, verifiedAt, paymentOrderId);
-      db.prepare(
-        `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, note, created_at)
-         VALUES (?, ?, 'DEPOSIT', 'SUCCESS', ?, ?, ?, ?, ?, ?)`
-      ).run(
-        `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        existing.user_id,
-        Number(existing.amount),
-        currentBalance,
-        nextBalance,
-        gatewayPaymentId,
-        `Razorpay payment ${gatewayPaymentId}`,
-        verifiedAt
-      );
-    }
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
-
-  return findPaymentOrderById(paymentOrderId);
-}
-
-export async function completePaymentLinkOrder({ reference, gatewayOrderId, gatewayPaymentId, gatewaySignature = "payment_link_webhook" }) {
-  if (!reference) {
-    return null;
-  }
-
-  const existingOrder = await findPaymentOrderByReference(reference);
-  if (!existingOrder) {
-    return null;
-  }
-
-  return completePaymentOrder({
-    paymentOrderId: existingOrder.id,
-    gatewayOrderId: gatewayOrderId || existingOrder.gatewayOrderId || `plink_${reference}`,
-    gatewayPaymentId: gatewayPaymentId || existingOrder.gatewayPaymentId || `plinkpay_${reference}`,
-    gatewaySignature
+  const { createPaymentOrder: createPaymentOrderFromPaymentDb } = await import("./db/payment-db.mjs");
+  return createPaymentOrderFromPaymentDb({
+    id,
+    userId,
+    amount,
+    provider,
+    reference,
+    checkoutToken,
+    gatewayOrderId,
+    redirectUrl
   });
 }
 
-export async function handlePaymentWebhook(reference, status) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = getPgPool();
-    const result = await pool.query(
-      `UPDATE payment_orders
-       SET status = $2, updated_at = $3
-       WHERE reference = $1
-       RETURNING id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at`,
-      [reference, status, nowIso()]
-    );
-    return mapPaymentOrderRow(result.rows[0]);
-  }
+export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gatewayPaymentId, gatewaySignature }) {
+  const { completePaymentOrder: completePaymentOrderFromPaymentDb } = await import("./db/payment-db.mjs");
+  return completePaymentOrderFromPaymentDb({ paymentOrderId, gatewayOrderId, gatewayPaymentId, gatewaySignature });
+}
 
-  const db = getSqlite();
-  db.prepare(`UPDATE payment_orders SET status = ?, updated_at = ? WHERE reference = ?`).run(status, nowIso(), reference);
-  return mapPaymentOrderRow(
-    db
-      .prepare(
-        `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
-         FROM payment_orders
-         WHERE reference = ?
-         LIMIT 1`
-      )
-      .get(reference)
-  );
+export async function completePaymentLinkOrder({ reference, gatewayOrderId, gatewayPaymentId, gatewaySignature = "payment_link_webhook" }) {
+  const { completePaymentLinkOrder: completePaymentLinkOrderFromPaymentDb } = await import("./db/payment-db.mjs");
+  return completePaymentLinkOrderFromPaymentDb({ reference, gatewayOrderId, gatewayPaymentId, gatewaySignature });
+}
+
+export async function handlePaymentWebhook(reference, status) {
+  const { handlePaymentWebhook: handlePaymentWebhookFromPaymentDb } = await import("./db/payment-db.mjs");
+  return handlePaymentWebhookFromPaymentDb(reference, status);
 }
 
 async function findWalletEntryById(entryId) {
@@ -4247,445 +2146,38 @@ async function updateWalletEntryStatus(entryId, status) {
 }
 
 export async function updateWalletEntryAdmin(entryId, updates = {}) {
-  const current = await findWalletEntryById(entryId);
-  if (!current) {
-    return null;
-  }
-
-  const nextStatus = String(updates.status ?? current.status).trim() || current.status;
-  const nextReferenceId = String(updates.referenceId ?? current.referenceId ?? "").trim();
-  const nextProofUrl = String(updates.proofUrl ?? current.proofUrl ?? "").trim();
-  const nextNote = String(updates.note ?? current.note ?? "").trim();
-  const nextBeforeBalance = Number.isFinite(Number(updates.beforeBalance))
-    ? Number(updates.beforeBalance)
-    : Number(current.beforeBalance ?? 0);
-  const nextAfterBalance = Number.isFinite(Number(updates.afterBalance))
-    ? Number(updates.afterBalance)
-    : Number(current.afterBalance ?? 0);
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = getPgPool();
-    const result = await pool.query(
-      `UPDATE wallet_entries
-       SET status = $2,
-           before_balance = $3,
-           after_balance = $4,
-           reference_id = $5,
-           proof_url = $6,
-           note = $7
-       WHERE id = $1
-       RETURNING id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at`,
-      [entryId, nextStatus, nextBeforeBalance, nextAfterBalance, nextReferenceId || null, nextProofUrl || null, nextNote || null]
-    );
-    return mapWalletEntryRow(result.rows[0]);
-  }
-
-  getSqlite()
-    .prepare(
-      `UPDATE wallet_entries
-       SET status = ?, before_balance = ?, after_balance = ?, reference_id = ?, proof_url = ?, note = ?
-       WHERE id = ?`
-    )
-    .run(nextStatus, nextBeforeBalance, nextAfterBalance, nextReferenceId || null, nextProofUrl || null, nextNote || null, entryId);
-
-  return findWalletEntryById(entryId);
+  const { updateWalletEntryAdmin: updateWalletEntryAdminFromWalletDb } = await import("./db/wallet-db.mjs");
+  return updateWalletEntryAdminFromWalletDb(entryId, updates);
 }
 
 export async function getWalletApprovalRequests() {
-  const filters = ["DEPOSIT", "WITHDRAW"];
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at
-         FROM wallet_entries
-         WHERE (type = 'DEPOSIT' AND status = 'INITIATED')
-            OR (type = 'WITHDRAW' AND status = ANY($1::text[]))
-         ORDER BY created_at DESC, id DESC`,
-      [["INITIATED", "BACKOFFICE"]]
-    );
-    return result.rows.map((row) => mapWalletEntryRow(row));
-  }
-
-    return getSqlite()
-      .prepare(
-        `SELECT id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at
-         FROM wallet_entries
-         WHERE (type = ? AND status = ?)
-            OR (type = ? AND status IN (?, ?))
-         ORDER BY created_at DESC, id DESC`
-    )
-    .all("DEPOSIT", "INITIATED", "WITHDRAW", "INITIATED", "BACKOFFICE")
-    .map((row) => mapWalletEntryRow(row));
+  const { getWalletApprovalRequests: getWalletApprovalRequestsFromWalletDb } = await import("./db/wallet-db.mjs");
+  return getWalletApprovalRequestsFromWalletDb();
 }
 
 export async function getWalletRequestHistory() {
-  const filters = ["DEPOSIT", "WITHDRAW"];
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at
-         FROM wallet_entries
-         WHERE type = ANY($1::text[])
-         ORDER BY created_at DESC, id DESC`,
-      [filters]
-    );
-    return result.rows.map((row) => mapWalletEntryRow(row));
-  }
-
-    return getSqlite()
-      .prepare(
-        `SELECT id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at
-         FROM wallet_entries
-         WHERE type IN (?, ?)
-         ORDER BY created_at DESC, id DESC`
-    )
-    .all(filters[0], filters[1])
-    .map((row) => mapWalletEntryRow(row));
+  const { getWalletRequestHistory: getWalletRequestHistoryFromWalletDb } = await import("./db/wallet-db.mjs");
+  return getWalletRequestHistoryFromWalletDb();
 }
 
 export async function getWalletAdminRequestItems({ history = false } = {}) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const params = history ? [["DEPOSIT", "WITHDRAW"]] : [["INITIATED", "BACKOFFICE"]];
-    const query = history
-      ? `SELECT
-           we.id,
-           we.user_id,
-           we.type,
-           we.status,
-           we.amount,
-           we.before_balance,
-           we.after_balance,
-           we.reference_id,
-           we.proof_url,
-           we.note,
-           we.created_at,
-           u.phone AS user_phone,
-           u.name AS user_name,
-           u.approval_status AS user_approval_status,
-           COALESCE(balance.after_balance, 0) AS live_balance,
-           bank.id AS bank_id,
-           bank.account_number AS bank_account_number,
-           bank.holder_name AS bank_holder_name,
-           bank.ifsc AS bank_ifsc,
-           bank.created_at AS bank_created_at
-         FROM wallet_entries we
-         LEFT JOIN users u ON u.id = we.user_id
-         LEFT JOIN LATERAL (
-           SELECT after_balance
-           FROM wallet_entries
-           WHERE user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) balance ON TRUE
-         LEFT JOIN LATERAL (
-           SELECT id, account_number, holder_name, ifsc, created_at
-           FROM bank_accounts
-           WHERE user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) bank ON TRUE
-         WHERE we.type = ANY($1::text[])
-         ORDER BY we.created_at DESC, we.id DESC`
-      : `SELECT
-           we.id,
-           we.user_id,
-           we.type,
-           we.status,
-           we.amount,
-           we.before_balance,
-           we.after_balance,
-           we.reference_id,
-           we.proof_url,
-           we.note,
-           we.created_at,
-           u.phone AS user_phone,
-           u.name AS user_name,
-           u.approval_status AS user_approval_status,
-           COALESCE(balance.after_balance, 0) AS live_balance,
-           bank.id AS bank_id,
-           bank.account_number AS bank_account_number,
-           bank.holder_name AS bank_holder_name,
-           bank.ifsc AS bank_ifsc,
-           bank.created_at AS bank_created_at
-         FROM wallet_entries we
-         LEFT JOIN users u ON u.id = we.user_id
-         LEFT JOIN LATERAL (
-           SELECT after_balance
-           FROM wallet_entries
-           WHERE user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) balance ON TRUE
-         LEFT JOIN LATERAL (
-           SELECT id, account_number, holder_name, ifsc, created_at
-           FROM bank_accounts
-           WHERE user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) bank ON TRUE
-         WHERE (we.type = 'DEPOSIT' AND we.status = 'INITIATED')
-            OR (we.type = 'WITHDRAW' AND we.status = ANY($1::text[]))
-         ORDER BY we.created_at DESC, we.id DESC`;
-    const result = await pool.query(query, params);
-    return result.rows.map((row) => ({
-      ...mapWalletEntryRow(row),
-      user: row.user_phone || row.user_name || row.user_approval_status
-        ? {
-            id: row.user_id,
-            phone: row.user_phone ?? "",
-            name: row.user_name ?? "",
-            approvalStatus: row.user_approval_status ?? "Approved"
-          }
-        : null,
-      liveBalance: Number(row.live_balance ?? 0),
-      primaryBankAccount: row.bank_id
-        ? {
-            id: row.bank_id,
-            accountNumber: row.bank_account_number,
-            holderName: row.bank_holder_name,
-            ifsc: row.bank_ifsc,
-            createdAt: toIso(row.bank_created_at)
-          }
-        : null,
-      referenceId: row.reference_id ?? "",
-      proofUrl: row.proof_url ?? "",
-      note: row.note ?? ""
-    }));
-  }
-
-  const sqlite = getSqlite();
-  const query = history
-    ? `SELECT
-         we.id,
-         we.user_id,
-         we.type,
-         we.status,
-         we.amount,
-         we.before_balance,
-         we.after_balance,
-         we.reference_id,
-         we.proof_url,
-         we.note,
-         we.created_at,
-         u.phone AS user_phone,
-         u.name AS user_name,
-         u.approval_status AS user_approval_status,
-         COALESCE((
-           SELECT after_balance
-           FROM wallet_entries latest
-           WHERE latest.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ), 0) AS live_balance,
-         (
-           SELECT id
-           FROM bank_accounts bank
-           WHERE bank.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) AS bank_id,
-         (
-           SELECT account_number
-           FROM bank_accounts bank
-           WHERE bank.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) AS bank_account_number,
-         (
-           SELECT holder_name
-           FROM bank_accounts bank
-           WHERE bank.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) AS bank_holder_name,
-         (
-           SELECT ifsc
-           FROM bank_accounts bank
-           WHERE bank.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) AS bank_ifsc,
-         (
-           SELECT created_at
-           FROM bank_accounts bank
-           WHERE bank.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) AS bank_created_at
-       FROM wallet_entries we
-       LEFT JOIN users u ON u.id = we.user_id
-       WHERE we.type IN (?, ?)
-       ORDER BY we.created_at DESC, we.id DESC`
-    : `SELECT
-         we.id,
-         we.user_id,
-         we.type,
-         we.status,
-         we.amount,
-         we.before_balance,
-         we.after_balance,
-         we.reference_id,
-         we.proof_url,
-         we.note,
-         we.created_at,
-         u.phone AS user_phone,
-         u.name AS user_name,
-         u.approval_status AS user_approval_status,
-         COALESCE((
-           SELECT after_balance
-           FROM wallet_entries latest
-           WHERE latest.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ), 0) AS live_balance,
-         (
-           SELECT id
-           FROM bank_accounts bank
-           WHERE bank.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) AS bank_id,
-         (
-           SELECT account_number
-           FROM bank_accounts bank
-           WHERE bank.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) AS bank_account_number,
-         (
-           SELECT holder_name
-           FROM bank_accounts bank
-           WHERE bank.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) AS bank_holder_name,
-         (
-           SELECT ifsc
-           FROM bank_accounts bank
-           WHERE bank.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) AS bank_ifsc,
-         (
-           SELECT created_at
-           FROM bank_accounts bank
-           WHERE bank.user_id = we.user_id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
-         ) AS bank_created_at
-       FROM wallet_entries we
-       LEFT JOIN users u ON u.id = we.user_id
-       WHERE (we.type = ? AND we.status = ?)
-          OR (we.type = ? AND we.status IN (?, ?))
-       ORDER BY we.created_at DESC, we.id DESC`;
-  const params = history
-    ? ["DEPOSIT", "WITHDRAW"]
-    : ["DEPOSIT", "INITIATED", "WITHDRAW", "INITIATED", "BACKOFFICE"];
-
-  return sqlite
-    .prepare(query)
-    .all(...params)
-    .map((row) => ({
-      ...mapWalletEntryRow(row),
-      user: row.user_phone || row.user_name || row.user_approval_status
-        ? {
-            id: row.user_id,
-            phone: row.user_phone ?? "",
-            name: row.user_name ?? "",
-            approvalStatus: row.user_approval_status ?? "Approved"
-          }
-        : null,
-      liveBalance: Number(row.live_balance ?? 0),
-      primaryBankAccount: row.bank_id
-        ? {
-            id: row.bank_id,
-            accountNumber: row.bank_account_number,
-            holderName: row.bank_holder_name,
-            ifsc: row.bank_ifsc,
-            createdAt: toIso(row.bank_created_at)
-          }
-        : null,
-      referenceId: row.reference_id ?? "",
-      proofUrl: row.proof_url ?? "",
-      note: row.note ?? ""
-    }));
+  const { getWalletAdminRequestItems: getWalletAdminRequestItemsFromWalletDb } = await import("./db/wallet-db.mjs");
+  return getWalletAdminRequestItemsFromWalletDb({ history });
 }
 
 export async function resolveWalletApprovalRequest(entryId, action) {
-  const request = await findWalletEntryById(entryId);
-  if (!request || request.status !== "INITIATED" || !["DEPOSIT", "WITHDRAW"].includes(request.type)) {
-    return null;
-  }
-
-  if (action === "reject") {
-    return {
-      request: await updateWalletEntryStatus(entryId, "REJECTED"),
-      settlementEntry: null
-    };
-  }
-
-  const beforeBalance = await getUserBalance(request.userId);
-  if (request.type === "WITHDRAW" && request.amount > beforeBalance) {
-    throw new Error("User has insufficient live balance for withdraw approval");
-  }
-
-  if (request.type === "DEPOSIT") {
-    return {
-      request: await updateWalletEntryAdmin(entryId, {
-        status: "SUCCESS",
-        beforeBalance,
-        afterBalance: beforeBalance + request.amount
-      }),
-      settlementEntry: null
-    };
-  }
-
-  return {
-    request: await updateWalletEntryStatus(entryId, "BACKOFFICE"),
-    settlementEntry: null
-  };
+  const { resolveWalletApprovalRequest: resolveWalletApprovalRequestFromWalletDb } = await import("./db/wallet-db.mjs");
+  return resolveWalletApprovalRequestFromWalletDb(entryId, action);
 }
 
 export async function completeWalletRequest(entryId) {
-  const request = await findWalletEntryById(entryId);
-  if (!request || !["DEPOSIT", "WITHDRAW"].includes(request.type)) {
-    return null;
-  }
-
-  if (request.status === "SUCCESS") {
-    return request;
-  }
-
-  const beforeBalance = await getUserBalance(request.userId);
-  if (request.type === "WITHDRAW" && request.amount > beforeBalance) {
-    throw new Error("User has insufficient live balance for withdraw completion");
-  }
-
-  return updateWalletEntryAdmin(entryId, {
-    status: "SUCCESS",
-    beforeBalance,
-    afterBalance: request.type === "DEPOSIT" ? beforeBalance + request.amount : beforeBalance - request.amount
-  });
+  const { completeWalletRequest: completeWalletRequestFromWalletDb } = await import("./db/wallet-db.mjs");
+  return completeWalletRequestFromWalletDb(entryId);
 }
 
 export async function rejectWalletRequest(entryId) {
-  const request = await findWalletEntryById(entryId);
-  if (!request || !["DEPOSIT", "WITHDRAW"].includes(request.type)) {
-    return null;
-  }
-
-  if (!["INITIATED", "BACKOFFICE"].includes(String(request.status || ""))) {
-    return null;
-  }
-
-  return updateWalletEntryAdmin(entryId, {
-    status: "REJECTED",
-    beforeBalance: request.beforeBalance ?? 0,
-    afterBalance: request.afterBalance ?? request.beforeBalance ?? 0
-  });
+  const { rejectWalletRequest: rejectWalletRequestFromWalletDb } = await import("./db/wallet-db.mjs");
+  return rejectWalletRequestFromWalletDb(entryId);
 }
 
 export async function updateUserApprovalStatus(userId, status) {
@@ -4755,78 +2247,13 @@ export async function addAuditLog(entry) {
 }
 
 export async function getAuditLogs(limit = 100) {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const result = await pool.query(
-      `SELECT id, actor_user_id, action, entity_type, entity_id, details, created_at
-       FROM audit_logs
-       ORDER BY created_at DESC, id DESC
-       LIMIT $1`,
-      [limit]
-    );
-    return result.rows.map((row) => mapAuditLogRow(row));
-  }
-
-  return getSqlite()
-    .prepare(
-      `SELECT id, actor_user_id, action, entity_type, entity_id, details, created_at
-       FROM audit_logs
-       ORDER BY created_at DESC, id DESC
-       LIMIT ?`
-    )
-    .all(limit)
-    .map((row) => mapAuditLogRow(row));
+  const { getAuditLogs: getAuditLogsFromAdminAuditDb } = await import("./db/admin-audit-db.mjs");
+  return getAuditLogsFromAdminAuditDb(limit);
 }
 
 export async function getAdminSnapshot() {
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const [usersResult, sessionsResult, walletResult, bidsResult, marketsResult, devicesResult] = await Promise.all([
-      pool.query(`SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id FROM users ORDER BY joined_at DESC, id DESC`),
-      pool.query(`SELECT token_hash, user_id, created_at FROM sessions ORDER BY created_at DESC, token_hash DESC`),
-      pool.query(`SELECT id, user_id, type, status, amount, before_balance, after_balance, created_at FROM wallet_entries ORDER BY created_at DESC, id DESC`),
-      pool.query(`SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at FROM bids ORDER BY created_at DESC, id DESC`),
-      pool.query(`SELECT id, slug, name, result, status, action, open_time, close_time, category FROM markets ORDER BY id ASC`),
-      pool.query(`SELECT id, user_id, platform, token, enabled, created_at, updated_at FROM notification_devices ORDER BY created_at DESC, id DESC`)
-    ]);
-
-    return {
-      users: usersResult.rows.map((row) => mapUserRow(row)),
-      sessions: sessionsResult.rows.map((row) => ({ tokenHash: row.token_hash, userId: row.user_id, createdAt: toIso(row.created_at) })),
-      walletEntries: walletResult.rows.map((row) => mapWalletEntryRow(row)),
-      bids: bidsResult.rows.map((row) => mapBidRow(row)),
-      markets: marketsResult.rows.map((row) => mapMarketRow(row)),
-      notificationDevices: devicesResult.rows.map((row) => mapNotificationDeviceRow(row))
-    };
-  }
-
-  const db = getSqlite();
-  return {
-    users: db
-      .prepare(`SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id FROM users ORDER BY joined_at DESC, id DESC`)
-      .all()
-      .map((row) => mapUserRow(row)),
-    sessions: db
-      .prepare(`SELECT token_hash, user_id, created_at FROM sessions ORDER BY created_at DESC, token_hash DESC`)
-      .all()
-      .map((row) => ({ tokenHash: row.token_hash, userId: row.user_id, createdAt: toIso(row.created_at) })),
-    walletEntries: db
-      .prepare(`SELECT id, user_id, type, status, amount, before_balance, after_balance, created_at FROM wallet_entries ORDER BY created_at DESC, id DESC`)
-      .all()
-      .map((row) => mapWalletEntryRow(row)),
-    bids: db
-      .prepare(`SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at FROM bids ORDER BY created_at DESC, id DESC`)
-      .all()
-      .map((row) => mapBidRow(row)),
-    markets: db
-      .prepare(`SELECT id, slug, name, result, status, action, open_time, close_time, category FROM markets ORDER BY id ASC`)
-      .all()
-      .map((row) => mapMarketRow(row)),
-    notificationDevices: db
-      .prepare(`SELECT id, user_id, platform, token, enabled, created_at, updated_at FROM notification_devices ORDER BY created_at DESC, id DESC`)
-      .all()
-      .map((row) => mapNotificationDeviceRow(row))
-  };
+  const { getAdminSnapshot: getAdminSnapshotFromAdminSnapshotDb } = await import("./db/admin-snapshot-db.mjs");
+  return getAdminSnapshotFromAdminSnapshotDb();
 }
 
 export { hashCredential, verifyCredential };

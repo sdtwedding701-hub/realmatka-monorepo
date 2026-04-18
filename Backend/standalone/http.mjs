@@ -25,6 +25,10 @@ function getCorsHeaders(request) {
   };
 }
 
+export function getResponseCorsHeaders(request) {
+  return getCorsHeaders(request);
+}
+
 export async function getJsonBody(request) {
   try {
     return await request.json();

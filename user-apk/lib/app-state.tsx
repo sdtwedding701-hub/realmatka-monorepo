@@ -73,6 +73,10 @@ function isAuthFailure(error: unknown) {
   return String(ensureMessage(error, "")).toLowerCase().includes("unauthorized");
 }
 
+function getResolvedWalletBalance(user: Pick<SessionUser, "walletBalance"> | null | undefined) {
+  return typeof user?.walletBalance === "number" ? user.walletBalance : 0;
+}
+
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [sessionToken, setSessionToken] = useState("");
@@ -91,6 +95,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const walletReloadPromiseRef = useRef<Promise<void> | null>(null);
   const bidReloadPromiseRef = useRef<Promise<void> | null>(null);
   const bankReloadPromiseRef = useRef<Promise<void> | null>(null);
+
+  const applySessionUser = useCallback((token: string, user: SessionUser | null) => {
+    const resolvedBalance = getResolvedWalletBalance(user);
+    activeSessionTokenRef.current = token;
+    setSessionToken(token);
+    setCurrentUser(user ? { ...user, walletBalance: resolvedBalance } : null);
+    setWalletBalance(resolvedBalance);
+    lastSessionReloadAtRef.current = Date.now();
+  }, []);
 
   const persistSessionSnapshot = useCallback(async (user: SessionUser, balance: number) => {
     await writeStoredSessionSnapshot({
@@ -140,11 +153,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         walletBalance: resolvedBalance
       };
 
-      activeSessionTokenRef.current = token;
-      setSessionToken(token);
-      setCurrentUser(mergedUser);
-      setWalletBalance(resolvedBalance);
-      lastSessionReloadAtRef.current = Date.now();
+      applySessionUser(token, mergedUser);
       await persistSessionSnapshot(mergedUser, resolvedBalance);
       return;
     } catch (error) {
@@ -157,26 +166,34 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         throw error;
       }
 
-      activeSessionTokenRef.current = token;
-      setSessionToken(token);
-      setCurrentUser(snapshot.user);
-      setWalletBalance(Number(snapshot.user.walletBalance || 0));
+      applySessionUser(token, snapshot.user);
       lastSessionReloadAtRef.current = 0;
     }
-  }, [persistSessionSnapshot]);
+  }, [applySessionUser, persistSessionSnapshot]);
 
   useEffect(() => {
     let active = true;
 
     void (async () => {
       try {
-        const storedToken = await readStoredSessionToken();
+        const [storedToken, snapshot] = await Promise.all([readStoredSessionToken(), readStoredSessionSnapshot()]);
         if (!active) {
           return;
         }
 
         if (!storedToken) {
           setLoading(false);
+          return;
+        }
+
+        if (snapshot?.user?.id) {
+          applySessionUser(storedToken, snapshot.user);
+          setLoading(false);
+          void hydrateSession(storedToken).catch(async (error) => {
+            if (active && isAuthFailure(error)) {
+              await clearSession();
+            }
+          });
           return;
         }
 
@@ -195,7 +212,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [clearSession, hydrateSession]);
+  }, [applySessionUser, clearSession, hydrateSession]);
 
   useEffect(() => {
     let clearing = false;
@@ -223,14 +240,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (phone: string, password: string) => {
     const response = await api.login(phone, password);
     await writeStoredSessionToken(response.token);
-    await hydrateSession(response.token);
-  }, [hydrateSession]);
+    applySessionUser(response.token, response.user);
+    await persistSessionSnapshot(response.user, getResolvedWalletBalance(response.user));
+    void hydrateSession(response.token).catch(async (error) => {
+      if (isAuthFailure(error)) {
+        await clearSession();
+      }
+    });
+  }, [applySessionUser, clearSession, hydrateSession, persistSessionSnapshot]);
 
   const otpLogin = useCallback(async (phone: string, otp: string) => {
     const response = await api.otpLogin(phone, otp);
     await writeStoredSessionToken(response.token);
-    await hydrateSession(response.token);
-  }, [hydrateSession]);
+    applySessionUser(response.token, response.user);
+    await persistSessionSnapshot(response.user, getResolvedWalletBalance(response.user));
+    void hydrateSession(response.token).catch(async (error) => {
+      if (isAuthFailure(error)) {
+        await clearSession();
+      }
+    });
+  }, [applySessionUser, clearSession, hydrateSession, persistSessionSnapshot]);
 
   const register = useCallback(async (firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode = "") => {
     await api.register(firstName, lastName, phone, otp, password, confirmPassword, referenceCode);

@@ -65,6 +65,8 @@ const emptyBoardHelper: BoardHelperData = {
   validationMessage: "",
   sangam: { valid: false, value: "", message: "" }
 };
+const boardHelperCache = new Map<string, BoardHelperData>();
+const BOARD_HELPER_DEBOUNCE_MS = 180;
 
 function useBoardHelper(
   boardLabel: string,
@@ -77,22 +79,34 @@ function useBoardHelper(
 
   useEffect(() => {
     let mounted = true;
+    const cacheKey = JSON.stringify([boardLabel, query, sessionType, first, second]);
+    const cached = boardHelperCache.get(cacheKey);
+    if (cached) {
+      setData(cached);
+      return () => {
+        mounted = false;
+      };
+    }
 
-    api
-      .boardHelper(boardLabel, query, sessionType, first, second)
-      .then((response) => {
-        if (mounted) {
-          setData(response);
-        }
-      })
-      .catch(() => {
-        if (mounted) {
-          setData(emptyBoardHelper);
-        }
-      });
+    const timer = setTimeout(() => {
+      api
+        .boardHelper(boardLabel, query, sessionType, first, second)
+        .then((response) => {
+          boardHelperCache.set(cacheKey, response);
+          if (mounted) {
+            setData(response);
+          }
+        })
+        .catch(() => {
+          if (mounted) {
+            setData(emptyBoardHelper);
+          }
+        });
+    }, BOARD_HELPER_DEBOUNCE_MS);
 
     return () => {
       mounted = false;
+      clearTimeout(timer);
     };
   }, [boardLabel, first, query, second, sessionType]);
 

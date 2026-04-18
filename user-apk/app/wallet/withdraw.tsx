@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppState } from "@/lib/app-state";
+import { formatApiError } from "@/lib/api";
 import { colors } from "@/theme/colors";
 
 const MIN_WITHDRAW_AMOUNT = 500;
@@ -196,7 +197,7 @@ export default function WithdrawScreen() {
       setOtp("");
       setOtpMessage(response.provider === "twilio" ? "Withdraw OTP SMS successfully sent." : "Withdraw OTP generated.");
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Withdraw OTP send nahi hui.");
+      setError(formatApiError(submitError, "Withdraw OTP send nahi hui."));
     } finally {
       setSubmitting(false);
     }
@@ -242,7 +243,7 @@ export default function WithdrawScreen() {
         router.replace("/wallet/history");
       }, 700);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Withdraw request submit nahi hui.");
+      setError(formatApiError(submitError, "Withdraw request submit nahi hui."));
     } finally {
       setSubmitting(false);
     }

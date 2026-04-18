@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Easing, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { marketCatalog } from "../../data/mock";
-import { api } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
+import type { HealthSnapshot } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
 import { getCachedMarkets, getCachedSettings, hydrateCachedMarkets, hydrateCachedSettings, setCachedMarkets, setCachedSettings } from "@/lib/content-cache";
 import { colors } from "@/theme/colors";
@@ -152,6 +153,7 @@ export default function HomeScreen() {
   const [noticeText, setNoticeText] = useState("Notice: Market open-close time change ho sakta hai, bet place karne se pehle check karein.");
   const [selectedChartMarket, setSelectedChartMarket] = useState<Pick<MarketItem, "slug" | "name"> | null>(null);
   const [currentMinutes, setCurrentMinutes] = useState(() => getCurrentMinutes());
+  const [health, setHealth] = useState<HealthSnapshot | null>(null);
 
   useEffect(() => {
     const cachedMarkets = getCachedMarkets();
@@ -182,7 +184,7 @@ export default function HomeScreen() {
         }
       }
 
-      await Promise.allSettled([loadMarkets(false), loadSettings()]);
+      await Promise.allSettled([loadMarkets(false), loadSettings(), loadHealth()]);
     })();
   }, []);
 
@@ -216,6 +218,12 @@ export default function HomeScreen() {
       <View style={styles.noticeStrip}>
         <Ionicons color={colors.warning} name="alert-circle-outline" size={14} />
         <NoticeTicker text={noticeText} />
+      </View>
+      <View style={[styles.noticeStrip, styles.healthStrip, health?.status === "error" ? styles.healthStripError : health?.status === "warn" ? styles.healthStripWarn : styles.healthStripOk]}>
+        <Ionicons color={health?.status === "error" ? "#991b1b" : health?.status === "warn" ? "#92400e" : "#166534"} name="pulse-outline" size={14} />
+        <Text style={[styles.healthText, health?.status === "error" ? styles.healthTextError : health?.status === "warn" ? styles.healthTextWarn : styles.healthTextOk]}>
+          {health ? `Server ${health.status.toUpperCase()} • DB ${health.checks?.database?.status || "-"} • Req ${health.requestId || "-"}` : "Server diagnostics loading..."}
+        </Text>
       </View>
 
       <AppScreen
@@ -366,7 +374,7 @@ export default function HomeScreen() {
       if (showPullRefresh) {
         setRefreshing(true);
       }
-      await loadMarkets(false);
+      await Promise.allSettled([loadMarkets(false), loadHealth()]);
     } finally {
       if (showPullRefresh) {
         setRefreshing(false);
@@ -419,7 +427,7 @@ export default function HomeScreen() {
       lastGoodMarketsRef.current = nextMarkets;
       setCachedMarkets(nextMarkets);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load markets");
+      setError(formatApiError(loadError, "Unable to load markets"));
       if (lastGoodMarketsRef.current.length > 0) {
         setMarkets(lastGoodMarketsRef.current);
       } else {
@@ -442,6 +450,21 @@ export default function HomeScreen() {
       }
     } catch {
       // Keep fallback text when settings are unavailable.
+    }
+  }
+
+  async function loadHealth() {
+    try {
+      const snapshot = await api.health();
+      setHealth(snapshot);
+    } catch {
+      setHealth({
+        ok: false,
+        status: "error",
+        service: "realmatka-api",
+        timestamp: new Date().toISOString(),
+        uptimeSeconds: 0
+      });
     }
   }
 }
@@ -558,6 +581,35 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 15,
     position: "absolute"
+  },
+  healthStrip: {
+    borderTopWidth: 0
+  },
+  healthStripOk: {
+    backgroundColor: "#ecfdf5",
+    borderColor: "#bbf7d0"
+  },
+  healthStripWarn: {
+    backgroundColor: "#fffbeb",
+    borderColor: "#fcd34d"
+  },
+  healthStripError: {
+    backgroundColor: "#fef2f2",
+    borderColor: "#fecaca"
+  },
+  healthText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  healthTextOk: {
+    color: "#166534"
+  },
+  healthTextWarn: {
+    color: "#92400e"
+  },
+  healthTextError: {
+    color: "#991b1b"
   },
   errorTitle: {
     color: colors.textPrimary,

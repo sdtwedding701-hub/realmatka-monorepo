@@ -1,27 +1,24 @@
-import { createHmac, randomBytes } from "node:crypto";
-import {
-  completePaymentOrder,
-  completePaymentLinkOrder,
-  createPaymentOrder,
-  findPaymentOrderByReferenceForUser,
-  findWalletEntryByReferenceId,
-  handlePaymentWebhook,
-  findPaymentOrderForCheckout,
-  findUserById,
-  getUserBalance,
-  requireUserByToken
-} from "../db.mjs";
-import { addWalletEntry, updateWalletEntryAdmin } from "../db.mjs";
-import { corsPreflight, fail, getJsonBody, getSessionToken, ok, unauthorized } from "../http.mjs";
+import { requireAuthenticatedUser } from "../middleware/auth-middleware.mjs";
+import { corsPreflight, fail, getJsonBody, ok } from "../http.mjs";
 import { standaloneConfig } from "../config.mjs";
-
-const razorpayKeyId = process.env.RAZORPAY_KEY_ID?.trim() || "";
-const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET?.trim() || "";
-const razorpayWebhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim() || "";
-
-function isRazorpayEnabled() {
-  return Boolean(razorpayKeyId && razorpayKeySecret);
-}
+import {
+  completeCheckoutSession,
+  createHostedPaymentOrder,
+  getPaymentOrderStatusSnapshot,
+  getUpiDepositEntry,
+  processPaymentWebhook,
+  reportUpiDepositEntry,
+  resolveCheckoutSession,
+  startUpiDepositEntry
+} from "../services/payment-service.mjs";
+import {
+  createRazorpayPaymentLink,
+  fetchRazorpayPaymentLinkStatus,
+  getRazorpayWebhookSecret,
+  isRazorpayEnabled,
+  verifyRazorpaySignature,
+  verifyRazorpayWebhookSignature
+} from "../services/payment-providers/razorpay-adapter.mjs";
 
 function getServerOrigin(request) {
   const requestUrl = new URL(request.url);
@@ -35,86 +32,6 @@ function getServerOrigin(request) {
   return requestUrl.origin.replace(/\/$/, "");
 }
 
-function roundToPaise(amount) {
-  return Math.round(Number(amount || 0) * 100);
-}
-
-function getRazorpayAuthHeader() {
-  return `Basic ${Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64")}`;
-}
-
-async function createRazorpayPaymentLink({ amountPaise, receipt, paymentOrderId, user }) {
-  const appReturnBase = (standaloneConfig.appUrl || "https://play.realmatka.in").replace(/\/$/, "");
-  const callbackUrl = `${appReturnBase}/wallet/payment-success?referenceId=${encodeURIComponent(receipt)}&amount=${encodeURIComponent(
-    (amountPaise / 100).toFixed(2)
-  )}`;
-
-  const response = await fetch("https://api.razorpay.com/v1/payment_links", {
-    method: "POST",
-    headers: {
-      Authorization: getRazorpayAuthHeader(),
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      amount: amountPaise,
-      currency: "INR",
-      upi_link: true,
-      reference_id: receipt,
-      description: "Real Matka Wallet Deposit",
-      callback_url: callbackUrl,
-      callback_method: "get",
-      customer: {
-        name: user?.name || "Real Matka User",
-        contact: user?.phone ? `+91${user.phone}` : undefined
-      },
-      notes: {
-        paymentOrderId,
-        userId: user?.id || ""
-      }
-    })
-  });
-
-  const payload = await response.json().catch(() => null);
-  if (!response.ok || !payload?.id || !payload?.short_url) {
-    throw new Error(payload?.error?.description || payload?.description || "Unable to create Razorpay payment link");
-  }
-
-  return payload;
-}
-
-async function fetchRazorpayPaymentLinkStatus(paymentLinkId) {
-  if (!paymentLinkId || !isRazorpayEnabled()) {
-    return null;
-  }
-
-  const response = await fetch(`https://api.razorpay.com/v1/payment_links/${encodeURIComponent(paymentLinkId)}`, {
-    method: "GET",
-    headers: {
-      Authorization: getRazorpayAuthHeader(),
-      "Content-Type": "application/json"
-    }
-  });
-
-  const payload = await response.json().catch(() => null);
-  if (!response.ok || !payload?.id) {
-    throw new Error(payload?.error?.description || payload?.description || "Unable to fetch Razorpay payment link status");
-  }
-
-  return payload;
-}
-
-function verifyRazorpaySignature({ orderId, paymentId, signature }) {
-  const expected = createHmac("sha256", razorpayKeySecret).update(`${orderId}|${paymentId}`).digest("hex");
-  return expected === signature;
-}
-
-function verifyRazorpayWebhookSignature(rawBody, signature) {
-  if (!razorpayWebhookSecret || !signature) {
-    return false;
-  }
-  const expected = createHmac("sha256", razorpayWebhookSecret).update(rawBody).digest("hex");
-  return expected === signature;
-}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -275,107 +192,53 @@ export function options(request) {
 }
 
 export async function createOrder(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+  const { user } = auth;
   if (!isRazorpayEnabled()) {
     return fail("Razorpay test mode keys are not configured", 503, request);
   }
 
   const body = await getJsonBody(request);
   const amount = Number(body.amount ?? 0);
-  const platform = String(body.platform ?? "web").trim().toLowerCase();
-  const amountPaise = roundToPaise(amount);
-  if (amountPaise < 10000) {
-    return fail("Minimum deposit is Rs. 100", 400, request);
-  }
-
-  const paymentOrderId = `payment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const reference = `RM${Date.now()}${Math.random().toString(36).slice(2, 4).toUpperCase()}`.slice(0, 40);
-  const checkoutToken = randomBytes(24).toString("hex");
-  const razorpayPaymentLink = await createRazorpayPaymentLink({
-    amountPaise,
-    receipt: reference,
-    paymentOrderId,
-    user
-  });
-  const redirectUrl = razorpayPaymentLink.short_url;
-
-  const order = await createPaymentOrder({
-    id: paymentOrderId,
-    userId: user.id,
+  const result = await createHostedPaymentOrder({
+    user,
     amount,
-    provider: "razorpay_payment_link",
-    reference,
-    checkoutToken,
-    gatewayOrderId: razorpayPaymentLink.id,
-    redirectUrl
+    createPaymentLink: ({ amountPaise, receipt, paymentOrderId, user: paymentUser }) =>
+      createRazorpayPaymentLink({
+        amount: amountPaise / 100,
+        receipt,
+        paymentOrderId,
+        user: paymentUser
+      })
   });
-
-  return ok(order, request);
+  if (!result.ok) {
+    return fail(result.error, result.status, request);
+  }
+  return ok(result.data, request);
 }
 
 export async function getPaymentOrderStatus(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+  const { user } = auth;
 
   const body = request.method.toUpperCase() === "GET" ? getRequestParams(request) : await getJsonBody(request);
   const referenceId = String(body.referenceId ?? body.reference ?? "").trim();
-  if (!referenceId) {
-    return fail("referenceId is required", 400, request);
-  }
-
-  let order = await findPaymentOrderByReferenceForUser(user.id, referenceId);
-  if (!order) {
-    return fail("Payment order not found", 404, request);
-  }
-
-  if (order.status === "PENDING" && order.provider === "razorpay_payment_link" && order.gatewayOrderId && isRazorpayEnabled()) {
-    try {
-      const paymentLink = await fetchRazorpayPaymentLinkStatus(order.gatewayOrderId);
-      const remoteStatus = String(paymentLink?.status || "").trim().toLowerCase();
-
-      if (remoteStatus === "paid") {
-        order = await completePaymentLinkOrder({
-          reference: order.reference,
-          gatewayOrderId: String(order.gatewayOrderId || paymentLink.id || "").trim(),
-          gatewayPaymentId: String(paymentLink.payment_id || paymentLink.payments?.[0]?.payment_id || paymentLink.payments?.[0]?.id || "").trim(),
-          gatewaySignature: "payment_link_status_poll"
-        });
-      } else if (remoteStatus === "cancelled" || remoteStatus === "expired") {
-        order = await handlePaymentWebhook(order.reference, "FAILED");
-      } else {
-        order = {
-          ...order,
-          remoteStatus: remoteStatus || "created"
-        };
-      }
-    } catch (error) {
-      return fail(error instanceof Error ? error.message : "Unable to verify payment status", 502, request);
+  try {
+    const result = await getPaymentOrderStatusSnapshot({
+      userId: user.id,
+      referenceId,
+      isProviderEnabled: isRazorpayEnabled(),
+      fetchPaymentLinkStatus: fetchRazorpayPaymentLinkStatus
+    });
+    if (!result.ok) {
+      return fail(result.error, result.status, request);
     }
+    return ok(result.data, request);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Unable to verify payment status", 502, request);
   }
-
-  return ok(order, request);
-}
-
-function normalizeUpiClientStatus(value) {
-  const status = String(value ?? "").trim().toUpperCase();
-  if (status === "SUCCESS") {
-    return "INITIATED";
-  }
-  if (status === "SUBMITTED") {
-    return "INITIATED";
-  }
-  if (status === "FAILED") {
-    return "FAILED";
-  }
-  if (status === "CANCELLED") {
-    return "CANCELLED";
-  }
-  return "";
 }
 
 function getRequestParams(request) {
@@ -384,116 +247,65 @@ function getRequestParams(request) {
 }
 
 export async function startUpiDeposit(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+  const { user } = auth;
 
   const body = request.method.toUpperCase() === "GET" ? getRequestParams(request) : await getJsonBody(request);
-  const amount = Number(body.amount ?? 0);
-  const appName = String(body.appName ?? "UPI").trim() || "UPI";
-  const referenceId = String(body.referenceId ?? "").trim();
-  if (amount <= 0) {
-    return fail("Amount must be greater than 0", 400, request);
-  }
-  if (!referenceId) {
-    return fail("referenceId is required", 400, request);
-  }
-
-  const existing = await findWalletEntryByReferenceId(user.id, referenceId);
-  if (existing) {
-    return ok(existing, request);
-  }
-
-  const beforeBalance = await getUserBalance(user.id);
-  const entry = await addWalletEntry({
+  const result = await startUpiDepositEntry({
     userId: user.id,
-    type: "DEPOSIT",
-    status: "INITIATED",
-    amount,
-    beforeBalance,
-    afterBalance: beforeBalance,
-    referenceId,
-    note: JSON.stringify({
-      channel: "upi_intent",
-      appName,
-      appReportedStatus: "STARTED"
-    })
+    amount: Number(body.amount ?? 0),
+    appName: String(body.appName ?? "UPI").trim() || "UPI",
+    referenceId: String(body.referenceId ?? "").trim()
   });
-
-  return ok(entry, request);
+  if (!result.ok) {
+    return fail(result.error, result.status, request);
+  }
+  return ok(result.data, request);
 }
 
 export async function reportUpiDeposit(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+  const { user } = auth;
 
   const body = request.method.toUpperCase() === "GET" ? getRequestParams(request) : await getJsonBody(request);
-  const referenceId = String(body.referenceId ?? "").trim();
-  const appName = String(body.appName ?? "UPI").trim() || "UPI";
-  const rawResponse = String(body.rawResponse ?? "").trim();
-  const utr = String(body.utr ?? "").trim();
-  const appReportedStatus = String(body.appReportedStatus ?? "").trim().toUpperCase();
-  const mappedStatus = normalizeUpiClientStatus(appReportedStatus);
-
-  if (!referenceId) {
-    return fail("referenceId is required", 400, request);
-  }
-  if (!mappedStatus) {
-    return fail("Unsupported appReportedStatus", 400, request);
-  }
-  const existing = await findWalletEntryByReferenceId(user.id, referenceId);
-  if (!existing) {
-    return fail("Deposit request not found", 404, request);
-  }
-
-  const nextNote = [
-    `UPI App: ${appName}`,
-    `Client Status: ${appReportedStatus}`,
-    utr ? `UTR: ${utr}` : "",
-    rawResponse ? `Raw: ${rawResponse}` : ""
-  ]
-    .filter(Boolean)
-    .join(" | ");
-
-  const updated = await updateWalletEntryAdmin(existing.id, {
-    status: mappedStatus,
-    referenceId: utr || referenceId,
-    note: nextNote
+  const result = await reportUpiDepositEntry({
+    userId: user.id,
+    referenceId: String(body.referenceId ?? "").trim(),
+    appName: String(body.appName ?? "UPI").trim() || "UPI",
+    rawResponse: String(body.rawResponse ?? "").trim(),
+    utr: String(body.utr ?? "").trim(),
+    appReportedStatus: String(body.appReportedStatus ?? "").trim().toUpperCase()
   });
-
-  return ok(updated, request);
+  if (!result.ok) {
+    return fail(result.error, result.status, request);
+  }
+  return ok(result.data, request);
 }
 
 export async function getUpiDepositStatus(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+  const { user } = auth;
 
   const body = request.method.toUpperCase() === "GET" ? getRequestParams(request) : await getJsonBody(request);
-  const referenceId = String(body.referenceId ?? "").trim();
-  if (!referenceId) {
-    return fail("referenceId is required", 400, request);
+  const result = await getUpiDepositEntry({
+    userId: user.id,
+    referenceId: String(body.referenceId ?? "").trim()
+  });
+  if (!result.ok) {
+    return fail(result.error, result.status, request);
   }
-
-  const existing = await findWalletEntryByReferenceId(user.id, referenceId);
-  if (!existing) {
-    return fail("Deposit request not found", 404, request);
-  }
-
-  return ok(existing, request);
+  return ok(result.data, request);
 }
 
 export async function checkoutPage(request) {
   const url = new URL(request.url);
   const paymentOrderId = String(url.searchParams.get("paymentOrderId") ?? "").trim();
   const checkoutToken = String(url.searchParams.get("token") ?? "").trim();
-
-  const paymentOrder = await findPaymentOrderForCheckout(paymentOrderId, checkoutToken);
-  if (!paymentOrder) {
+  const result = await resolveCheckoutSession({ paymentOrderId, checkoutToken });
+  if (!result.ok) {
     return renderHtml(buildPaymentResultHtml({
       title: "Invalid Payment Link",
       message: "This deposit session is invalid or has expired. Please start a new payment from the app.",
@@ -502,7 +314,7 @@ export async function checkoutPage(request) {
     }), 404);
   }
 
-  const user = await findUserById(paymentOrder.userId);
+  const { paymentOrder, user } = result.data;
   const serverOrigin = getServerOrigin(request);
   const callbackUrl = `${serverOrigin}/payments/callback?paymentOrderId=${encodeURIComponent(paymentOrder.id)}&token=${encodeURIComponent(checkoutToken)}&platform=${encodeURIComponent(
     String(url.searchParams.get("platform") ?? "web").trim().toLowerCase()
@@ -516,9 +328,8 @@ export async function callbackPage(request) {
   const paymentOrderId = String(url.searchParams.get("paymentOrderId") ?? "").trim();
   const checkoutToken = String(url.searchParams.get("token") ?? "").trim();
   const platform = String(url.searchParams.get("platform") ?? "web").trim().toLowerCase();
-  const paymentOrder = await findPaymentOrderForCheckout(paymentOrderId, checkoutToken);
-
-  if (!paymentOrder) {
+  const checkoutResult = await resolveCheckoutSession({ paymentOrderId, checkoutToken });
+  if (!checkoutResult.ok) {
     return renderHtml(
       buildPaymentResultHtml({
         title: "Payment Session Invalid",
@@ -529,6 +340,7 @@ export async function callbackPage(request) {
       404
     );
   }
+  const { paymentOrder } = checkoutResult.data;
 
   const payload = await getCallbackPayload(request);
   if (!payload.razorpayPaymentId || !payload.razorpayOrderId || !payload.razorpaySignature) {
@@ -559,12 +371,22 @@ export async function callbackPage(request) {
     );
   }
 
-  await completePaymentOrder({
-    paymentOrderId: paymentOrder.id,
-    gatewayOrderId: payload.razorpayOrderId,
-    gatewayPaymentId: payload.razorpayPaymentId,
-    gatewaySignature: payload.razorpaySignature
+  const completionResult = await completeCheckoutSession({
+    paymentOrderId,
+    checkoutToken,
+    payload
   });
+  if (!completionResult.ok) {
+    return renderHtml(
+      buildPaymentResultHtml({
+        title: "Payment Session Invalid",
+        message: completionResult.error,
+        actionLabel: "Back to Website",
+        actionHref: standaloneConfig.appUrl || "https://play.realmatka.in"
+      }),
+      completionResult.status
+    );
+  }
 
   const webReturnUrl = `${(standaloneConfig.appUrl || "https://play.realmatka.in").replace(/\/$/, "")}/wallet/history?payment=success&reference=${encodeURIComponent(
     paymentOrder.reference
@@ -593,7 +415,7 @@ export async function webhook(request) {
   const rawBody = await request.text();
   const signature = request.headers.get("x-razorpay-signature")?.trim() || "";
 
-  if (!razorpayWebhookSecret) {
+  if (!getRazorpayWebhookSecret()) {
     return fail("Razorpay webhook secret is not configured", 503, request);
   }
 
@@ -619,24 +441,18 @@ export async function webhook(request) {
   const gatewayPaymentId =
     String(paymentEntity.id || paymentLinkEntity.payments?.[0]?.payment_id || paymentLinkEntity.payments?.[0]?.id || orderEntity.payment_id || orderEntity.id || "").trim();
 
-  if (event === "payment_link.paid") {
-    const updated = await completePaymentLinkOrder({
-      reference,
-      gatewayOrderId,
-      gatewayPaymentId,
-      gatewaySignature: signature
-    });
-
-    if (!updated) {
-      return fail("Payment link order not found", 404, request);
-    }
-
-    return ok({ received: true, event, status: "SUCCESS", order: updated }, request);
-  }
-
   if (event === "payment_link.cancelled" || event === "payment_link.expired") {
     return ok({ received: true, event, status: "IGNORED" }, request);
   }
-
-  return ok({ received: true, event, status: "IGNORED" }, request);
+  const result = await processPaymentWebhook({
+    event,
+    reference,
+    gatewayOrderId,
+    gatewayPaymentId,
+    gatewaySignature: signature
+  });
+  if (!result.ok) {
+    return fail(result.error, result.status, request);
+  }
+  return ok(result.data, request);
 }

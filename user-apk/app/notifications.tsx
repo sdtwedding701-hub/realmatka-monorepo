@@ -1,9 +1,10 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
-import { api } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
+import { getCachedNotifications, hydrateCachedNotifications, setCachedNotifications } from "@/lib/content-cache";
 import { colors } from "@/theme/colors";
 
 type NotificationEntry = {
@@ -15,14 +16,17 @@ type NotificationEntry = {
   createdAt: string;
 };
 
-const NOTIFICATIONS_REFRESH_INTERVAL_MS = 30_000;
+const NOTIFICATIONS_REFRESH_INTERVAL_MS = 60_000;
+const NOTIFICATIONS_WINDOW_SIZE = 50;
 
 export default function NotificationsScreen() {
   const { sessionToken } = useAppState();
-  const [loading, setLoading] = useState(true);
+  const sessionCacheKey = sessionToken || "guest";
+  const [items, setItems] = useState<NotificationEntry[]>(() => (sessionToken ? getCachedNotifications(sessionToken) ?? [] : []));
+  const [loading, setLoading] = useState(() => !(sessionToken && getCachedNotifications(sessionToken)?.length));
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [items, setItems] = useState<NotificationEntry[]>([]);
+  const inFlightRef = useRef<Promise<void> | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -34,31 +38,49 @@ export default function NotificationsScreen() {
 
       let active = true;
 
-      const load = async (mode: "load" | "refresh") => {
-        try {
-          if (mode === "load") {
-            setLoading(true);
-          } else {
-            setRefreshing(true);
-          }
-          const response = await api.notificationHistory(sessionToken);
-          if (!active) {
-            return;
-          }
-          setItems(response);
-          setError("");
-        } catch (loadError) {
-          if (!active) {
-            return;
-          }
-          setError(loadError instanceof Error ? loadError.message : "Notifications load nahi hui.");
-        } finally {
-          if (!active) {
-            return;
-          }
+      void (async () => {
+        const cached = await hydrateCachedNotifications(sessionToken);
+        if (active && cached?.length) {
+          setItems(cached);
           setLoading(false);
-          setRefreshing(false);
         }
+      })();
+
+      const load = async (mode: "load" | "refresh") => {
+        if (inFlightRef.current) {
+          return inFlightRef.current;
+        }
+
+        inFlightRef.current = (async () => {
+          try {
+            if (mode === "load" && !items.length) {
+              setLoading(true);
+            } else if (mode === "refresh") {
+              setRefreshing(true);
+            }
+            const response = await api.notificationHistory(sessionToken, NOTIFICATIONS_WINDOW_SIZE);
+            if (!active) {
+              return;
+            }
+            setItems(response);
+            setCachedNotifications(sessionToken, response);
+            setError("");
+          } catch (loadError) {
+            if (!active) {
+              return;
+            }
+            setError(formatApiError(loadError, "Notifications load nahi hui."));
+          } finally {
+            inFlightRef.current = null;
+            if (!active) {
+              return;
+            }
+            setLoading(false);
+            setRefreshing(false);
+          }
+        })();
+
+        return inFlightRef.current;
       };
 
       void load("load");
@@ -70,7 +92,7 @@ export default function NotificationsScreen() {
         active = false;
         clearInterval(interval);
       };
-    }, [sessionToken])
+    }, [items.length, sessionToken])
   );
 
   return (
@@ -127,13 +149,25 @@ export default function NotificationsScreen() {
       return;
     }
 
+    if (inFlightRef.current) {
+      return inFlightRef.current;
+    }
+
     try {
       setRefreshing(true);
-      const response = await api.notificationHistory(sessionToken);
-      setItems(response);
-      setError("");
+      const request = api.notificationHistory(sessionToken, NOTIFICATIONS_WINDOW_SIZE)
+        .then((response) => {
+          setItems(response);
+          setCachedNotifications(sessionToken, response);
+          setError("");
+        })
+        .finally(() => {
+          inFlightRef.current = null;
+        });
+      inFlightRef.current = request.then(() => undefined);
+      await request;
     } catch (refreshError) {
-      setError(refreshError instanceof Error ? refreshError.message : "Notifications refresh nahi hui.");
+      setError(formatApiError(refreshError, "Notifications refresh nahi hui."));
     } finally {
       setRefreshing(false);
       setLoading(false);

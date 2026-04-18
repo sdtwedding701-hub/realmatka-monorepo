@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
+import { formatApiError } from "@/lib/api";
 import { colors } from "@/theme/colors";
 
 export default function AddBankDetailsScreen() {
@@ -57,7 +58,7 @@ export default function AddBankDetailsScreen() {
       await addBankAccount(accountNumber, holderName, ifsc);
       setMessage("Bank details saved successfully.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to save bank details");
+      setError(formatApiError(saveError, "Unable to save bank details"));
     } finally {
       setSubmitting(false);
     }

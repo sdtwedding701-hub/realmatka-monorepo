@@ -4,7 +4,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View 
 import { LinearGradient } from "expo-linear-gradient";
 import { AppScreen, SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
-import { api } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
 import { colors } from "@/theme/colors";
 
 export default function OtpLoginScreen() {
@@ -68,7 +68,7 @@ export default function OtpLoginScreen() {
                   const response = await api.requestOtp(phone, "login");
                   setMessage(response.provider === "twilio" ? "OTP SMS successfully sent." : "OTP generated successfully.");
                 } catch (otpError) {
-                  setError(otpError instanceof Error ? otpError.message : "Unable to send OTP");
+                  setError(formatApiError(otpError, "Unable to send OTP"));
                 } finally {
                   setSendingOtp(false);
                 }
@@ -110,7 +110,7 @@ export default function OtpLoginScreen() {
                 await otpLogin(normalizedPhone, normalizedOtp);
                 router.replace("/(tabs)");
               } catch (loginError) {
-                setError(loginError instanceof Error ? loginError.message : "OTP login failed");
+                setError(formatApiError(loginError, "OTP login failed"));
               } finally {
                 setLoggingIn(false);
                 }

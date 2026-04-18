@@ -1,4 +1,5 @@
-import { addBid, addWalletEntry, getUserBalance, requireUserByToken } from "../db.mjs";
+import { addBid, addWalletEntry, getUserBalance } from "../db.mjs";
+import { requireAuthenticatedUser } from "../middleware/auth-middleware.mjs";
 import {
   allDoublePannas,
   allSinglePannas,
@@ -6,7 +7,7 @@ import {
   getPannaType,
   isValidPanna
 } from "../matka-rules.mjs";
-import { corsPreflight, fail, getJsonBody, getSessionToken, ok, unauthorized } from "../http.mjs";
+import { corsPreflight, fail, getJsonBody, ok } from "../http.mjs";
 
 const MIN_BID_POINTS = 5;
 const MAX_BID_POINTS = 99999;
@@ -27,10 +28,9 @@ export function options(request) {
 }
 
 export async function place(request) {
-  const user = await requireUserByToken(getSessionToken(request));
-  if (!user) {
-    return unauthorized(request);
-  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+  const { user } = auth;
 
   const body = await getJsonBody(request);
   const market = String(body.market ?? "");

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { fetchApi, normalizeAdminApiBase } from "../lib/api.js";
+import { fetchApi, formatApiError, normalizeAdminApiBase } from "../lib/api.js";
 import { storeAdminSession } from "../lib/session.js";
 
 export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
@@ -59,7 +59,7 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
       setToken(data.token);
       window.location.hash = "#/dashboard";
     } catch (error) {
-      setMessage(error.message || "Login failed");
+      setMessage(formatApiError(error, "Login failed"));
     } finally {
       setBusy(false);
     }
@@ -91,7 +91,7 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
       setToken(data.token);
       window.location.hash = "#/dashboard";
     } catch (error) {
-      setMessage(error.message || "2FA verify failed");
+      setMessage(formatApiError(error, "2FA verify failed"));
     } finally {
       setBusy(false);
     }

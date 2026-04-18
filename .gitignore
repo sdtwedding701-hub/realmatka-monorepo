@@ -43,6 +43,7 @@ yarn-error.log*
 # expo / react native
 **/.expo
 **/.expo-shared
+**/.gradle-cache
 **/android/.gradle
 **/android/app/build
 **/android/build

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
-import { api } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
 import { getCachedChart, setCachedChart } from "@/lib/content-cache";
 import { colors } from "@/theme/colors";
 
@@ -177,7 +177,7 @@ export default function ChartDetailScreen() {
       setChart(payload);
       setCachedChart(String(params.slug), chartType, payload);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load chart");
+      setError(formatApiError(loadError, "Unable to load chart"));
     } finally {
       if (showLoader) {
         setLoading(false);

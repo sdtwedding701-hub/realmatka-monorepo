@@ -56,12 +56,40 @@ function packPannaCell(open, close) {
   return normalizedOpen || normalizedClose || "";
 }
 
+function isPlaceholderChartCell(value) {
+  const normalized = String(value ?? "").trim();
+  return !normalized || normalized === "--" || normalized === "---" || normalized === "**" || normalized === "***";
+}
+
+function hasMeaningfulChartValue(value) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    return false;
+  }
+  if (/^[0-9]{2}$/.test(normalized)) {
+    return true;
+  }
+  if (/^[0-9]{3}-[0-9]{2}-[0-9]{3}$/.test(normalized)) {
+    return true;
+  }
+  if (/^[0-9]{3}\/[0-9]{3}$/.test(normalized)) {
+    return true;
+  }
+  return !isPlaceholderChartCell(normalized);
+}
+
+function filterEmptyChartRows(rows) {
+  return (Array.isArray(rows) ? rows : []).filter((row) =>
+    Array.isArray(row) && row.slice(1).some((cell) => hasMeaningfulChartValue(cell))
+  );
+}
+
 function formatPannaRowsForResponse(rows, market) {
   const parsed = parseResult(market?.result);
   const currentWeekLabel = normalizeWeekLabel(getWeekChartLabel(new Date()));
   const currentDayIndex = getWeekdayIndex(new Date());
 
-  return (Array.isArray(rows) ? rows : []).map((row, rowIndex) => {
+  const formattedRows = (Array.isArray(rows) ? rows : []).map((row, rowIndex) => {
     const label = String(row?.[0] ?? `Week ${rowIndex + 1}`).trim();
     const normalizedRow = Array.isArray(row) ? row.map((cell) => String(cell ?? "").trim()) : [];
 
@@ -91,6 +119,8 @@ function formatPannaRowsForResponse(rows, market) {
     }
     return nextRow;
   });
+
+  return filterEmptyChartRows(formattedRows);
 }
 
 function normalizeChartBatchTypes(value) {
@@ -162,7 +192,10 @@ export async function chartBatch(request) {
         rows: formatPannaRowsForResponse(chart.rows, marketMap.get(chart.marketSlug) ?? null)
       };
     }
-    return chart;
+    return {
+      ...chart,
+      rows: filterEmptyChartRows(chart.rows)
+    };
   });
 
   return ok({
@@ -194,5 +227,5 @@ export async function chart(request, params) {
   if (chartType === "panna") {
     return ok({ ...chart, rows: formatPannaRowsForResponse(chart.rows, market) }, request);
   }
-  return ok(chart, request);
+  return ok({ ...chart, rows: filterEmptyChartRows(chart.rows) }, request);
 }

@@ -104,6 +104,23 @@ function normalizeChartBatchTypes(value) {
   );
 }
 
+function buildEmptyChartRows(chartType, weeks = 8) {
+  const rowSize = chartType === "panna" ? 15 : 8;
+  const placeholder = chartType === "panna" ? "---" : "--";
+  const rows = [];
+
+  for (let index = 0; index < weeks; index += 1) {
+    const date = new Date();
+    date.setDate(date.getDate() - index * 7);
+    rows.push([
+      getWeekChartLabel(date),
+      ...Array.from({ length: rowSize - 1 }, () => placeholder)
+    ]);
+  }
+
+  return rows.reverse();
+}
+
 export async function list(request) {
   return ok(await getMarketListSnapshot(), request);
 }
@@ -169,10 +186,11 @@ export async function chart(request, params) {
   if (!market) {
     return fail("Market not found", 404, request);
   }
-  const chart = await getChartRecord(params.slug, chartType);
-  if (!chart) {
-    return fail("Chart not found", 404, request);
-  }
+  const chart = (await getChartRecord(params.slug, chartType)) ?? {
+    marketSlug: params.slug,
+    chartType,
+    rows: buildEmptyChartRows(chartType)
+  };
   if (chartType === "panna") {
     return ok({ ...chart, rows: formatPannaRowsForResponse(chart.rows, market) }, request);
   }

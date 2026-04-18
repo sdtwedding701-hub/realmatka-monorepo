@@ -452,7 +452,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === "/health") {
       const snapshot = await getHealthSnapshot({ startedAt, routesManifestPath });
-      sendJson(res, snapshot.ok ? 200 : 503, snapshot);
+      sendJson(res, 200, snapshot);
       return;
     }
 

@@ -51,6 +51,9 @@ CREATE TABLE wallet_entries (
   amount NUMERIC(12,2) NOT NULL,
   before_balance NUMERIC(12,2) NOT NULL,
   after_balance NUMERIC(12,2) NOT NULL,
+  reference_id TEXT,
+  proof_url TEXT,
+  note TEXT,
   created_at TIMESTAMPTZ NOT NULL
 );
 

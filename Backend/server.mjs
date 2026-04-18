@@ -378,6 +378,20 @@ async function handleApiRequest(req, res) {
   }
 
   if (pathname.startsWith("/api/charts/")) {
+    if (pathname === "/api/charts/batch") {
+      const marketsRoutes = await loadStandaloneModule("markets");
+      const handler = methodName === "OPTIONS" ? marketsRoutes.options : methodName === "GET" ? marketsRoutes.chartBatch : null;
+      if (typeof handler !== "function") {
+        res.setHeader("allow", "GET, OPTIONS");
+        sendJson(res, 405, { ok: false, error: "Method not allowed" });
+        return;
+      }
+      const webRequest = toWebRequest(req);
+      const webResponse = await handler(webRequest);
+      await sendWebResponse(res, webResponse);
+      return;
+    }
+
     const slug = pathname.replace(/^\/api\/charts\//, "").replace(/\/$/, "");
     if (slug) {
       const marketsRoutes = await loadStandaloneModule("markets");

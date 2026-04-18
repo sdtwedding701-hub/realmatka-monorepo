@@ -2,6 +2,14 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { ApiError, api, setAuthFailureListener, type BankAccount, type BidEntry, type SessionUser, type WalletEntry } from "@/lib/api";
 import { readStoredMpinConfigured, writeStoredMpinValue, writeStoredMpinConfigured } from "@/lib/security-storage";
 import {
+  getCachedBidHistory,
+  getCachedWalletHistory,
+  hydrateCachedBidHistory,
+  hydrateCachedWalletHistory,
+  setCachedBidHistory,
+  setCachedWalletHistory
+} from "@/lib/content-cache";
+import {
   clearStoredSessionSnapshot,
   clearStoredSessionToken,
   readStoredSessionSnapshot,
@@ -47,7 +55,7 @@ type AppStateValue = {
 
 const AppStateContext = createContext<AppStateValue | null>(null);
 const SESSION_REFRESH_STALE_MS = 60_000;
-const COLLECTION_REFRESH_STALE_MS = 60_000;
+const COLLECTION_REFRESH_STALE_MS = 120_000;
 
 function ensureMessage(value: unknown, fallback: string) {
   return value instanceof Error ? value.message : fallback;
@@ -215,6 +223,49 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [applySessionUser, clearSession, hydrateSession]);
 
   useEffect(() => {
+    let active = true;
+
+    if (!sessionToken) {
+      return () => {
+        active = false;
+      };
+    }
+
+    const cachedWallet = getCachedWalletHistory(sessionToken, 30 * 60_000);
+    if (cachedWallet?.length) {
+      setWalletEntries(cachedWallet);
+    }
+
+    const cachedBids = getCachedBidHistory(sessionToken, 30 * 60_000);
+    if (cachedBids?.length) {
+      setBids(cachedBids);
+    }
+
+    void (async () => {
+      const [walletHistory, bidHistory] = await Promise.all([
+        hydrateCachedWalletHistory(sessionToken),
+        hydrateCachedBidHistory(sessionToken)
+      ]);
+
+      if (!active) {
+        return;
+      }
+
+      if (walletHistory?.length) {
+        setWalletEntries(walletHistory);
+      }
+
+      if (bidHistory?.length) {
+        setBids(bidHistory);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [sessionToken]);
+
+  useEffect(() => {
     let clearing = false;
 
     setAuthFailureListener((failedToken) => {
@@ -333,6 +384,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       try {
         const walletHistory = await api.walletHistory(sessionToken);
         setWalletEntries(walletHistory);
+        setCachedWalletHistory(sessionToken, walletHistory);
         lastWalletReloadAtRef.current = Date.now();
       } catch (error) {
         if (isAuthFailure(error)) {
@@ -365,6 +417,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       try {
         const bidHistory = await api.bidHistory(sessionToken);
         setBids(bidHistory);
+        setCachedBidHistory(sessionToken, bidHistory);
         lastBidReloadAtRef.current = Date.now();
       } catch (error) {
         if (isAuthFailure(error)) {
@@ -509,9 +562,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       throw error;
     }
     setWalletEntries((existing) => [entry, ...existing]);
+    setCachedWalletHistory(sessionToken, [entry, ...walletEntries]);
     lastWalletReloadAtRef.current = Date.now();
     await reloadSessionData({ force: true });
-  }, [clearSession, reloadSessionData, sessionToken]);
+  }, [clearSession, reloadSessionData, sessionToken, walletEntries]);
 
   const submitDraftBid = useCallback(async () => {
     if (!sessionToken) {

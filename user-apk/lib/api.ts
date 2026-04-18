@@ -110,6 +110,16 @@ export type HealthSnapshot = {
   };
 };
 
+export type ChartBatchPayload = {
+  items: Array<{
+    marketSlug: string;
+    chartType: "jodi" | "panna";
+    rows: string[][];
+  }>;
+  markets: string[];
+  types: Array<"jodi" | "panna">;
+};
+
 type ApiEnvelope<T> = {
   ok: boolean;
   data?: T;
@@ -343,6 +353,15 @@ export const api = {
   getChart(slug: string, chartType: "jodi" | "panna") {
     return request<{ marketSlug: string; chartType: "jodi" | "panna"; rows: string[][] }>(
       `/api/charts/${encodeURIComponent(slug)}${queryString({ type: chartType })}`
+    );
+  },
+
+  getChartBatch(markets: string[], chartTypes: Array<"jodi" | "panna"> = ["jodi", "panna"]) {
+    return request<ChartBatchPayload>(
+      `/api/charts/batch${queryString({
+        markets: markets.join(","),
+        types: chartTypes.join(",")
+      })}`
     );
   },
 

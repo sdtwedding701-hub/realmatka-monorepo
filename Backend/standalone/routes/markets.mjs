@@ -170,6 +170,17 @@ function decorateMarketWithLookup(market, chartLookup) {
   };
 }
 
+function normalizeChartBatchTypes(value) {
+  return Array.from(
+    new Set(
+      String(value || "jodi,panna")
+        .split(",")
+        .map((item) => item.trim().toLowerCase())
+        .filter((item) => item === "jodi" || item === "panna")
+    )
+  );
+}
+
 export async function list(request) {
   const markets = await listMarkets();
   const placeholderMarkets = markets.filter((market) => isPlaceholderResult(market?.result));
@@ -185,6 +196,53 @@ export async function list(request) {
   const chartLookup = buildChartLookup(charts);
 
   return ok(markets.map((market) => decorateMarketWithLookup(market, chartLookup)), request);
+}
+
+export async function chartBatch(request) {
+  const url = new URL(request.url);
+  const marketSlugs = Array.from(
+    new Set(
+      String(url.searchParams.get("markets") || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  ).slice(0, 12);
+  const chartTypes = normalizeChartBatchTypes(url.searchParams.get("types"));
+
+  if (!marketSlugs.length) {
+    return fail("markets query is required", 400, request);
+  }
+  if (!chartTypes.length) {
+    return fail("At least one valid chart type is required", 400, request);
+  }
+
+  const [charts, markets] = await Promise.all([
+    getChartRecordsForMarkets(marketSlugs, chartTypes),
+    Promise.all(marketSlugs.map((slug) => findMarketBySlug(slug)))
+  ]);
+
+  const marketMap = new Map(
+    markets
+      .filter(Boolean)
+      .map((market) => [market.slug, market])
+  );
+
+  const items = charts.map((chart) => {
+    if (chart.chartType === "panna") {
+      return {
+        ...chart,
+        rows: formatPannaRowsForResponse(chart.rows, marketMap.get(chart.marketSlug) ?? null)
+      };
+    }
+    return chart;
+  });
+
+  return ok({
+    items,
+    markets: marketSlugs,
+    types: chartTypes
+  }, request);
 }
 
 export async function detail(request, params) {

@@ -4,7 +4,7 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, V
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { api, formatApiError } from "@/lib/api";
-import { getCachedChart, setCachedChart } from "@/lib/content-cache";
+import { getCachedChart, hydrateCachedChart, setCachedChart } from "@/lib/content-cache";
 import { colors } from "@/theme/colors";
 
 type ChartPayload = {
@@ -34,6 +34,7 @@ export default function ChartDetailScreen() {
   const [chart, setChart] = useState<ChartPayload | null>(() => (params.slug ? getCachedChart(String(params.slug), chartType) : null));
   const [loading, setLoading] = useState(() => !(params.slug && getCachedChart(String(params.slug), chartType)));
   const [error, setError] = useState("");
+  const [syncing, setSyncing] = useState(false);
   const [showAllRows, setShowAllRows] = useState(false);
   const pageScrollRef = useRef<ScrollView | null>(null);
 
@@ -42,14 +43,26 @@ export default function ChartDetailScreen() {
       return;
     }
     setShowAllRows(false);
-    const cachedChart = getCachedChart(String(params.slug), chartType);
-    if (cachedChart) {
-      setChart(cachedChart);
-      setLoading(false);
-      void load(false);
-      return;
-    }
-    void load(true);
+    let active = true;
+
+    void (async () => {
+      const slug = String(params.slug);
+      const cachedChart = getCachedChart(slug, chartType, 15 * 60_000) ?? (await hydrateCachedChart(slug, chartType));
+      if (!active) {
+        return;
+      }
+      if (cachedChart) {
+        setChart(cachedChart);
+        setLoading(false);
+        void load(false);
+        return;
+      }
+      void load(true);
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [params.slug, chartType]);
 
   const rawRows = useMemo(() => chart?.rows ?? [], [chart]);
@@ -150,6 +163,7 @@ export default function ChartDetailScreen() {
           )}
           </View>
         </SurfaceCard>
+        {syncing && chart ? <Text style={styles.syncText}>Background me latest chart sync ho raha hai...</Text> : null}
 
         <View style={styles.bottomActions}>
           <Pressable onPress={() => router.back()} style={[styles.jumpButton, styles.secondaryActionButton]}>
@@ -171,16 +185,22 @@ export default function ChartDetailScreen() {
     try {
       if (showLoader) {
         setLoading(true);
+      } else {
+        setSyncing(true);
       }
-      setError("");
       const payload = await api.getChart(String(params.slug), chartType);
       setChart(payload);
       setCachedChart(String(params.slug), chartType, payload);
+      setError("");
     } catch (loadError) {
-      setError(formatApiError(loadError, "Unable to load chart"));
+      if (!chart) {
+        setError(formatApiError(loadError, "Unable to load chart"));
+      }
     } finally {
       if (showLoader) {
         setLoading(false);
+      } else {
+        setSyncing(false);
       }
     }
   }
@@ -511,5 +531,11 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   highlightCell: { color: "#ef4444" },
-  errorText: { color: "#dc2626", textAlign: "center", fontWeight: "600" }
+  errorText: { color: "#dc2626", textAlign: "center", fontWeight: "600" },
+  syncText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center"
+  }
 });

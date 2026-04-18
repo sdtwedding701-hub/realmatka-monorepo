@@ -7,7 +7,19 @@ import { marketCatalog } from "../../data/mock";
 import { api, formatApiError } from "@/lib/api";
 import type { HealthSnapshot } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
-import { getCachedMarkets, getCachedSettings, hydrateCachedMarkets, hydrateCachedSettings, setCachedMarkets, setCachedSettings } from "@/lib/content-cache";
+import {
+  getCachedChart,
+  getCachedHealth,
+  getCachedMarkets,
+  getCachedSettings,
+  hydrateCachedHealth,
+  hydrateCachedMarkets,
+  hydrateCachedSettings,
+  setCachedChart,
+  setCachedHealth,
+  setCachedMarkets,
+  setCachedSettings
+} from "@/lib/content-cache";
 import { colors } from "@/theme/colors";
 
 type MarketItem = {
@@ -153,7 +165,7 @@ export default function HomeScreen() {
   const [noticeText, setNoticeText] = useState("Notice: Market open-close time change ho sakta hai, bet place karne se pehle check karein.");
   const [selectedChartMarket, setSelectedChartMarket] = useState<Pick<MarketItem, "slug" | "name"> | null>(null);
   const [currentMinutes, setCurrentMinutes] = useState(() => getCurrentMinutes());
-  const [health, setHealth] = useState<HealthSnapshot | null>(null);
+  const [health, setHealth] = useState<HealthSnapshot | null>(() => getCachedHealth() ?? null);
 
   useEffect(() => {
     const cachedMarkets = getCachedMarkets();
@@ -184,6 +196,11 @@ export default function HomeScreen() {
         }
       }
 
+      const persistedHealth = await hydrateCachedHealth();
+      if (persistedHealth) {
+        setHealth(persistedHealth);
+      }
+
       await Promise.allSettled([loadMarkets(false), loadSettings(), loadHealth()]);
     })();
   }, []);
@@ -208,6 +225,13 @@ export default function HomeScreen() {
   const listedMarkets = useMemo(() => sortMarketsByTime(markets, currentMinutes), [markets, currentMinutes]);
   const isCompactScreen = height < 760;
   const showHardError = listedMarkets.length === 0 && Boolean(error);
+
+  useEffect(() => {
+    if (!listedMarkets.length) {
+      return;
+    }
+    void prefetchChartPreview(listedMarkets.slice(0, 4));
+  }, [listedMarkets]);
 
   return (
     <View style={styles.page}>
@@ -426,6 +450,7 @@ export default function HomeScreen() {
       setMarkets(nextMarkets);
       lastGoodMarketsRef.current = nextMarkets;
       setCachedMarkets(nextMarkets);
+      void prefetchChartPreview(sortMarketsByTime(nextMarkets, getCurrentMinutes()).slice(0, 4));
     } catch (loadError) {
       setError(formatApiError(loadError, "Unable to load markets"));
       if (lastGoodMarketsRef.current.length > 0) {
@@ -437,6 +462,27 @@ export default function HomeScreen() {
       if (showLoader) {
         setLoading(false);
       }
+    }
+  }
+
+  async function prefetchChartPreview(items: MarketItem[]) {
+    const uncachedMarkets = items.filter(
+      (item) => !getCachedChart(item.slug, "jodi", 15 * 60_000) || !getCachedChart(item.slug, "panna", 15 * 60_000)
+    );
+    if (!uncachedMarkets.length) {
+      return;
+    }
+
+    try {
+      const payload = await api.getChartBatch(
+        uncachedMarkets.map((item) => item.slug),
+        ["jodi", "panna"]
+      );
+      for (const chart of payload.items) {
+        setCachedChart(chart.marketSlug, chart.chartType, chart);
+      }
+    } catch {
+      // Ignore prefetch failures to keep home responsive.
     }
   }
 
@@ -457,10 +503,20 @@ export default function HomeScreen() {
     try {
       const snapshot = await api.health();
       setHealth(snapshot);
+      setCachedHealth(snapshot);
     } catch {
+      const cached = getCachedHealth(30 * 60_000);
+      if (cached) {
+        setHealth({
+          ...cached,
+          status: "warn"
+        });
+        return;
+      }
+
       setHealth({
         ok: false,
-        status: "error",
+        status: "warn",
         service: "realmatka-api",
         timestamp: new Date().toISOString(),
         uptimeSeconds: 0

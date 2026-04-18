@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppHeader, AppScreen } from "@/components/ui";
 import { api, formatApiError } from "@/lib/api";
-import { getCachedMarkets, setCachedMarkets } from "@/lib/content-cache";
+import { getCachedChart, getCachedMarkets, setCachedChart, setCachedMarkets } from "@/lib/content-cache";
 import { colors } from "@/theme/colors";
 
 type MarketItem = {
@@ -26,6 +26,13 @@ export default function ChartsScreen() {
   useEffect(() => {
     void load(!getCachedMarkets());
   }, []);
+
+  useEffect(() => {
+    if (!markets.length) {
+      return;
+    }
+    void prefetchVisibleCharts(markets.slice(0, 6));
+  }, [markets]);
 
   const sections = useMemo(
     () => [
@@ -83,12 +90,35 @@ export default function ChartsScreen() {
       const nextMarkets = await api.listMarkets();
       setMarkets(nextMarkets);
       setCachedMarkets(nextMarkets);
+      void prefetchVisibleCharts(nextMarkets.slice(0, 6));
     } catch (loadError) {
       setError(formatApiError(loadError, "Unable to load charts"));
     } finally {
       if (showLoader) {
         setLoading(false);
       }
+    }
+  }
+
+  async function prefetchVisibleCharts(items: MarketItem[]) {
+    const targets = items.filter((item) => item?.slug).slice(0, 6);
+    const uncachedTargets = targets.filter(
+      (item) => !getCachedChart(item.slug, "jodi", 15 * 60_000) || !getCachedChart(item.slug, "panna", 15 * 60_000)
+    );
+    if (!uncachedTargets.length) {
+      return;
+    }
+
+    try {
+      const payload = await api.getChartBatch(
+        uncachedTargets.map((item) => item.slug),
+        ["jodi", "panna"]
+      );
+      for (const chart of payload.items) {
+        setCachedChart(chart.marketSlug, chart.chartType, chart);
+      }
+    } catch {
+      // Silent prefetch failure should not block chart list rendering.
     }
   }
 }

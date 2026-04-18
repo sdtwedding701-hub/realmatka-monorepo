@@ -15,6 +15,15 @@ CREATE TABLE users (
   referred_by_user_id TEXT REFERENCES users(id)
 );
 
+CREATE TABLE admin_accounts (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  phone TEXT UNIQUE NOT NULL,
+  display_name TEXT NOT NULL,
+  two_factor_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE sessions (
   token_hash TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id),
@@ -159,6 +168,9 @@ CREATE TABLE chat_messages (
 
 CREATE INDEX IF NOT EXISTS idx_users_role_approval_joined_at
   ON users (role, approval_status, joined_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_admin_accounts_phone
+  ON admin_accounts (phone);
 
 CREATE INDEX IF NOT EXISTS idx_users_status_flags
   ON users (blocked_at, deactivated_at);

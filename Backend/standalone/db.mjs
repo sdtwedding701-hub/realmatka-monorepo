@@ -19,6 +19,7 @@ const signupBonusAmount = 25;
 const supportChatResolvedRetentionMs = Math.max(1, standaloneConfig.supportChatResolvedRetentionDays) * 24 * 60 * 60 * 1000;
 const dbIndexDefinitions = [
   ["idx_users_role_approval_joined_at", "users (role, approval_status, joined_at DESC)"],
+  ["idx_admin_accounts_phone", "admin_accounts (phone)"],
   ["idx_users_status_flags", "users (blocked_at, deactivated_at)"],
   ["idx_sessions_user_created_at", "sessions (user_id, created_at DESC)"],
   ["idx_otp_challenges_phone_purpose_created_at", "otp_challenges (phone, purpose, created_at DESC)"],
@@ -324,6 +325,32 @@ function clearCachedAuthSession(tokenHash) {
     return;
   }
   authSessionCache.delete(tokenHash);
+}
+
+async function syncPostgresAdminAccounts(client) {
+  await client.query(
+    `INSERT INTO admin_accounts (user_id, phone, display_name, two_factor_enabled, created_at, updated_at)
+     SELECT id, phone, name, TRUE, COALESCE(joined_at, NOW()), NOW()
+     FROM users
+     WHERE role IN ('admin', 'super_admin')
+     ON CONFLICT (user_id) DO UPDATE SET
+       phone = EXCLUDED.phone,
+       display_name = EXCLUDED.display_name,
+       updated_at = EXCLUDED.updated_at`
+  );
+}
+
+function syncSqliteAdminAccounts(db) {
+  db.prepare(
+    `INSERT INTO admin_accounts (user_id, phone, display_name, two_factor_enabled, created_at, updated_at)
+     SELECT id, phone, name, 1, COALESCE(joined_at, ?), ?
+     FROM users
+     WHERE role IN ('admin', 'super_admin')
+     ON CONFLICT(user_id) DO UPDATE SET
+       phone = excluded.phone,
+       display_name = excluded.display_name,
+       updated_at = excluded.updated_at`
+  ).run(nowIso(), nowIso());
 }
 
 function mapWalletEntryRow(row) {
@@ -641,6 +668,16 @@ async function ensurePostgresBootstrap(pool) {
           updated_at TIMESTAMPTZ NOT NULL
         )
       `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS admin_accounts (
+          user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          phone TEXT UNIQUE NOT NULL,
+          display_name TEXT NOT NULL,
+          two_factor_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMPTZ NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL
+        )
+      `);
       await ensurePostgresIndexes(client);
 
       const userCount = Number((await client.query("SELECT COUNT(*)::int AS count FROM users")).rows[0]?.count ?? 0);
@@ -662,6 +699,8 @@ async function ensurePostgresBootstrap(pool) {
           ]
         );
       }
+
+      await syncPostgresAdminAccounts(client);
 
       const walletCount = Number((await client.query("SELECT COUNT(*)::int AS count FROM wallet_entries")).rows[0]?.count ?? 0);
       if (walletCount === 0 && defaultWalletEntry) {
@@ -869,6 +908,15 @@ function getSqlite() {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS admin_accounts (
+      user_id TEXT PRIMARY KEY,
+      phone TEXT NOT NULL UNIQUE,
+      display_name TEXT NOT NULL,
+      two_factor_enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS markets (
       id TEXT PRIMARY KEY,
       slug TEXT NOT NULL UNIQUE,
@@ -921,6 +969,7 @@ function getSqlite() {
   ensureSqliteColumn(sqlite, "payment_orders", "gateway_signature", "TEXT");
   ensureSqliteColumn(sqlite, "payment_orders", "verified_at", "TEXT");
   ensureSqliteColumn(sqlite, "chat_conversations", "resolved_at", "TEXT");
+  ensureSqliteColumn(sqlite, "admin_accounts", "two_factor_enabled", "INTEGER NOT NULL DEFAULT 1");
   ensureSqliteIndexes(sqlite);
 
   const userCount = Number(sqlite.prepare("SELECT COUNT(*) AS count FROM users").get().count || 0);
@@ -1207,8 +1256,10 @@ async function findUserByReferralCode(referenceCode) {
          LIMIT 1`
       )
       .get(referenceCode)
-  );
-}
+    );
+  }
+
+  syncSqliteAdminAccounts(sqlite);
 
 export async function findUserById(userId) {
   if (isStandalonePostgresEnabled()) {

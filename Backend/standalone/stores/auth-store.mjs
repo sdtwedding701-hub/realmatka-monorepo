@@ -15,6 +15,16 @@ export async function findUserByPhone(phone) {
   return findUserByPhoneRecord(phone);
 }
 
+export async function findAdminByPhone(phone) {
+  const { findAdminByPhone: findAdminByPhoneRecord } = await import("../db/auth-db.mjs");
+  return findAdminByPhoneRecord(phone);
+}
+
+export async function findAdminByUserId(userId) {
+  const { findAdminByUserId: findAdminByUserIdRecord } = await import("../db/auth-db.mjs");
+  return findAdminByUserIdRecord(userId);
+}
+
 export async function createSession(userId) {
   return createSessionRecord(userId);
 }

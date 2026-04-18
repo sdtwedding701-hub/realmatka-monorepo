@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { createSession, findUserByPhone, getAppSettings, requireUserSnapshotByToken, verifyUserPassword } from "../stores/auth-store.mjs";
+import { createSession, findAdminByPhone, findAdminByUserId, findUserByPhone, getAppSettings, requireUserSnapshotByToken, verifyUserPassword } from "../stores/auth-store.mjs";
 import { issueOtp, verifyOtp } from "../routes/auth-otp.mjs";
 
 const adminTwoFactorChallenges = new Map();
@@ -48,6 +48,58 @@ export async function isAdminTwoFactorEnabled() {
 }
 
 export async function loginWithPassword(phone, password) {
+  const adminAccount = await findAdminByPhone(phone);
+  if (adminAccount && verifyUserPassword(password, adminAccount.passwordHash)) {
+    try {
+      assertApprovedActiveUser(adminAccount);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Login failed";
+      return { ok: false, status: 403, error: message };
+    }
+
+    if (await isAdminTwoFactorEnabled() && adminAccount.adminTwoFactorEnabled !== false) {
+      cleanupExpiredAdminTwoFactorChallenges();
+      const otpState = await issueOtp(adminAccount.adminPhone || adminAccount.phone, "admin_login");
+      const challengeId = `admin_2fa_${randomBytes(12).toString("hex")}`;
+      adminTwoFactorChallenges.set(challengeId, {
+        userId: adminAccount.userId,
+        phone: adminAccount.adminPhone || adminAccount.phone,
+        expiresAt: otpState.expiresAt
+      });
+
+      return {
+        ok: true,
+        data: {
+          requiresTwoFactor: true,
+          challengeId,
+          expiresAt: otpState.expiresAt,
+          provider: otpState.provider,
+          devCode: otpState.devCode,
+          user: {
+            id: adminAccount.userId,
+            phone: adminAccount.adminPhone || adminAccount.phone,
+            name: adminAccount.adminDisplayName || adminAccount.name,
+            role: adminAccount.role
+          }
+        }
+      };
+    }
+
+    const { rawToken } = await createSession(adminAccount.userId);
+    return {
+      ok: true,
+      data: {
+        token: rawToken,
+        user: sanitizeSessionUser({
+          ...adminAccount,
+          id: adminAccount.userId,
+          phone: adminAccount.adminPhone || adminAccount.phone,
+          name: adminAccount.adminDisplayName || adminAccount.name
+        })
+      }
+    };
+  }
+
   const user = await findUserByPhone(phone);
   if (!user || !verifyUserPassword(password, user.passwordHash)) {
     return { ok: false, status: 401, error: "Invalid phone or password" };
@@ -59,35 +111,6 @@ export async function loginWithPassword(phone, password) {
     const message = error instanceof Error ? error.message : "Login failed";
     return { ok: false, status: message.includes("pending admin approval") ? 403 : 403, error: message };
   }
-
-  if (user.role === "admin" && await isAdminTwoFactorEnabled()) {
-    cleanupExpiredAdminTwoFactorChallenges();
-    const otpState = await issueOtp(user.phone, "admin_login");
-    const challengeId = `admin_2fa_${randomBytes(12).toString("hex")}`;
-    adminTwoFactorChallenges.set(challengeId, {
-      userId: user.id,
-      phone: user.phone,
-      expiresAt: otpState.expiresAt
-    });
-
-    return {
-      ok: true,
-      data: {
-        requiresTwoFactor: true,
-        challengeId,
-        expiresAt: otpState.expiresAt,
-        provider: otpState.provider,
-        devCode: otpState.devCode,
-        user: {
-          id: user.id,
-          phone: user.phone,
-          name: user.name,
-          role: user.role
-        }
-      }
-    };
-  }
-
   const { rawToken } = await createSession(user.id);
   return {
     ok: true,
@@ -121,10 +144,10 @@ export async function verifyAdminTwoFactorLogin(challengeId, otp) {
     return { ok: false, status: 400, error: "Invalid or expired 2FA code" };
   }
 
-  const user = await findUserByPhone(challenge.phone);
+  const user = await findAdminByUserId(challenge.userId);
   adminTwoFactorChallenges.delete(challengeId);
 
-  if (!user || user.id !== challenge.userId || user.role !== "admin") {
+  if (!user || user.userId !== challenge.userId || !["admin", "super_admin"].includes(String(user.role || "").toLowerCase())) {
     return { ok: false, status: 403, error: "Admin account not available for 2FA completion" };
   }
   if (user.deactivatedAt) {
@@ -137,12 +160,17 @@ export async function verifyAdminTwoFactorLogin(challengeId, otp) {
     return { ok: false, status: 403, error: "Your account is not approved for admin access." };
   }
 
-  const { rawToken } = await createSession(user.id);
+  const { rawToken } = await createSession(user.userId);
   return {
     ok: true,
     data: {
       token: rawToken,
-      user: sanitizeSessionUser(user)
+      user: sanitizeSessionUser({
+        ...user,
+        id: user.userId,
+        phone: user.adminPhone || user.phone,
+        name: user.adminDisplayName || user.name
+      })
     }
   };
 }

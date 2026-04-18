@@ -38,6 +38,157 @@ export async function findUserByPhone(phone) {
   return __internalMapUserRow(row);
 }
 
+function mapAdminAccountRow(row) {
+  const user = __internalMapUserRow(row);
+  if (!user) {
+    return null;
+  }
+
+  return {
+    ...user,
+    userId: row.user_id ?? user.id,
+    adminPhone: row.admin_phone ?? user.phone,
+    adminDisplayName: row.admin_display_name ?? user.name,
+    adminTwoFactorEnabled: row.admin_two_factor_enabled == null ? true : Boolean(row.admin_two_factor_enabled)
+  };
+}
+
+export async function findAdminByPhone(phone) {
+  try {
+    const pool = await __internalGetReadyPgPool();
+    const result = await pool.query(
+      `SELECT
+         a.user_id,
+         a.phone AS admin_phone,
+         a.display_name AS admin_display_name,
+         a.two_factor_enabled AS admin_two_factor_enabled,
+         u.id,
+         u.phone,
+         u.password_hash,
+         u.mpin_hash,
+         u.mpin_configured,
+         u.name,
+         u.role,
+         u.referral_code,
+         u.joined_at,
+         u.approval_status,
+         u.approved_at,
+         u.rejected_at,
+         u.blocked_at,
+         u.deactivated_at,
+         u.status_note,
+         u.signup_bonus_granted,
+         u.referred_by_user_id
+       FROM admin_accounts a
+       JOIN users u ON u.id = a.user_id
+       WHERE a.phone = $1
+       LIMIT 1`,
+      [phone]
+    );
+    return mapAdminAccountRow(result.rows[0]);
+  } catch {
+    const row = __internalGetSqlite()
+      .prepare(
+        `SELECT
+           a.user_id,
+           a.phone AS admin_phone,
+           a.display_name AS admin_display_name,
+           a.two_factor_enabled AS admin_two_factor_enabled,
+           u.id,
+           u.phone,
+           u.password_hash,
+           u.mpin_hash,
+           u.mpin_configured,
+           u.name,
+           u.role,
+           u.referral_code,
+           u.joined_at,
+           u.approval_status,
+           u.approved_at,
+           u.rejected_at,
+           u.blocked_at,
+           u.deactivated_at,
+           u.status_note,
+           u.signup_bonus_granted,
+           u.referred_by_user_id
+         FROM admin_accounts a
+         JOIN users u ON u.id = a.user_id
+         WHERE a.phone = ?
+         LIMIT 1`
+      )
+      .get(phone);
+    return mapAdminAccountRow(row);
+  }
+}
+
+export async function findAdminByUserId(userId) {
+  try {
+    const pool = await __internalGetReadyPgPool();
+    const result = await pool.query(
+      `SELECT
+         a.user_id,
+         a.phone AS admin_phone,
+         a.display_name AS admin_display_name,
+         a.two_factor_enabled AS admin_two_factor_enabled,
+         u.id,
+         u.phone,
+         u.password_hash,
+         u.mpin_hash,
+         u.mpin_configured,
+         u.name,
+         u.role,
+         u.referral_code,
+         u.joined_at,
+         u.approval_status,
+         u.approved_at,
+         u.rejected_at,
+         u.blocked_at,
+         u.deactivated_at,
+         u.status_note,
+         u.signup_bonus_granted,
+         u.referred_by_user_id
+       FROM admin_accounts a
+       JOIN users u ON u.id = a.user_id
+       WHERE a.user_id = $1
+       LIMIT 1`,
+      [userId]
+    );
+    return mapAdminAccountRow(result.rows[0]);
+  } catch {
+    const row = __internalGetSqlite()
+      .prepare(
+        `SELECT
+           a.user_id,
+           a.phone AS admin_phone,
+           a.display_name AS admin_display_name,
+           a.two_factor_enabled AS admin_two_factor_enabled,
+           u.id,
+           u.phone,
+           u.password_hash,
+           u.mpin_hash,
+           u.mpin_configured,
+           u.name,
+           u.role,
+           u.referral_code,
+           u.joined_at,
+           u.approval_status,
+           u.approved_at,
+           u.rejected_at,
+           u.blocked_at,
+           u.deactivated_at,
+           u.status_note,
+           u.signup_bonus_granted,
+           u.referred_by_user_id
+         FROM admin_accounts a
+         JOIN users u ON u.id = a.user_id
+         WHERE a.user_id = ?
+         LIMIT 1`
+      )
+      .get(userId);
+    return mapAdminAccountRow(row);
+  }
+}
+
 export async function createSession(userId) {
   const rawToken = randomBytes(24).toString("hex");
   const tokenHash = hashSecret(rawToken);

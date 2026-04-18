@@ -51,8 +51,7 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
         setMessage(data.provider === "local" ? "2FA code generate ho gaya. OTP enter karo." : "2FA code phone par bhej diya gaya hai.");
         return;
       }
-      const me = await fetchApi(normalizedApiBase, "/api/auth/me", data.token);
-      if (!["admin", "super_admin"].includes(me.role)) {
+      if (!["admin", "super_admin"].includes(String(data.user?.role || "").toLowerCase())) {
         throw new Error("Super admin access required");
       }
       storeAdminSession(data.token);
@@ -81,8 +80,7 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
         method: "POST",
         body: { challengeId: challenge.challengeId, otp: normalizedOtp }
       });
-      const me = await fetchApi(normalizedApiBase, "/api/auth/me", data.token);
-      if (!["admin", "super_admin"].includes(me.role)) {
+      if (!["admin", "super_admin"].includes(String(data.user?.role || "").toLowerCase())) {
         throw new Error("Super admin access required");
       }
       storeAdminSession(data.token);

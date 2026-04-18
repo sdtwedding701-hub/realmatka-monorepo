@@ -20,7 +20,8 @@ type PannaRow = {
   cells: PannaCell[];
 };
 
-const API_BASE_URL = "https://realmatka-backend.onrender.com";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://realmatka-monorepo-production.up.railway.app";
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 export default function PublicChartPage({

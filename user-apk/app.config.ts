@@ -14,7 +14,8 @@ const splashImagePath = process.env.EXPO_PUBLIC_SPLASH_IMAGE || "./assets/brandi
 const webFaviconPath = process.env.EXPO_PUBLIC_WEB_FAVICON || "./assets/images/app-icon.jpg";
 const appBuildProfile = process.env.APP_BUILD_PROFILE || "development";
 const webOutput = process.env.EXPO_PUBLIC_WEB_OUTPUT || "single";
-const productionApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL_PRODUCTION || "https://realmatka-backend.onrender.com";
+const productionApiBaseUrl =
+  process.env.EXPO_PUBLIC_API_BASE_URL_PRODUCTION || "https://realmatka-monorepo-production.up.railway.app";
 const localApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_APP_URL || "";
 const apiBaseUrl = ["preview", "production"].includes(appBuildProfile) ? productionApiBaseUrl : localApiBaseUrl;
 

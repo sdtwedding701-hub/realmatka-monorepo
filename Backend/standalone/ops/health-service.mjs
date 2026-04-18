@@ -6,11 +6,17 @@ import { validateEnvironment } from "./env-validator.mjs";
 async function checkManifest(routesManifestPath) {
   try {
     await access(routesManifestPath);
-    return { status: "ok" };
+    return { status: "ok", mode: "expo-dist" };
   } catch (error) {
+    const isMissingManifest = error?.code === "ENOENT";
     return {
-      status: "error",
-      message: error instanceof Error ? error.message : "Manifest unavailable"
+      status: isMissingManifest ? "warn" : "error",
+      mode: isMissingManifest ? "standalone-only" : "unknown",
+      message: isMissingManifest
+        ? "Expo routes manifest not found. Running with standalone API routes only."
+        : error instanceof Error
+          ? error.message
+          : "Manifest unavailable"
     };
   }
 }

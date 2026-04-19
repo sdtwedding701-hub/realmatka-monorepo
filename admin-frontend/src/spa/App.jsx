@@ -19,7 +19,7 @@ function isAllowedAdminRole(role) {
 function getDefaultAdminApiBase() {
   return normalizeAdminApiBase(
     window.ADMIN_DEFAULT_API_BASE ||
-      `${window.location.protocol}//${window.location.hostname}:3000`
+      "https://api.realmatka.in"
   );
 }
 

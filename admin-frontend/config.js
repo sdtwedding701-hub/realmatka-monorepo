@@ -1,7 +1,7 @@
 const localApiBase = "http://localhost:3000";
 const productionApiBase =
   window.ADMIN_DEFAULT_API_BASE ||
-  "https://realmatka-monorepo-production.up.railway.app";
+  "https://api.realmatka.in";
 
 window.ADMIN_DEFAULT_API_BASE =
   window.ADMIN_DEFAULT_API_BASE ||

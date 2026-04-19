@@ -54,7 +54,10 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 *.log
-Backend/data/
-data/
+# Keep runtime DB/log files ignored, but allow chart seed JSONs to deploy.
+Backend/data/*
+!Backend/data/*.chart.json
+data/*
+!data/*.chart.json
 !user-apk/data/
 !user-apk/data/**

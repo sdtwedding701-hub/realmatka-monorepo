@@ -1,0 +1,55 @@
+{
+  "date": "2025-09-06",
+  "tagline": "Daily Guessing Cards \u2014 \u0906\u091c \u0915\u0940 \u092a\u094d\u0930\u0947\u0921\u093f\u0915\u094d\u0936\u0928 (Educational)",
+  "offDay": false,
+  "markets": [
+    {
+      "key": "sita",
+      "name": "SITA",
+      "lines": [
+        "***"
+      ],
+      "offDay": false
+    },
+    {
+      "key": "kamal",
+      "name": "KAMAL",
+      "lines": [
+        "***"
+      ],
+      "offDay": false
+    },
+    {
+      "key": "andhra",
+      "name": "ANDHRA",
+      "lines": [
+        "***"
+      ],
+      "offDay": false
+    },
+    {
+      "key": "star-tara",
+      "name": "STAR TARA",
+      "lines": [
+        "***"
+      ],
+      "offDay": false
+    },
+    {
+      "key": "sridevi",
+      "name": "SRIDEVI",
+      "lines": [
+        "***"
+      ],
+      "offDay": false
+    },
+    {
+      "key": "mahadevi",
+      "name": "MAHADEVI",
+      "lines": [
+        "***"
+      ],
+      "offDay": false
+    }
+  ]
+}

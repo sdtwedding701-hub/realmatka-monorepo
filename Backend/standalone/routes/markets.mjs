@@ -1,14 +1,7 @@
 import { findMarketBySlug, getChartRecord, getChartRecordsForMarkets } from "../stores/market-store.mjs";
 import { corsPreflight, fail, ok } from "../http.mjs";
 import { getDecoratedMarketBySlug, getMarketListSnapshot } from "../services/market-snapshot-service.mjs";
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectDataDir = path.resolve(__dirname, "..", "..", "..", "data");
-const chartFileCache = new Map();
+import { loadChartRowsForMarket } from "../services/chart-source-service.mjs";
 
 export function options(request) {
   return corsPreflight(request);
@@ -92,10 +85,6 @@ function filterEmptyChartRows(rows) {
   );
 }
 
-function getChartFilePath(slug) {
-  return path.join(projectDataDir, `${slug}.chart.json`);
-}
-
 function isValidJodiCell(value) {
   const normalized = String(value ?? "").trim();
   return /^[0-9]{2}$/.test(normalized) || normalized === "--";
@@ -138,31 +127,16 @@ function getStructuredChartRows(chartType, rows) {
   return (Array.isArray(rows) ? rows : []).filter((row) => isStructurallyValidChartRow(chartType, row));
 }
 
-function loadChartRowsFromDataFile(slug, chartType) {
-  const filePath = getChartFilePath(slug);
-  if (!existsSync(filePath)) {
-    return [];
-  }
-
-  if (!chartFileCache.has(filePath)) {
-    try {
-      chartFileCache.set(filePath, JSON.parse(readFileSync(filePath, "utf8")));
-    } catch {
-      chartFileCache.set(filePath, null);
-    }
-  }
-
-  const parsed = chartFileCache.get(filePath);
-  const rows = parsed?.[chartType];
-  return Array.isArray(rows) ? rows : [];
+function getStoredChartRows(chartType, rows) {
+  return filterEmptyChartRows(getStructuredChartRows(chartType, rows));
 }
 
-function getPreferredChartRows(slug, chartType, rows) {
-  const filteredRows = filterEmptyChartRows(getStructuredChartRows(chartType, rows));
-  if (filteredRows.length > 0) {
-    return filteredRows;
+async function getPreferredChartRows(slug, chartType, rows) {
+  const fileRows = filterEmptyChartRows(await loadChartRowsForMarket(slug, chartType));
+  if (fileRows.length > 0) {
+    return fileRows;
   }
-  return filterEmptyChartRows(loadChartRowsFromDataFile(slug, chartType));
+  return getStoredChartRows(chartType, rows);
 }
 
 function formatPannaRowsForResponse(rows, market) {
@@ -255,8 +229,22 @@ export async function chartBatch(request) {
     return fail("At least one valid chart type is required", 400, request);
   }
 
+  const missingFilePairs = [];
+  for (const marketSlug of marketSlugs) {
+    for (const chartType of chartTypes) {
+      if (!filterEmptyChartRows(await loadChartRowsForMarket(marketSlug, chartType)).length) {
+        missingFilePairs.push({ marketSlug, chartType });
+      }
+    }
+  }
+
   const [charts, markets] = await Promise.all([
-    getChartRecordsForMarkets(marketSlugs, chartTypes),
+    missingFilePairs.length
+      ? getChartRecordsForMarkets(
+          Array.from(new Set(missingFilePairs.map((item) => item.marketSlug))),
+          Array.from(new Set(missingFilePairs.map((item) => item.chartType)))
+        )
+      : Promise.resolve([]),
     Promise.all(marketSlugs.map((slug) => findMarketBySlug(slug)))
   ]);
 
@@ -279,19 +267,21 @@ export async function chartBatch(request) {
         };
 
       if (chartType === "panna") {
+        const preferredRows = await getPreferredChartRows(marketSlug, "panna", chart.rows);
         items.push({
           ...chart,
           rows: formatPannaRowsForResponse(
-            getPreferredChartRows(marketSlug, "panna", chart.rows),
+            preferredRows,
             marketMap.get(marketSlug) ?? null
           )
         });
         continue;
       }
 
+      const preferredRows = await getPreferredChartRows(marketSlug, "jodi", chart.rows);
       items.push({
         ...chart,
-        rows: getPreferredChartRows(marketSlug, "jodi", chart.rows)
+        rows: preferredRows
       });
     }
   }
@@ -317,7 +307,8 @@ export async function chart(request, params) {
   if (!market) {
     return fail("Market not found", 404, request);
   }
-  const storedChart = await getChartRecord(params.slug, chartType);
+  const fileRows = filterEmptyChartRows(await loadChartRowsForMarket(params.slug, chartType));
+  const storedChart = !fileRows.length ? await getChartRecord(params.slug, chartType) : null;
   const chart = storedChart ?? {
     marketSlug: params.slug,
     chartType,
@@ -327,7 +318,7 @@ export async function chart(request, params) {
     return ok(
       {
         ...chart,
-        rows: formatPannaRowsForResponse(getPreferredChartRows(params.slug, "panna", chart.rows), market)
+        rows: formatPannaRowsForResponse(await getPreferredChartRows(params.slug, "panna", chart.rows), market)
       },
       request
     );
@@ -335,7 +326,7 @@ export async function chart(request, params) {
   return ok(
     {
       ...chart,
-      rows: getPreferredChartRows(params.slug, "jodi", chart.rows)
+      rows: await getPreferredChartRows(params.slug, "jodi", chart.rows)
     },
     request
   );

@@ -17,7 +17,14 @@ export const standaloneConfig = {
   defaultAdminPassword: readEnv("DEFAULT_ADMIN_PASSWORD"),
   defaultAdminMpin: readEnv("DEFAULT_ADMIN_MPIN"),
   defaultAdminName: readEnv("DEFAULT_ADMIN_NAME", "Admin User"),
-  defaultAdminReferralCode: readEnv("DEFAULT_ADMIN_REFERRAL_CODE", "621356")
+  defaultAdminReferralCode: readEnv("DEFAULT_ADMIN_REFERRAL_CODE", "621356"),
+  r2AccountId: readEnv("R2_ACCOUNT_ID", readEnv("CLOUDFLARE_ACCOUNT_ID")),
+  r2AccessKeyId: readEnv("R2_ACCESS_KEY_ID", readEnv("CLOUDFLARE_ACCESS_KEY_ID")),
+  r2SecretAccessKey: readEnv("R2_SECRET_ACCESS_KEY", readEnv("CLOUDFLARE_SECRET_ACCESS_KEY")),
+  r2BucketName: readEnv("R2_BUCKET_NAME"),
+  r2BucketEndpoint: readEnv("R2_BUCKET_ENDPOINT"),
+  r2PublicBaseUrl: readEnv("R2_PUBLIC_BASE_URL"),
+  r2ChartsPrefix: readEnv("R2_CHARTS_PREFIX", "charts/")
 };
 
 export function isStandalonePostgresEnabled() {

@@ -20,7 +20,11 @@ const appUrl = readEnv("EXPO_PUBLIC_APP_URL", "http://localhost:8081");
 const apiUrl = readEnv("EXPO_PUBLIC_API_BASE_URL", "");
 const adminDomain = readEnv("ADMIN_DOMAIN", "http://localhost:5500");
 const extraCorsOrigins = readCsvEnv("EXTRA_CORS_ORIGINS");
-const allowedOrigins = [...new Set([appUrl, apiUrl, adminDomain, ...extraCorsOrigins].filter(Boolean))];
+/** Public Expo web build; browser requires origin in CORS list. */
+const defaultWebCorsOrigins = ["https://play.realmatka.in"];
+const allowedOrigins = [
+  ...new Set([appUrl, apiUrl, adminDomain, ...extraCorsOrigins, ...defaultWebCorsOrigins].filter(Boolean))
+];
 const nodeEnv = readEnv("NODE_ENV", "development");
 
 export const productionConfig = {

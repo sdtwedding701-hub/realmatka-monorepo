@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
 
+/** Expo / marketing web (browser CORS); override or extend via EXTRA_CORS_ORIGINS on Railway. */
+const DEFAULT_WEB_CORS_ORIGINS = ["https://play.realmatka.in"];
+
 function extraCorsOriginList() {
   return String(process.env.EXTRA_CORS_ORIGINS || "")
     .split(",")
@@ -14,7 +17,8 @@ function getAllowedOrigin(request) {
       process.env.EXPO_PUBLIC_APP_URL,
       process.env.EXPO_PUBLIC_API_BASE_URL,
       process.env.ADMIN_DOMAIN,
-      ...extraCorsOriginList()
+      ...extraCorsOriginList(),
+      ...DEFAULT_WEB_CORS_ORIGINS
     ]
       .filter(Boolean)
       .map((value) => value.replace(/\/$/, ""))

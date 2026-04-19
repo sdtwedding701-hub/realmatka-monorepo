@@ -1,10 +1,19 @@
 import { isStandalonePostgresEnabled } from "../config.mjs";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   __internalGetPgPool,
   __internalGetReadyPgPool,
   __internalGetSqlite,
   __internalToIso
 } from "../db.mjs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const backendRoot = path.resolve(__dirname, "..", "..");
+const projectRoot = path.resolve(backendRoot, "..");
+const chartDataDir = path.join(projectRoot, "data");
 
 function toChartRows(value) {
   if (Array.isArray(value)) return value;
@@ -78,6 +87,12 @@ function sortChartRowsChronologicallyForRows(rows) {
   });
 }
 
+function hasMeaningfulChartRows(rows) {
+  return (Array.isArray(rows) ? rows : []).some(
+    (row) => Array.isArray(row) && row.slice(1).some((cell) => !isPlaceholderChartCellForRows(cell))
+  );
+}
+
 function normalizeChartRowsForStorage(chartType, rows) {
   const size = chartType === "panna" ? 14 : 7;
   const placeholder = chartType === "panna" ? "---" : "--";
@@ -97,6 +112,30 @@ function normalizeChartRowsForStorage(chartType, rows) {
   }
 
   return sortChartRowsChronologicallyForRows(Array.from(merged.values()));
+}
+
+function readChartRowsFromSeedFile(slug, chartType) {
+  try {
+    const filePath = path.join(chartDataDir, `${String(slug || "").trim()}.chart.json`);
+    const payload = JSON.parse(readFileSync(filePath, "utf8"));
+    const sourceRows = chartType === "panna" ? payload?.panna : payload?.jodi;
+    const normalized = normalizeChartRowsForStorage(chartType, Array.isArray(sourceRows) ? sourceRows : []);
+    return hasMeaningfulChartRows(normalized) ? normalized : [];
+  } catch {
+    return [];
+  }
+}
+
+async function healChartRowsFromSeedFile(slug, chartType, rows) {
+  if (hasMeaningfulChartRows(rows)) {
+    return rows;
+  }
+  const seedRows = readChartRowsFromSeedFile(slug, chartType);
+  if (!hasMeaningfulChartRows(seedRows)) {
+    return rows;
+  }
+  const healed = await upsertChartRecord(slug, chartType, seedRows);
+  return healed?.rows ?? seedRows;
 }
 
 function parseClockTimeToMinutes(value) {
@@ -182,7 +221,15 @@ export async function getChartRecord(slug, chartType) {
     );
     const row = result.rows[0];
     return row
-      ? { marketSlug: row.market_slug, chartType: row.chart_type, rows: normalizeChartRowsForStorage(chartType, toChartRows(row.rows_json)) }
+      ? {
+          marketSlug: row.market_slug,
+          chartType: row.chart_type,
+          rows: await healChartRowsFromSeedFile(
+            row.market_slug,
+            chartType,
+            normalizeChartRowsForStorage(chartType, toChartRows(row.rows_json))
+          )
+        }
       : null;
   }
 
@@ -195,7 +242,15 @@ export async function getChartRecord(slug, chartType) {
     )
     .get(slug, chartType);
   return row
-    ? { marketSlug: row.market_slug, chartType: row.chart_type, rows: normalizeChartRowsForStorage(chartType, toChartRows(row.rows_json)) }
+    ? {
+        marketSlug: row.market_slug,
+        chartType: row.chart_type,
+        rows: await healChartRowsFromSeedFile(
+          row.market_slug,
+          chartType,
+          normalizeChartRowsForStorage(chartType, toChartRows(row.rows_json))
+        )
+      }
     : null;
 }
 
@@ -212,11 +267,17 @@ export async function getChartRecordsForMarkets(slugs, chartTypes = ["jodi", "pa
        WHERE market_slug = ANY($1::text[]) AND chart_type = ANY($2::text[])`,
       [normalizedSlugs, normalizedChartTypes]
     );
-    return result.rows.map((row) => ({
-      marketSlug: row.market_slug,
-      chartType: row.chart_type,
-      rows: normalizeChartRowsForStorage(row.chart_type, toChartRows(row.rows_json))
-    }));
+    return Promise.all(
+      result.rows.map(async (row) => ({
+        marketSlug: row.market_slug,
+        chartType: row.chart_type,
+        rows: await healChartRowsFromSeedFile(
+          row.market_slug,
+          row.chart_type,
+          normalizeChartRowsForStorage(row.chart_type, toChartRows(row.rows_json))
+        )
+      }))
+    );
   }
 
   const slugPlaceholders = normalizedSlugs.map(() => "?").join(", ");
@@ -229,11 +290,17 @@ export async function getChartRecordsForMarkets(slugs, chartTypes = ["jodi", "pa
     )
     .all(...normalizedSlugs, ...normalizedChartTypes);
 
-  return rows.map((row) => ({
-    marketSlug: row.market_slug,
-    chartType: row.chart_type,
-    rows: normalizeChartRowsForStorage(row.chart_type, toChartRows(row.rows_json))
-  }));
+  return Promise.all(
+    rows.map(async (row) => ({
+      marketSlug: row.market_slug,
+      chartType: row.chart_type,
+      rows: await healChartRowsFromSeedFile(
+        row.market_slug,
+        row.chart_type,
+        normalizeChartRowsForStorage(row.chart_type, toChartRows(row.rows_json))
+      )
+    }))
+  );
 }
 
 export async function upsertChartRecord(marketSlug, chartType, rows) {

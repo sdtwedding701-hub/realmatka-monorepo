@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const backendRoot = path.resolve(__dirname, "..");
 const projectRoot = path.resolve(backendRoot, "..");
-const chartDataDir = path.join(projectRoot, "data");
+const chartDataDirs = [path.join(projectRoot, "data"), path.join(backendRoot, "data")];
 const sqlitePath = path.join(backendRoot, "data", "server.db");
 const postgresSchemaSql = readFileSync(path.join(backendRoot, "postgres-schema.sql"), "utf8");
 const sessionTtlMs = standaloneConfig.sessionTtlHours * 60 * 60 * 1000;
@@ -262,33 +262,35 @@ function normalizeChartRowsForStorage(chartType, rows) {
 }
 
 function loadChartSeedPayloads() {
-  let fileNames = [];
-  try {
-    fileNames = readdirSync(chartDataDir).filter((fileName) => fileName.endsWith(".chart.json"));
-  } catch {
-    return [];
-  }
-
-  const payloads = [];
-  for (const fileName of fileNames) {
+  const payloadBySlug = new Map();
+  for (const dirPath of chartDataDirs) {
+    let fileNames = [];
     try {
-      const payload = JSON.parse(readFileSync(path.join(chartDataDir, fileName), "utf8"));
-      const slug = String(payload?.slug || fileName.replace(/\.chart\.json$/i, "")).trim();
-      if (!slug) {
-        continue;
-      }
-
-      payloads.push({
-        slug,
-        jodi: Array.isArray(payload?.jodi) ? payload.jodi : [],
-        panna: Array.isArray(payload?.panna) ? payload.panna : []
-      });
+      fileNames = readdirSync(dirPath).filter((fileName) => fileName.endsWith(".chart.json"));
     } catch {
-      // Skip malformed chart seed files instead of breaking backend bootstrap.
+      continue;
+    }
+
+    for (const fileName of fileNames) {
+      try {
+        const payload = JSON.parse(readFileSync(path.join(dirPath, fileName), "utf8"));
+        const slug = String(payload?.slug || fileName.replace(/\.chart\.json$/i, "")).trim();
+        if (!slug) {
+          continue;
+        }
+
+        payloadBySlug.set(slug, {
+          slug,
+          jodi: Array.isArray(payload?.jodi) ? payload.jodi : [],
+          panna: Array.isArray(payload?.panna) ? payload.panna : []
+        });
+      } catch {
+        // Skip malformed chart seed files instead of breaking backend bootstrap.
+      }
     }
   }
 
-  return payloads;
+  return Array.from(payloadBySlug.values());
 }
 
 async function syncChartsFromFilesToPostgres(client) {

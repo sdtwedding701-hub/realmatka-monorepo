@@ -85,6 +85,12 @@ function filterEmptyChartRows(rows) {
   );
 }
 
+function getNonEmptyRows(rows) {
+  return (Array.isArray(rows) ? rows : []).filter((row) =>
+    Array.isArray(row) && row.length > 1 && String(row[0] ?? "").trim()
+  );
+}
+
 function isValidJodiCell(value) {
   const normalized = String(value ?? "").trim();
   return /^[0-9]{2}$/.test(normalized) || normalized === "--";
@@ -128,15 +134,35 @@ function getStructuredChartRows(chartType, rows) {
 }
 
 function getStoredChartRows(chartType, rows) {
-  return filterEmptyChartRows(getStructuredChartRows(chartType, rows));
+  const structuredRows = getStructuredChartRows(chartType, rows);
+  const meaningfulRows = filterEmptyChartRows(structuredRows);
+  if (meaningfulRows.length > 0) {
+    return meaningfulRows;
+  }
+  if (structuredRows.length > 0) {
+    return structuredRows;
+  }
+  return getNonEmptyRows(rows);
 }
 
 async function getPreferredChartRows(slug, chartType, rows) {
-  const fileRows = filterEmptyChartRows(await loadChartRowsForMarket(slug, chartType));
-  if (fileRows.length > 0) {
-    return fileRows;
+  const loadedFileRows = await loadChartRowsForMarket(slug, chartType);
+  const meaningfulFileRows = filterEmptyChartRows(loadedFileRows);
+  if (meaningfulFileRows.length > 0) {
+    return meaningfulFileRows;
   }
-  return getStoredChartRows(chartType, rows);
+
+  const usableFileRows = getNonEmptyRows(loadedFileRows);
+  if (usableFileRows.length > 0) {
+    return usableFileRows;
+  }
+
+  const storedRows = getStoredChartRows(chartType, rows);
+  if (storedRows.length > 0) {
+    return storedRows;
+  }
+
+  return buildEmptyChartRows(chartType);
 }
 
 function formatPannaRowsForResponse(rows, market) {
@@ -175,7 +201,12 @@ function formatPannaRowsForResponse(rows, market) {
     return nextRow;
   });
 
-  return filterEmptyChartRows(formattedRows);
+  const meaningfulRows = filterEmptyChartRows(formattedRows);
+  if (meaningfulRows.length > 0) {
+    return meaningfulRows;
+  }
+  const usableRows = getNonEmptyRows(formattedRows);
+  return usableRows.length > 0 ? usableRows : buildEmptyChartRows("panna");
 }
 
 function normalizeChartBatchTypes(value) {
@@ -232,7 +263,7 @@ export async function chartBatch(request) {
   const missingFilePairs = [];
   for (const marketSlug of marketSlugs) {
     for (const chartType of chartTypes) {
-      if (!filterEmptyChartRows(await loadChartRowsForMarket(marketSlug, chartType)).length) {
+      if (!getNonEmptyRows(await loadChartRowsForMarket(marketSlug, chartType)).length) {
         missingFilePairs.push({ marketSlug, chartType });
       }
     }
@@ -281,7 +312,7 @@ export async function chartBatch(request) {
       const preferredRows = await getPreferredChartRows(marketSlug, "jodi", chart.rows);
       items.push({
         ...chart,
-        rows: preferredRows
+        rows: preferredRows.length ? preferredRows : buildEmptyChartRows("jodi")
       });
     }
   }
@@ -307,7 +338,7 @@ export async function chart(request, params) {
   if (!market) {
     return fail("Market not found", 404, request);
   }
-  const fileRows = filterEmptyChartRows(await loadChartRowsForMarket(params.slug, chartType));
+  const fileRows = getNonEmptyRows(await loadChartRowsForMarket(params.slug, chartType));
   const storedChart = !fileRows.length ? await getChartRecord(params.slug, chartType) : null;
   const chart = storedChart ?? {
     marketSlug: params.slug,
@@ -323,10 +354,11 @@ export async function chart(request, params) {
       request
     );
   }
+  const preferredRows = await getPreferredChartRows(params.slug, "jodi", chart.rows);
   return ok(
     {
       ...chart,
-      rows: await getPreferredChartRows(params.slug, "jodi", chart.rows)
+      rows: preferredRows.length ? preferredRows : buildEmptyChartRows("jodi")
     },
     request
   );

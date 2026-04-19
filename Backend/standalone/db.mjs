@@ -11,7 +11,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const backendRoot = path.resolve(__dirname, "..");
 const projectRoot = path.resolve(backendRoot, "..");
-const chartDataDirs = [path.join(projectRoot, "data"), path.join(backendRoot, "data")];
+const chartDataDirs = [
+  path.join(backendRoot, "chart-data"),
+  path.join(projectRoot, "data"),
+  path.join(backendRoot, "data")
+];
 const sqlitePath = path.join(backendRoot, "data", "server.db");
 const postgresSchemaSql = readFileSync(path.join(backendRoot, "postgres-schema.sql"), "utf8");
 const sessionTtlMs = standaloneConfig.sessionTtlHours * 60 * 60 * 1000;

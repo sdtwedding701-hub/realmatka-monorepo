@@ -1,7 +1,6 @@
 import { findMarketBySlug, getChartRecord, getChartRecordsForMarkets } from "../stores/market-store.mjs";
 import { corsPreflight, fail, ok } from "../http.mjs";
 import { getDecoratedMarketBySlug, getMarketListSnapshot } from "../services/market-snapshot-service.mjs";
-import { loadChartRowsForMarket } from "../services/chart-source-service.mjs";
 
 export function options(request) {
   return corsPreflight(request);
@@ -145,28 +144,7 @@ function getStoredChartRows(chartType, rows) {
   return getNonEmptyRows(rows);
 }
 
-function isFileOnlyMode(request) {
-  const url = new URL(request.url);
-  return url.searchParams.get("source") === "file-only" || process.env.CHARTS_DISABLE_DB_FALLBACK === "true";
-}
-
-async function getPreferredChartRows(slug, chartType, rows, options = {}) {
-  const { fileOnly = false } = options;
-  const loadedFileRows = await loadChartRowsForMarket(slug, chartType);
-  const meaningfulFileRows = filterEmptyChartRows(loadedFileRows);
-  if (meaningfulFileRows.length > 0) {
-    return meaningfulFileRows;
-  }
-
-  const usableFileRows = getNonEmptyRows(loadedFileRows);
-  if (usableFileRows.length > 0) {
-    return usableFileRows;
-  }
-
-  if (fileOnly) {
-    return [];
-  }
-
+function getPreferredChartRows(chartType, rows) {
   const storedRows = getStoredChartRows(chartType, rows);
   if (storedRows.length > 0) {
     return storedRows;
@@ -262,7 +240,6 @@ export async function chartBatch(request) {
     )
   ).slice(0, 12);
   const chartTypes = normalizeChartBatchTypes(url.searchParams.get("types"));
-  const fileOnly = isFileOnlyMode(request);
 
   if (!marketSlugs.length) {
     return fail("markets query is required", 400, request);
@@ -271,22 +248,8 @@ export async function chartBatch(request) {
     return fail("At least one valid chart type is required", 400, request);
   }
 
-  const missingFilePairs = [];
-  for (const marketSlug of marketSlugs) {
-    for (const chartType of chartTypes) {
-      if (!getNonEmptyRows(await loadChartRowsForMarket(marketSlug, chartType)).length) {
-        missingFilePairs.push({ marketSlug, chartType });
-      }
-    }
-  }
-
   const [charts, markets] = await Promise.all([
-    !fileOnly && missingFilePairs.length
-      ? getChartRecordsForMarkets(
-          Array.from(new Set(missingFilePairs.map((item) => item.marketSlug))),
-          Array.from(new Set(missingFilePairs.map((item) => item.chartType)))
-        )
-      : Promise.resolve([]),
+    getChartRecordsForMarkets(marketSlugs, chartTypes),
     Promise.all(marketSlugs.map((slug) => findMarketBySlug(slug)))
   ]);
 
@@ -309,23 +272,21 @@ export async function chartBatch(request) {
         };
 
       if (chartType === "panna") {
-        const preferredRows = await getPreferredChartRows(marketSlug, "panna", chart.rows, { fileOnly });
+        const preferredRows = getPreferredChartRows("panna", chart.rows);
         items.push({
           ...chart,
           rows: formatPannaRowsForResponse(
             preferredRows.length ? preferredRows : buildEmptyChartRows("panna"),
             marketMap.get(marketSlug) ?? null
-          ),
-          sourceMode: fileOnly ? "file-only" : "auto"
+          )
         });
         continue;
       }
 
-      const preferredRows = await getPreferredChartRows(marketSlug, "jodi", chart.rows, { fileOnly });
+      const preferredRows = getPreferredChartRows("jodi", chart.rows);
       items.push({
         ...chart,
-        rows: preferredRows.length ? preferredRows : buildEmptyChartRows("jodi"),
-        sourceMode: fileOnly ? "file-only" : "auto"
+        rows: preferredRows.length ? preferredRows : buildEmptyChartRows("jodi")
       });
     }
   }
@@ -333,8 +294,7 @@ export async function chartBatch(request) {
   return ok({
     items,
     markets: marketSlugs,
-    types: chartTypes,
-    sourceMode: fileOnly ? "file-only" : "auto"
+    types: chartTypes
   }, request);
 }
 
@@ -349,49 +309,25 @@ export async function detail(request, params) {
 export async function chart(request, params) {
   const url = new URL(request.url);
   const chartType = url.searchParams.get("type") === "panna" ? "panna" : "jodi";
-  const fileOnly = isFileOnlyMode(request);
   const market = await findMarketBySlug(params.slug);
   if (!market) {
     return fail("Market not found", 404, request);
   }
 
-  const rawFileRows = await loadChartRowsForMarket(params.slug, chartType);
-  const fileRows = getNonEmptyRows(rawFileRows);
-  const storedChart = !fileOnly && !fileRows.length ? await getChartRecord(params.slug, chartType) : null;
+  const storedChart = await getChartRecord(params.slug, chartType);
   const chart = storedChart ?? {
     marketSlug: params.slug,
     chartType,
     rows: buildEmptyChartRows(chartType)
   };
 
-  const preferredRows = await getPreferredChartRows(params.slug, chartType, chart.rows, { fileOnly });
-
-  if (fileOnly && !preferredRows.length) {
-    return fail(
-      `Chart file rows not found for market '${params.slug}' and type '${chartType}'`,
-      404,
-      request,
-      {
-        marketSlug: params.slug,
-        chartType,
-        sourceMode: "file-only",
-        rawFileRowCount: Array.isArray(rawFileRows) ? rawFileRows.length : 0,
-        usableFileRowCount: fileRows.length
-      }
-    );
-  }
+  const preferredRows = getPreferredChartRows(chartType, chart.rows);
 
   if (chartType === "panna") {
     return ok(
       {
         ...chart,
-        rows: formatPannaRowsForResponse(preferredRows.length ? preferredRows : buildEmptyChartRows("panna"), market),
-        sourceMode: fileOnly ? "file-only" : storedChart ? "db-fallback-or-file" : "file-or-empty",
-        debug: {
-          rawFileRowCount: Array.isArray(rawFileRows) ? rawFileRows.length : 0,
-          usableFileRowCount: fileRows.length,
-          usedDbFallback: Boolean(storedChart)
-        }
+        rows: formatPannaRowsForResponse(preferredRows.length ? preferredRows : buildEmptyChartRows("panna"), market)
       },
       request
     );
@@ -400,13 +336,7 @@ export async function chart(request, params) {
   return ok(
     {
       ...chart,
-      rows: preferredRows.length ? preferredRows : buildEmptyChartRows("jodi"),
-      sourceMode: fileOnly ? "file-only" : storedChart ? "db-fallback-or-file" : "file-or-empty",
-      debug: {
-        rawFileRowCount: Array.isArray(rawFileRows) ? rawFileRows.length : 0,
-        usableFileRowCount: fileRows.length,
-        usedDbFallback: Boolean(storedChart)
-      }
+      rows: preferredRows.length ? preferredRows : buildEmptyChartRows("jodi")
     },
     request
   );

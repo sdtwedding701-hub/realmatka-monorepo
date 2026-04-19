@@ -26,11 +26,6 @@ export function validateEnvironment() {
     paymentsEnabled: Boolean(process.env.RAZORPAY_KEY_ID?.trim() && process.env.RAZORPAY_KEY_SECRET?.trim()),
     paymentWebhooksEnabled: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET?.trim())
   };
-  const hasR2AccountId = Boolean(standaloneConfig.r2AccountId);
-  const hasR2AccessKeyId = Boolean(standaloneConfig.r2AccessKeyId);
-  const hasR2SecretAccessKey = Boolean(standaloneConfig.r2SecretAccessKey);
-  const hasR2BucketName = Boolean(standaloneConfig.r2BucketName);
-  const hasR2PublicBaseUrl = Boolean(standaloneConfig.r2PublicBaseUrl);
 
   if (!Number.isFinite(standaloneConfig.port) || standaloneConfig.port <= 0) {
     errors.push("PORT must be a valid positive number");
@@ -88,18 +83,6 @@ export function validateEnvironment() {
 
   if (!/^https?:\/\//i.test(standaloneConfig.apiUrl || "")) {
     warnings.push("EXPO_PUBLIC_API_BASE_URL should be an absolute URL");
-  }
-
-  if (hasR2PublicBaseUrl && !/^https:\/\//i.test(standaloneConfig.r2PublicBaseUrl)) {
-    warnings.push("R2_PUBLIC_BASE_URL should use https");
-  }
-
-  if (hasR2BucketName || hasR2PublicBaseUrl || hasR2AccountId || hasR2AccessKeyId || hasR2SecretAccessKey) {
-    const hasPrivateR2Config = hasR2AccountId && hasR2AccessKeyId && hasR2SecretAccessKey && hasR2BucketName;
-    const hasPublicR2Config = hasR2PublicBaseUrl;
-    if (!hasPrivateR2Config && !hasPublicR2Config) {
-      warnings.push("R2 config is partial. Set either R2_PUBLIC_BASE_URL or full private R2 credentials with bucket name");
-    }
   }
 
   return {

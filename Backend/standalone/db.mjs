@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Pool } from "pg";
@@ -10,6 +10,8 @@ import { hashSecret } from "./http.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const backendRoot = path.resolve(__dirname, "..");
+const projectRoot = path.resolve(backendRoot, "..");
+const chartDataDir = path.join(projectRoot, "data");
 const sqlitePath = path.join(backendRoot, "data", "server.db");
 const postgresSchemaSql = readFileSync(path.join(backendRoot, "postgres-schema.sql"), "utf8");
 const sessionTtlMs = standaloneConfig.sessionTtlHours * 60 * 60 * 1000;
@@ -257,6 +259,67 @@ function normalizeChartRowsForStorage(chartType, rows) {
   }
 
   return sortChartRowsChronologicallyForRows(Array.from(merged.values()));
+}
+
+function loadChartSeedPayloads() {
+  let fileNames = [];
+  try {
+    fileNames = readdirSync(chartDataDir).filter((fileName) => fileName.endsWith(".chart.json"));
+  } catch {
+    return [];
+  }
+
+  const payloads = [];
+  for (const fileName of fileNames) {
+    try {
+      const payload = JSON.parse(readFileSync(path.join(chartDataDir, fileName), "utf8"));
+      const slug = String(payload?.slug || fileName.replace(/\.chart\.json$/i, "")).trim();
+      if (!slug) {
+        continue;
+      }
+
+      payloads.push({
+        slug,
+        jodi: Array.isArray(payload?.jodi) ? payload.jodi : [],
+        panna: Array.isArray(payload?.panna) ? payload.panna : []
+      });
+    } catch {
+      // Skip malformed chart seed files instead of breaking backend bootstrap.
+    }
+  }
+
+  return payloads;
+}
+
+async function syncChartsFromFilesToPostgres(client) {
+  const chartPayloads = loadChartSeedPayloads();
+  for (const payload of chartPayloads) {
+    for (const chartType of ["jodi", "panna"]) {
+      const normalizedRows = normalizeChartRowsForStorage(chartType, payload[chartType]);
+      await client.query(
+        `INSERT INTO charts (market_slug, chart_type, rows_json)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (market_slug, chart_type) DO UPDATE SET rows_json = EXCLUDED.rows_json`,
+        [payload.slug, chartType, JSON.stringify(normalizedRows)]
+      );
+    }
+  }
+}
+
+function syncChartsFromFilesToSqlite(db) {
+  const upsertChartStatement = db.prepare(
+    `INSERT INTO charts (market_slug, chart_type, rows_json)
+     VALUES (?, ?, ?)
+     ON CONFLICT(market_slug, chart_type) DO UPDATE SET rows_json = excluded.rows_json`
+  );
+  const chartPayloads = loadChartSeedPayloads();
+
+  for (const payload of chartPayloads) {
+    for (const chartType of ["jodi", "panna"]) {
+      const normalizedRows = normalizeChartRowsForStorage(chartType, payload[chartType]);
+      upsertChartStatement.run(payload.slug, chartType, JSON.stringify(normalizedRows));
+    }
+  }
 }
 
 function mapUserRow(row) {
@@ -774,6 +837,8 @@ async function ensurePostgresBootstrap(pool) {
         );
       }
 
+      await syncChartsFromFilesToPostgres(client);
+
       const settingsCount = Number((await client.query("SELECT COUNT(*)::int AS count FROM app_settings")).rows[0]?.count ?? 0);
       if (settingsCount === 0) {
         const settings = [
@@ -1052,15 +1117,7 @@ function getSqlite() {
     insert.run("market_2", "bharat-starline", "Bharat Starline", "580", "Live bidding open now", "Play Now", "10:00 AM", "09:00 PM", "starline");
   }
 
-  const chartCount = Number(sqlite.prepare("SELECT COUNT(*) AS count FROM charts").get().count || 0);
-  if (chartCount === 0) {
-    const sampleRows = JSON.stringify([
-      ["05-Feb", "470", "237", "450"],
-      ["12-Feb", "368", "125", "359"]
-    ]);
-    sqlite.prepare("INSERT INTO charts (market_slug, chart_type, rows_json) VALUES (?, ?, ?)").run("mangal-bazar", "jodi", sampleRows);
-    sqlite.prepare("INSERT INTO charts (market_slug, chart_type, rows_json) VALUES (?, ?, ?)").run("mangal-bazar", "panna", sampleRows);
-  }
+  syncChartsFromFilesToSqlite(sqlite);
 
   const settingsCount = Number(sqlite.prepare("SELECT COUNT(*) AS count FROM app_settings").get().count || 0);
   if (settingsCount === 0) {

@@ -1,9 +1,21 @@
 import { createHash } from "node:crypto";
 
+function extraCorsOriginList() {
+  return String(process.env.EXTRA_CORS_ORIGINS || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 function getAllowedOrigin(request) {
   const origin = request.headers.get("origin") || "";
   const allowed = new Set(
-    [process.env.EXPO_PUBLIC_APP_URL, process.env.EXPO_PUBLIC_API_BASE_URL, process.env.ADMIN_DOMAIN]
+    [
+      process.env.EXPO_PUBLIC_APP_URL,
+      process.env.EXPO_PUBLIC_API_BASE_URL,
+      process.env.ADMIN_DOMAIN,
+      ...extraCorsOriginList()
+    ]
       .filter(Boolean)
       .map((value) => value.replace(/\/$/, ""))
   );

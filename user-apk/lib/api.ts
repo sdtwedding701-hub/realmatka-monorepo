@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 type HttpMethod = "GET" | "POST";
 
@@ -216,10 +217,14 @@ async function request<T>(path: string, options: RequestOptions = {}) {
         await new Promise((resolve) => setTimeout(resolve, attempt * 900));
         continue;
       }
+      const webCorsHint =
+        !isAbort && Platform.OS === "web" && typeof window !== "undefined"
+          ? ` Web par CORS: Railway/backend env mein EXTRA_CORS_ORIGINS=${window.location.origin} add karo (comma se multiple origins).`
+          : "";
       throw new Error(
         isAbort
           ? `API server response time bahut slow hai. Server ko retry karo: ${getApiBaseUrl()}`
-          : `API server connect nahi ho raha. API Base URL check karo: ${getApiBaseUrl()}`
+          : `API server connect nahi ho raha. API Base URL check karo: ${getApiBaseUrl()}.${webCorsHint}`
       );
     }
 

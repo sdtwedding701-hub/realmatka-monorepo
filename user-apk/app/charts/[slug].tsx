@@ -31,8 +31,20 @@ export default function ChartDetailScreen() {
   const params = useLocalSearchParams<{ slug: string; chartType?: string; label?: string }>();
   const title = params.label ?? (params.slug ?? "chart").split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
   const chartType = params.chartType === "panna" ? "panna" : "jodi";
-  const [chart, setChart] = useState<ChartPayload | null>(() => (params.slug ? getCachedChart(String(params.slug), chartType) : null));
-  const [loading, setLoading] = useState(() => !(params.slug && getCachedChart(String(params.slug), chartType)));
+  const [chart, setChart] = useState<ChartPayload | null>(() => {
+    if (!params.slug) {
+      return null;
+    }
+    const cachedChart = getCachedChart(String(params.slug), chartType);
+    return hasRenderableChartRows(cachedChart?.rows) ? cachedChart : null;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (!params.slug) {
+      return false;
+    }
+    const cachedChart = getCachedChart(String(params.slug), chartType);
+    return !hasRenderableChartRows(cachedChart?.rows);
+  });
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [showAllRows, setShowAllRows] = useState(false);
@@ -51,7 +63,7 @@ export default function ChartDetailScreen() {
       if (!active) {
         return;
       }
-      if (cachedChart) {
+      if (cachedChart && hasRenderableChartRows(cachedChart.rows)) {
         setChart(cachedChart);
         setLoading(false);
         void load(false);
@@ -111,6 +123,8 @@ export default function ChartDetailScreen() {
             <ActivityIndicator color={colors.primary} size="large" />
           ) : error ? (
             <Text style={styles.errorText}>{error}</Text>
+          ) : !visibleRawRows.length ? (
+            <Text style={styles.errorText}>Chart data abhi available nahi hai. Thoda baad retry karo.</Text>
           ) : chartType === "jodi" ? (
               <View>
                 <View style={styles.jodiHeaderRow}>
@@ -215,6 +229,15 @@ function normalizeJodiRows(rows: string[][]) {
     }
     return trimmed;
   });
+}
+
+function hasRenderableChartRows(rows: string[][] | undefined | null) {
+  return Array.isArray(rows) && rows.some((row) => Array.isArray(row) && row.slice(1).some((cell) => !isPlaceholderChartCell(cell)));
+}
+
+function isPlaceholderChartCell(value: string | undefined) {
+  const cleaned = String(value ?? "").trim();
+  return !cleaned || cleaned === "--" || cleaned === "---" || cleaned === "**" || cleaned === "***";
 }
 
 function normalizePannaRows(rows: string[][]): PannaRow[] {

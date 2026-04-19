@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 type ChartPayload = {
   marketSlug: string;
@@ -20,19 +21,16 @@ type PannaRow = {
   cells: PannaCell[];
 };
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "https://realmatka-monorepo-production.up.railway.app";
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
-export default function PublicChartPage({
-  params,
-  searchParams
-}: {
-  params: { slug: string };
-  searchParams?: { type?: string; label?: string };
-}) {
-  const chartType = searchParams?.type === "panna" ? "panna" : "jodi";
-  const label = searchParams?.label ?? params.slug.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+function ChartPageContent() {
+  const routeParams = useParams<{ slug: string | string[] }>();
+  const searchParams = useSearchParams();
+  const slug = typeof routeParams.slug === "string" ? routeParams.slug : Array.isArray(routeParams.slug) ? routeParams.slug[0] ?? "" : "";
+  const chartType = searchParams.get("type") === "panna" ? "panna" : "jodi";
+  const label =
+    searchParams.get("label") ??
+    slug.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
   const upperLabel = label.toUpperCase();
   const [chart, setChart] = useState<ChartPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,10 +40,17 @@ export default function PublicChartPage({
     let active = true;
 
     async function loadChart() {
+      if (!slug) {
+        if (active) {
+          setError("Invalid chart link");
+          setLoading(false);
+        }
+        return;
+      }
       try {
         setLoading(true);
         setError("");
-        const response = await fetch(`${API_BASE_URL}/api/charts/${params.slug}?type=${chartType}`, {
+        const response = await fetch(`/api/charts/${encodeURIComponent(slug)}?type=${chartType}`, {
           cache: "no-store"
         });
         const payload = await response.json();
@@ -70,10 +75,11 @@ export default function PublicChartPage({
     return () => {
       active = false;
     };
-  }, [params.slug, chartType]);
+  }, [slug, chartType]);
 
   const jodiRows = useMemo(() => normalizeJodiRows(chart?.rows ?? []), [chart]);
   const pannaRows = useMemo(() => normalizePannaRows(chart?.rows ?? []), [chart]);
+  const hasRows = hasRenderableChartRows(chart?.rows);
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#07101d_0%,#08111f_36%,#060a14_100%)] text-white">
@@ -90,10 +96,10 @@ export default function PublicChartPage({
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link href={`/charts/${params.slug}?type=jodi&label=${encodeURIComponent(label)}`} className={chartType === "jodi" ? "action-primary" : "action-secondary"}>
+              <Link href={`/charts/${slug}?type=jodi&label=${encodeURIComponent(label)}`} className={chartType === "jodi" ? "action-primary" : "action-secondary"}>
                 Jodi Chart
               </Link>
-              <Link href={`/charts/${params.slug}?type=panna&label=${encodeURIComponent(label)}`} className={chartType === "panna" ? "action-primary" : "action-secondary"}>
+              <Link href={`/charts/${slug}?type=panna&label=${encodeURIComponent(label)}`} className={chartType === "panna" ? "action-primary" : "action-secondary"}>
                 Panna Chart
               </Link>
               <Link href="/#markets" className="action-secondary">
@@ -115,8 +121,11 @@ export default function PublicChartPage({
           </div>
           {loading ? <div className="py-12 text-center text-slate-300">Loading chart...</div> : null}
           {!loading && error ? <div className="py-12 text-center font-semibold text-rose-300">{error}</div> : null}
+          {!loading && !error && !hasRows ? (
+            <div className="py-12 text-center text-slate-300">Chart data abhi available nahi hai. Thoda baad retry karo.</div>
+          ) : null}
 
-          {!loading && !error && chartType === "jodi" ? (
+          {!loading && !error && hasRows && chartType === "jodi" ? (
             <div className="overflow-x-auto rounded-[22px] border border-white/10 bg-white/[0.02]">
               <table className="w-full min-w-[720px] border-collapse text-center">
                 <thead>
@@ -143,7 +152,7 @@ export default function PublicChartPage({
             </div>
           ) : null}
 
-          {!loading && !error && chartType === "panna" ? (
+          {!loading && !error && hasRows && chartType === "panna" ? (
             <div className="overflow-x-auto rounded-[22px] border border-white/10 bg-white/[0.02]">
               <table className="w-full min-w-[980px] border-collapse text-center">
                 <thead>
@@ -181,7 +190,7 @@ export default function PublicChartPage({
             </div>
           ) : null}
 
-          {!loading && !error ? (
+          {!loading && !error && hasRows ? (
             <div className="mt-6 flex justify-center">
               <button
                 type="button"
@@ -196,6 +205,31 @@ export default function PublicChartPage({
       </main>
     </div>
   );
+}
+
+export default function PublicChartPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[linear-gradient(180deg,#07101d_0%,#08111f_36%,#060a14_100%)] text-white">
+          <main className="mx-auto flex w-full max-w-[1620px] flex-col gap-6 px-3 py-6 sm:px-5 sm:py-8 xl:px-6">
+            <div className="section-shell px-5 py-12 text-center text-slate-300">Loading chart...</div>
+          </main>
+        </div>
+      }
+    >
+      <ChartPageContent />
+    </Suspense>
+  );
+}
+
+function hasRenderableChartRows(rows: string[][] | undefined | null) {
+  return Array.isArray(rows) && rows.some((row) => Array.isArray(row) && row.slice(1).some((cell) => !isPlaceholderChartCell(cell)));
+}
+
+function isPlaceholderChartCell(value: string | undefined) {
+  const cleaned = String(value ?? "").trim();
+  return !cleaned || cleaned === "--" || cleaned === "---" || cleaned === "**" || cleaned === "***";
 }
 
 function normalizeJodiRows(rows: string[][]) {

@@ -40,7 +40,7 @@ export function SettingsPage({ apiBase, token, fetchApi, PageHeader, PageState }
           <label><span>Support Phone</span><input value={form.support_phone} onChange={(e) => setForm({ ...form, support_phone: e.target.value })} /></label>
           <label><span>Support Hours</span><input value={form.support_hours} onChange={(e) => setForm({ ...form, support_hours: e.target.value })} /></label>
           <label><span>Bonus Enabled</span><select value={form.bonus_enabled} onChange={(e) => setForm({ ...form, bonus_enabled: e.target.value })}><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
-          <label><span>Admin 2FA</span><select value={form.admin_two_factor_enabled} onChange={(e) => setForm({ ...form, admin_two_factor_enabled: e.target.value })}><option value="true">Required</option><option value="false">Disabled</option></select></label>
+          <label><span>Admin Authenticator 2FA</span><select value={form.admin_two_factor_enabled} onChange={(e) => setForm({ ...form, admin_two_factor_enabled: e.target.value })}><option value="true">Required</option><option value="false">Disabled</option></select></label>
           <label className="wide"><span>Bonus Text</span><input value={form.bonus_text} onChange={(e) => setForm({ ...form, bonus_text: e.target.value })} /></label>
         </div>
         <div className="actions"><button className="primary" onClick={save}>Save Settings</button></div>

@@ -1,8 +1,10 @@
 import { randomBytes } from "node:crypto";
-import { createAdminSession, createSession, findAdminById, findAdminByPhone, findUserByPhone, getAppSettings, requireAdminByToken, requireUserSnapshotByToken, verifyUserPassword } from "../stores/auth-store.mjs";
-import { issueOtp, verifyOtp } from "../routes/auth-otp.mjs";
+import { createAdminSession, createSession, findAdminById, findAdminByPhone, findUserByPhone, getAppSettings, requireAdminByToken, requireUserSnapshotByToken, updateAdminTwoFactorSecret, verifyUserPassword } from "../stores/auth-store.mjs";
+import { buildTotpSetupPayload, generateTotpSecret, verifyTotpCode } from "./totp-service.mjs";
 
 const adminTwoFactorChallenges = new Map();
+const ADMIN_TOTP_ISSUER = "Real Matka Admin";
+const ADMIN_TWO_FACTOR_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 
 function sanitizeSessionUser(user) {
   return {
@@ -59,12 +61,24 @@ export async function loginWithPassword(phone, password) {
 
     if (await isAdminTwoFactorEnabled() && adminAccount.adminTwoFactorEnabled !== false) {
       cleanupExpiredAdminTwoFactorChallenges();
-      const otpState = await issueOtp(adminAccount.adminPhone || adminAccount.phone, "admin_login");
+      let adminTwoFactorSecret = String(adminAccount.adminTwoFactorSecret || "").trim();
+      let setup = null;
+      if (!adminTwoFactorSecret) {
+        adminTwoFactorSecret = generateTotpSecret();
+        const updatedAdmin = await updateAdminTwoFactorSecret(adminAccount.adminId || adminAccount.id, adminTwoFactorSecret);
+        adminTwoFactorSecret = String(updatedAdmin?.adminTwoFactorSecret || adminTwoFactorSecret).trim();
+        setup = buildTotpSetupPayload({
+          secret: adminTwoFactorSecret,
+          issuer: ADMIN_TOTP_ISSUER,
+          accountName: adminAccount.adminPhone || adminAccount.phone
+        });
+      }
+
+      const expiresAt = new Date(Date.now() + ADMIN_TWO_FACTOR_CHALLENGE_TTL_MS).toISOString();
       const challengeId = `admin_2fa_${randomBytes(12).toString("hex")}`;
       adminTwoFactorChallenges.set(challengeId, {
         adminId: adminAccount.adminId || adminAccount.id,
-        phone: adminAccount.adminPhone || adminAccount.phone,
-        expiresAt: otpState.expiresAt
+        expiresAt
       });
 
       return {
@@ -72,9 +86,10 @@ export async function loginWithPassword(phone, password) {
         data: {
           requiresTwoFactor: true,
           challengeId,
-          expiresAt: otpState.expiresAt,
-          provider: otpState.provider,
-          devCode: otpState.devCode,
+          expiresAt,
+          provider: "authenticator",
+          setupRequired: Boolean(setup),
+          setup,
           user: {
             id: adminAccount.adminId || adminAccount.id,
             adminId: adminAccount.adminId || adminAccount.id,
@@ -134,18 +149,17 @@ export async function verifyAdminTwoFactorLogin(challengeId, otp) {
     return { ok: false, status: 400, error: "2FA challenge expired. Login again." };
   }
 
-  let valid = false;
-  try {
-    valid = await verifyOtp(challenge.phone, "admin_login", otp);
-  } catch (error) {
-    return { ok: false, status: 500, error: error instanceof Error ? error.message : "Unable to verify 2FA code" };
-  }
-
-  if (!valid) {
-    return { ok: false, status: 400, error: "Invalid or expired 2FA code" };
-  }
-
   const user = await findAdminById(challenge.adminId);
+  if (!user || !user.adminTwoFactorSecret) {
+    adminTwoFactorChallenges.delete(challengeId);
+    return { ok: false, status: 400, error: "Authenticator setup required. Login again." };
+  }
+
+  const valid = verifyTotpCode(user.adminTwoFactorSecret, otp);
+  if (!valid) {
+    return { ok: false, status: 400, error: "Invalid authenticator code" };
+  }
+
   adminTwoFactorChallenges.delete(challengeId);
 
   if (!user || user.adminId !== challenge.adminId || !["admin", "super_admin"].includes(String(user.role || "").toLowerCase())) {

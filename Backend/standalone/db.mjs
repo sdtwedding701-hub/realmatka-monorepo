@@ -418,8 +418,8 @@ async function ensureSeedAdminInPostgres(client, seedAdmin) {
   }
 
   await client.query(
-    `INSERT INTO admins (id, phone, password_hash, display_name, role, two_factor_enabled, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+    `INSERT INTO admins (id, phone, password_hash, display_name, role, two_factor_enabled, two_factor_secret, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, $7)
      ON CONFLICT (id) DO UPDATE SET
        phone = EXCLUDED.phone,
        password_hash = EXCLUDED.password_hash,
@@ -445,8 +445,8 @@ function ensureSeedAdminInSqlite(db, seedAdmin) {
   }
 
   db.prepare(
-    `INSERT INTO admins (id, phone, password_hash, display_name, role, two_factor_enabled, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO admins (id, phone, password_hash, display_name, role, two_factor_enabled, two_factor_secret, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        phone = excluded.phone,
        password_hash = excluded.password_hash,
@@ -762,6 +762,7 @@ async function ensurePostgresBootstrap(pool) {
           display_name TEXT NOT NULL,
           role TEXT NOT NULL DEFAULT 'admin',
           two_factor_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+          two_factor_secret TEXT,
           blocked_at TIMESTAMPTZ,
           deactivated_at TIMESTAMPTZ,
           created_at TIMESTAMPTZ NOT NULL,
@@ -818,6 +819,7 @@ async function ensurePostgresBootstrap(pool) {
       `);
       await client.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'admin'`);
       await client.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT TRUE`);
+      await client.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS two_factor_secret TEXT`);
       await client.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMPTZ`);
       await client.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ`);
       await client.query(`
@@ -1061,6 +1063,7 @@ function getSqlite() {
       display_name TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'admin',
       two_factor_enabled INTEGER NOT NULL DEFAULT 1,
+      two_factor_secret TEXT,
       blocked_at TEXT,
       deactivated_at TEXT,
       created_at TEXT NOT NULL,
@@ -1128,6 +1131,7 @@ function getSqlite() {
   ensureSqliteColumn(sqlite, "admin_accounts", "two_factor_enabled", "INTEGER NOT NULL DEFAULT 1");
   ensureSqliteColumn(sqlite, "admins", "role", "TEXT NOT NULL DEFAULT 'admin'");
   ensureSqliteColumn(sqlite, "admins", "two_factor_enabled", "INTEGER NOT NULL DEFAULT 1");
+  ensureSqliteColumn(sqlite, "admins", "two_factor_secret", "TEXT");
   ensureSqliteColumn(sqlite, "admins", "blocked_at", "TEXT");
   ensureSqliteColumn(sqlite, "admins", "deactivated_at", "TEXT");
   ensureSqliteIndexes(sqlite);

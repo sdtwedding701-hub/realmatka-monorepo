@@ -49,10 +49,15 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
           challengeId: data.challengeId,
           expiresAt: data.expiresAt,
           provider: data.provider,
-          devCode: data.devCode || ""
+          setupRequired: Boolean(data.setupRequired),
+          setup: data.setup || null
         });
         setOtp("");
-        setMessage(data.provider === "local" ? "2FA code generate ho gaya. OTP enter karo." : "2FA code phone par bhej diya gaya hai.");
+        setMessage(
+          data.setupRequired
+            ? "Authenticator setup complete karo aur app ka 6 digit code enter karo."
+            : "Authenticator app ka 6 digit code enter karo."
+        );
         return;
       }
       if (!isAllowedAdminRole(data.user?.role)) {
@@ -123,9 +128,17 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
           {challenge ? (
             <>
               <label>
-                <span>2FA Code</span>
+                <span>Authenticator Code</span>
                 <input autoFocus inputMode="numeric" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value)} type="text" />
               </label>
+              {challenge?.setupRequired && challenge?.setup ? (
+                <div className="sidebar-note login-note">
+                  <strong>Google Authenticator Setup</strong>
+                  <div>App me manual setup choose karo.</div>
+                  <div>Account: <strong>{challenge.setup.accountName}</strong></div>
+                  <div>Key: <strong>{challenge.setup.displaySecret}</strong></div>
+                </div>
+              ) : null}
               <div className="actions">
                 <button type="submit" className="primary">Verify 2FA</button>
                 <button
@@ -143,7 +156,6 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
             </>
           ) : <button type="submit" className="primary">Login</button>}
         </form>
-        {challenge?.provider === "local" && challenge?.devCode ? <p className="sidebar-note login-note">Local dev 2FA code: <strong>{challenge.devCode}</strong></p> : null}
         <p className="sidebar-note login-note">React dashboard core pages live hain. Legacy operator pages sidebar se open ho sakti hain.</p>
         <p className={`message ${message ? "error" : ""}`}>{message}</p>
       </section>

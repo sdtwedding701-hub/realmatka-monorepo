@@ -54,6 +54,7 @@ function mapAdminAccountRow(row) {
     passwordHash: row.password_hash,
     role: row.role ?? "admin",
     adminTwoFactorEnabled: row.two_factor_enabled == null ? true : Boolean(row.two_factor_enabled),
+    adminTwoFactorSecret: row.two_factor_secret ?? "",
     blockedAt: row.blocked_at ?? null,
     deactivatedAt: row.deactivated_at ?? null,
     approvalStatus: "Approved",
@@ -80,6 +81,7 @@ export async function findAdminByPhone(phone) {
          display_name,
          role,
          two_factor_enabled,
+         two_factor_secret,
          blocked_at,
          deactivated_at,
          created_at
@@ -99,6 +101,7 @@ export async function findAdminByPhone(phone) {
            display_name,
            role,
            two_factor_enabled,
+           two_factor_secret,
            blocked_at,
            deactivated_at,
            created_at
@@ -122,6 +125,7 @@ export async function findAdminById(adminId) {
          display_name,
          role,
          two_factor_enabled,
+         two_factor_secret,
          blocked_at,
          deactivated_at,
          created_at
@@ -141,6 +145,7 @@ export async function findAdminById(adminId) {
            display_name,
            role,
            two_factor_enabled,
+           two_factor_secret,
            blocked_at,
            deactivated_at,
            created_at
@@ -191,6 +196,42 @@ export async function createAdminSession(adminId) {
 
   __internalClearCachedAuthSession(tokenHash);
   return { rawToken, tokenHash, createdAt };
+}
+
+export async function updateAdminTwoFactorSecret(adminId, secret) {
+  const updatedAt = __internalNowIso();
+
+  try {
+    const pool = await __internalGetReadyPgPool();
+    const result = await pool.query(
+      `UPDATE admins
+       SET two_factor_secret = $2, updated_at = $3
+       WHERE id = $1
+       RETURNING
+         id,
+         phone,
+         password_hash,
+         display_name,
+         role,
+         two_factor_enabled,
+         two_factor_secret,
+         blocked_at,
+         deactivated_at,
+         created_at`,
+      [adminId, secret, updatedAt]
+    );
+    return mapAdminAccountRow(result.rows[0]);
+  } catch {
+    __internalGetSqlite()
+      .prepare(
+        `UPDATE admins
+         SET two_factor_secret = ?, updated_at = ?
+         WHERE id = ?`
+      )
+      .run(secret, updatedAt, adminId);
+
+    return findAdminById(adminId);
+  }
 }
 
 export async function createSession(userId) {

@@ -34,6 +34,7 @@ CREATE TABLE admins (
   display_name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'admin',
   two_factor_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  two_factor_secret TEXT,
   blocked_at TIMESTAMPTZ,
   deactivated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,

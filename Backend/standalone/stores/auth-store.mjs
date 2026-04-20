@@ -27,6 +27,11 @@ export async function findAdminById(adminId) {
   return findAdminByIdRecord(adminId);
 }
 
+export async function updateAdminTwoFactorSecret(adminId, secret) {
+  const { updateAdminTwoFactorSecret: updateAdminTwoFactorSecretRecord } = await import("../db/auth-db.mjs");
+  return updateAdminTwoFactorSecretRecord(adminId, secret);
+}
+
 export async function createSession(userId) {
   return createSessionRecord(userId);
 }

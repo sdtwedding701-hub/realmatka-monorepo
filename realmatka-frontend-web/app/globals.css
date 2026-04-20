@@ -65,7 +65,7 @@ body {
   }
 
   .action-button {
-    @apply px-4 py-2.5 text-[13px];
+    @apply px-4 py-3 text-[14px];
   }
 
   .rate-card {
@@ -73,22 +73,42 @@ body {
   }
 
   .market-card {
-    min-height: 224px;
+    min-height: 286px;
+  }
+
+  .market-card-mobile {
+    padding: 1.1rem;
+    border-radius: 1.2rem;
+  }
+
+  .market-tag-mobile {
+    font-size: 0.7rem;
+    line-height: 1rem;
+    padding: 0.38rem 0.65rem;
   }
 
   .market-name-text {
-    font-size: 1.5rem;
-    line-height: 1.9rem;
+    font-size: 1.72rem;
+    line-height: 2.05rem;
   }
 
   .market-result-text {
-    font-size: 1.2rem;
-    line-height: 1.6rem;
+    font-size: 1.28rem;
+    line-height: 1.75rem;
   }
 
   .market-time-text {
-    font-size: 1rem;
-    line-height: 1.45rem;
+    font-size: 1.08rem;
+    line-height: 1.55rem;
+  }
+
+  .market-actions-mobile {
+    gap: 0.7rem;
+  }
+
+  .market-button-mobile {
+    min-height: 46px;
+    font-size: 0.95rem;
   }
 
   .rates-grid-mobile {

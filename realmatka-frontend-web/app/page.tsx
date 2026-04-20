@@ -93,6 +93,63 @@ function slugifyMarket(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+function parseClockTimeToMinutes(value: string) {
+  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+  if (!match) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  let hours = Number(match[1]) % 12;
+  const minutes = Number(match[2]);
+  const meridiem = match[3].toUpperCase();
+  if (meridiem === "PM") {
+    hours += 12;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function getCurrentMinutes() {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+function sortMarketsByCurrentPhase(markets: MarketCard[]) {
+  const currentMinutes = getCurrentMinutes();
+
+  return [...markets].sort((left, right) => {
+    const leftOpen = parseClockTimeToMinutes(left.open);
+    const leftClose = parseClockTimeToMinutes(left.close);
+    const rightOpen = parseClockTimeToMinutes(right.open);
+    const rightClose = parseClockTimeToMinutes(right.close);
+
+    const leftBucket = currentMinutes < leftOpen ? 1 : currentMinutes < leftClose ? 0 : 2;
+    const rightBucket = currentMinutes < rightOpen ? 1 : currentMinutes < rightClose ? 0 : 2;
+
+    if (leftBucket !== rightBucket) {
+      return leftBucket - rightBucket;
+    }
+
+    if (leftBucket === 0 || leftBucket === 1) {
+      const leftAnchor = leftBucket === 0 ? leftClose : leftOpen;
+      const rightAnchor = rightBucket === 0 ? rightClose : rightOpen;
+      const diff = leftAnchor - rightAnchor;
+      if (diff !== 0) {
+        return diff;
+      }
+    }
+
+    if (leftBucket === 2) {
+      const diff = rightClose - leftClose;
+      if (diff !== 0) {
+        return diff;
+      }
+    }
+
+    return left.name.localeCompare(right.name);
+  });
+}
+
 async function loadMarkets(): Promise<MarketCard[]> {
   try {
     const response = await fetch(`${apiBaseUrl}/api/markets/list`, {
@@ -107,7 +164,7 @@ async function loadMarkets(): Promise<MarketCard[]> {
     const liveMarkets = Array.isArray(payload?.data) ? payload.data : [];
     const liveMap = new Map(liveMarkets.map((market) => [market.slug, market] as const));
 
-    return marketCatalog.map((fallback) => {
+    const syncedMarkets = marketCatalog.map((fallback) => {
       const live = liveMap.get(fallback.slug);
       return {
         slug: fallback.slug,
@@ -118,15 +175,16 @@ async function loadMarkets(): Promise<MarketCard[]> {
         tag: fallback.tag
       };
     });
+    return sortMarketsByCurrentPhase(syncedMarkets);
   } catch {
-    return marketCatalog.map((fallback) => ({
+    return sortMarketsByCurrentPhase(marketCatalog.map((fallback) => ({
       slug: fallback.slug,
       name: fallback.name,
       result: "***-**-***",
       open: fallback.open,
       close: fallback.close,
       tag: fallback.tag
-    }));
+    })));
   }
 }
 
@@ -192,10 +250,10 @@ export default async function HomePage() {
 
           <div className="grid gap-4 xl:grid-cols-3">
             {markets.map((market) => (
-              <div key={market.slug} className="glass-card market-card p-5">
+              <div key={market.slug} className="glass-card market-card market-card-mobile p-5">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">
+                    <span className="market-tag-mobile inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">
                       {market.tag}
                     </span>
                   </div>
@@ -203,11 +261,11 @@ export default async function HomePage() {
                   <p className="market-result-text mt-3 font-extrabold text-orange-200">Result: {market.result}</p>
                   <p className="market-time-text mt-3 font-semibold text-slate-300">Open {market.open} • Close {market.close}</p>
                 </div>
-                <div className="mt-5 grid grid-cols-2 gap-2">
-                  <a href={`/charts/${slugifyMarket(market.name)}?type=jodi&label=${encodeURIComponent(market.name)}`} className="action-secondary w-full justify-center text-center">Jodi Chart</a>
-                  <a href={`/charts/${slugifyMarket(market.name)}?type=panna&label=${encodeURIComponent(market.name)}`} className="action-secondary w-full justify-center text-center">Panna Chart</a>
+                <div className="market-actions-mobile mt-5 grid grid-cols-2 gap-2">
+                  <a href={`/charts/${slugifyMarket(market.name)}?type=jodi&label=${encodeURIComponent(market.name)}`} className="action-secondary market-button-mobile w-full justify-center text-center">Jodi Chart</a>
+                  <a href={`/charts/${slugifyMarket(market.name)}?type=panna&label=${encodeURIComponent(market.name)}`} className="action-secondary market-button-mobile w-full justify-center text-center">Panna Chart</a>
                 </div>
-                <a href={loginUrl} target="_blank" rel="noreferrer" className="action-primary mt-4 w-full justify-center text-center">Play Now</a>
+                <a href={loginUrl} target="_blank" rel="noreferrer" className="action-primary market-button-mobile mt-4 w-full justify-center text-center">Play Now</a>
               </div>
             ))}
           </div>

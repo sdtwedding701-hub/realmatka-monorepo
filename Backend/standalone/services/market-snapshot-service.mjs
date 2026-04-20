@@ -5,6 +5,67 @@ const MARKET_SNAPSHOT_TTL_MS = 60_000;
 let marketSnapshotCache = null;
 let marketSnapshotPromise = null;
 
+function parseClockTimeToMinutes(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+  if (!match) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  let hours = Number(match[1]) % 12;
+  const minutes = Number(match[2]);
+  const meridiem = match[3].toUpperCase();
+  if (meridiem === "PM") {
+    hours += 12;
+  }
+  return hours * 60 + minutes;
+}
+
+function getCurrentMinutes() {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+function getMarketPhaseMeta(market, currentMinutes) {
+  const openMinutes = parseClockTimeToMinutes(market?.open);
+  const closeMinutes = parseClockTimeToMinutes(market?.close);
+
+  if (currentMinutes < openMinutes) {
+    return { sortBucket: 1, anchor: openMinutes };
+  }
+  if (currentMinutes < closeMinutes) {
+    return { sortBucket: 0, anchor: closeMinutes };
+  }
+  return { sortBucket: 2, anchor: closeMinutes };
+}
+
+function sortMarketsByCurrentPhase(markets) {
+  const currentMinutes = getCurrentMinutes();
+  return [...markets].sort((left, right) => {
+    const leftMeta = getMarketPhaseMeta(left, currentMinutes);
+    const rightMeta = getMarketPhaseMeta(right, currentMinutes);
+
+    if (leftMeta.sortBucket !== rightMeta.sortBucket) {
+      return leftMeta.sortBucket - rightMeta.sortBucket;
+    }
+
+    if (leftMeta.sortBucket === 0 || leftMeta.sortBucket === 1) {
+      const diff = leftMeta.anchor - rightMeta.anchor;
+      if (diff !== 0) {
+        return diff;
+      }
+    }
+
+    if (leftMeta.sortBucket === 2) {
+      const diff = rightMeta.anchor - leftMeta.anchor;
+      if (diff !== 0) {
+        return diff;
+      }
+    }
+
+    return String(left?.name || "").localeCompare(String(right?.name || ""));
+  });
+}
+
 function parseResult(result) {
   const parts = String(result ?? "").trim().split("-");
   return {
@@ -131,7 +192,7 @@ async function buildMarketSnapshot() {
     );
   }
 
-  return decoratedMarkets;
+  return sortMarketsByCurrentPhase(decoratedMarkets);
 }
 
 export function invalidateMarketListSnapshot() {

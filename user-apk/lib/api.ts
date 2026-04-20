@@ -179,7 +179,7 @@ function getApiBaseUrl() {
     return configuredFromEnv;
   }
 
-  return "https://realmatka-monorepo-production.up.railway.app";
+  return "https://api.realmatka.in";
 }
 
 export function setAuthFailureListener(listener: AuthFailureListener | null) {

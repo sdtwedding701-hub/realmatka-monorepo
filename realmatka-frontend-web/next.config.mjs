@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const backendBase = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "https://realmatka-monorepo-production.up.railway.app"
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.realmatka.in"
 ).replace(/\/$/, "");
 
 const nextConfig = {

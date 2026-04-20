@@ -56,10 +56,6 @@ function isPlaceholderResult(result) {
 }
 
 function deriveTodayResultFromCharts(market, jodiChart, pannaChart) {
-  if (!isPlaceholderResult(market?.result)) {
-    return String(market.result).trim();
-  }
-
   const currentDayIndex = getWeekdayIndex(new Date());
   const jodiRow = getCurrentChartRow(jodiChart?.rows);
   const pannaRow = getCurrentChartRow(pannaChart?.rows);
@@ -78,7 +74,7 @@ function deriveTodayResultFromCharts(market, jodiChart, pannaChart) {
     return `${openPanna}-${jodi}-***`;
   }
 
-  return String(market?.result ?? "").trim();
+  return "***-**-***";
 }
 
 function buildChartLookup(charts) {
@@ -95,12 +91,15 @@ function buildChartLookup(charts) {
 }
 
 function decorateMarketWithLookup(market, chartLookup) {
-  if (!market || !isPlaceholderResult(market.result)) {
+  if (!market) {
     return market;
   }
 
   const jodiChart = chartLookup.get(`${market.slug}:jodi`) ?? null;
   const pannaChart = chartLookup.get(`${market.slug}:panna`) ?? null;
+  if (!jodiChart || !pannaChart) {
+    return market;
+  }
 
   return {
     ...market,
@@ -110,14 +109,12 @@ function decorateMarketWithLookup(market, chartLookup) {
 
 async function buildMarketSnapshot() {
   const markets = await listMarkets();
-  const placeholderMarkets = markets.filter((market) => isPlaceholderResult(market?.result));
-
-  if (!placeholderMarkets.length) {
+  if (!markets.length) {
     return markets;
   }
 
   const charts = await getChartRecordsForMarkets(
-    placeholderMarkets.map((market) => market.slug),
+    markets.map((market) => market.slug),
     ["jodi", "panna"]
   );
   const chartLookup = buildChartLookup(charts);
@@ -175,7 +172,7 @@ export async function getDecoratedMarketBySlug(slug) {
   }
 
   const sourceMarket = (await listMarkets()).find((item) => item.slug === slug) ?? null;
-  if (!sourceMarket || !isPlaceholderResult(sourceMarket.result)) {
+  if (!sourceMarket) {
     return sourceMarket;
   }
 

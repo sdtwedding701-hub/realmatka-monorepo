@@ -15,7 +15,7 @@ const webFaviconPath = process.env.EXPO_PUBLIC_WEB_FAVICON || "./assets/images/a
 const appBuildProfile = process.env.APP_BUILD_PROFILE || "development";
 const webOutput = process.env.EXPO_PUBLIC_WEB_OUTPUT || "single";
 const productionApiBaseUrl =
-  process.env.EXPO_PUBLIC_API_BASE_URL_PRODUCTION || "https://realmatka-monorepo-production.up.railway.app";
+  process.env.EXPO_PUBLIC_API_BASE_URL_PRODUCTION || "https://api.realmatka.in";
 const localApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_APP_URL || "";
 const apiBaseUrl = ["preview", "production"].includes(appBuildProfile) ? productionApiBaseUrl : localApiBaseUrl;
 

@@ -62,17 +62,18 @@ export async function loginWithPassword(phone, password) {
     if (await isAdminTwoFactorEnabled() && adminAccount.adminTwoFactorEnabled !== false) {
       cleanupExpiredAdminTwoFactorChallenges();
       let adminTwoFactorSecret = String(adminAccount.adminTwoFactorSecret || "").trim();
-      let setup = null;
+      let setupRequired = false;
       if (!adminTwoFactorSecret) {
         adminTwoFactorSecret = generateTotpSecret();
         const updatedAdmin = await updateAdminTwoFactorSecret(adminAccount.adminId || adminAccount.id, adminTwoFactorSecret);
         adminTwoFactorSecret = String(updatedAdmin?.adminTwoFactorSecret || adminTwoFactorSecret).trim();
-        setup = buildTotpSetupPayload({
-          secret: adminTwoFactorSecret,
-          issuer: ADMIN_TOTP_ISSUER,
-          accountName: adminAccount.adminPhone || adminAccount.phone
-        });
+        setupRequired = true;
       }
+      const setup = buildTotpSetupPayload({
+        secret: adminTwoFactorSecret,
+        issuer: ADMIN_TOTP_ISSUER,
+        accountName: adminAccount.adminPhone || adminAccount.phone
+      });
 
       const expiresAt = new Date(Date.now() + ADMIN_TWO_FACTOR_CHALLENGE_TTL_MS).toISOString();
       const challengeId = `admin_2fa_${randomBytes(12).toString("hex")}`;
@@ -88,7 +89,7 @@ export async function loginWithPassword(phone, password) {
           challengeId,
           expiresAt,
           provider: "authenticator",
-          setupRequired: Boolean(setup),
+          setupRequired,
           setup,
           user: {
             id: adminAccount.adminId || adminAccount.id,

@@ -56,7 +56,7 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
         setMessage(
           data.setupRequired
             ? "Authenticator setup complete karo aur app ka 6 digit code enter karo."
-            : "Authenticator app ka 6 digit code enter karo."
+            : "Authenticator app ka 6 digit code enter karo. Agar account add nahi hai to niche wali key se setup kar lo."
         );
         return;
       }
@@ -131,9 +131,9 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
                 <span>Authenticator Code</span>
                 <input autoFocus inputMode="numeric" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value)} type="text" />
               </label>
-              {challenge?.setupRequired && challenge?.setup ? (
+              {challenge?.setup ? (
                 <div className="sidebar-note login-note">
-                  <strong>Google Authenticator Setup</strong>
+                  <strong>{challenge.setupRequired ? "Google Authenticator Setup" : "Authenticator Setup Key"}</strong>
                   <div>App me manual setup choose karo.</div>
                   <div>Account: <strong>{challenge.setup.accountName}</strong></div>
                   <div>Key: <strong>{challenge.setup.displaySecret}</strong></div>

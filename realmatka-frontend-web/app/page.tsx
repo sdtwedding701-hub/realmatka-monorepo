@@ -1,6 +1,7 @@
 const webAppBaseUrl = "https://play.realmatka.in";
 const loginUrl = `${webAppBaseUrl}/auth/login`;
 const registerUrl = `${webAppBaseUrl}/auth/register`;
+const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.realmatka.in").replace(/\/$/, "");
 
 const rates = [
   { name: "Single Digit", rate: "10" },
@@ -11,49 +12,43 @@ const rates = [
   { name: "Triple Pana", rate: "1000" },
   { name: "Half Sangam", rate: "1000" },
   { name: "Full Sangam", rate: "10000" }
-];
+] as const;
 
-const markets = [
-  { name: "Mangal Bazar", result: "***-**-***", open: "08:45 AM", close: "11:45 AM", tag: "Morning" },
-  { name: "NTR Morning", result: "***-**-***", open: "09:30 AM", close: "11:35 AM", tag: "Morning" },
-  { name: "Sita Morning", result: "***-**-***", open: "10:15 AM", close: "11:15 AM", tag: "Morning" },
-  { name: "Karnataka Day", result: "***-**-***", open: "10:30 AM", close: "12:30 PM", tag: "Day" },
-  { name: "Star Tara Morning", result: "***-**-***", open: "11:10 AM", close: "12:10 PM", tag: "Morning" },
-  { name: "Milan Morning", result: "***-**-***", open: "11:30 AM", close: "12:30 PM", tag: "Morning" },
-  { name: "Maya Bazar", result: "***-**-***", open: "11:45 AM", close: "01:45 PM", tag: "Day" },
-  { name: "Andhra Morning", result: "***-**-***", open: "12:15 PM", close: "02:15 PM", tag: "Day" },
-  { name: "Sridevi", result: "***-**-***", open: "01:30 PM", close: "03:30 PM", tag: "Day" },
-  { name: "Mahadevi Morning", result: "***-**-***", open: "09:45 AM", close: "12:45 PM", tag: "Live" },
-  { name: "Time Bazar", result: "***-**-***", open: "01:00 PM", close: "02:00 PM", tag: "Main" },
-  { name: "Madhur Day", result: "***-**-***", open: "02:00 PM", close: "04:00 PM", tag: "Day" },
-  { name: "Sita Day", result: "***-**-***", open: "02:15 PM", close: "04:15 PM", tag: "Day" },
-  { name: "Star Tara Day", result: "***-**-***", open: "03:00 PM", close: "05:00 PM", tag: "Day" },
-  { name: "NTR Bazar", result: "***-**-***", open: "03:15 PM", close: "05:15 PM", tag: "Day" },
-  { name: "Milan Day", result: "***-**-***", open: "03:30 PM", close: "05:30 PM", tag: "Day" },
-  { name: "Rajdhani Day", result: "***-**-***", open: "03:45 PM", close: "05:45 PM", tag: "Day" },
-  { name: "Andhra Day", result: "***-**-***", open: "04:00 PM", close: "06:00 PM", tag: "Day" },
-  { name: "Kalyan", result: "***-**-***", open: "04:10 PM", close: "06:10 PM", tag: "Popular" },
-  { name: "Mahadevi", result: "***-**-***", open: "05:00 PM", close: "07:00 PM", tag: "Evening" },
-  { name: "NTR Day", result: "***-**-***", open: "05:30 PM", close: "07:30 PM", tag: "Evening" },
-  { name: "Sita Night", result: "***-**-***", open: "06:00 PM", close: "08:00 PM", tag: "Night" },
-  { name: "Sridevi Night", result: "***-**-***", open: "06:30 PM", close: "08:30 PM", tag: "Night" },
-  { name: "Star Tara Night", result: "***-**-***", open: "07:00 PM", close: "09:00 PM", tag: "Night" },
-  { name: "Mahadevi Night", result: "***-**-***", open: "07:30 PM", close: "09:30 PM", tag: "Night" },
-  { name: "Madhur Night", result: "***-**-***", open: "08:00 PM", close: "10:00 PM", tag: "Night" },
-  { name: "Andhra Night", result: "***-**-***", open: "08:15 PM", close: "10:15 PM", tag: "Night" },
-  { name: "Supreme Night", result: "***-**-***", open: "08:30 PM", close: "10:30 PM", tag: "Night" },
-  { name: "NTR Night", result: "***-**-***", open: "08:45 PM", close: "10:45 PM", tag: "Night" },
-  { name: "Milan Night", result: "***-**-***", open: "09:00 PM", close: "11:00 PM", tag: "Night" },
-  { name: "Kalyan Night", result: "***-**-***", open: "09:15 PM", close: "11:15 PM", tag: "Prime" },
-  { name: "Rajdhani Night", result: "***-**-***", open: "09:30 PM", close: "11:30 PM", tag: "Night" },
-  { name: "Main Bazar", result: "***-**-***", open: "09:00 PM", close: "11:55 PM", tag: "Prime" },
-  { name: "Bharat Starline", result: "***-**-***", open: "11:15 AM", close: "11:45 AM", tag: "Starline" },
-  { name: "Bharat Jackpot", result: "***-**-***", open: "12:15 PM", close: "12:45 PM", tag: "Jackpot" }
-];
-
-function slugifyMarket(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
+const marketCatalog = [
+  { slug: "ntr-morning", name: "NTR Morning", open: "09:00 AM", close: "10:00 AM", tag: "Games" },
+  { slug: "sita-morning", name: "Sita Morning", open: "09:40 AM", close: "10:40 AM", tag: "Games" },
+  { slug: "karnataka-day", name: "Karnataka Day", open: "09:55 AM", close: "10:55 AM", tag: "Games" },
+  { slug: "star-tara-morning", name: "Star Tara Morning", open: "10:05 AM", close: "11:05 AM", tag: "Games" },
+  { slug: "milan-morning", name: "Milan Morning", open: "10:10 AM", close: "11:10 AM", tag: "Games" },
+  { slug: "maya-bazar", name: "Maya Bazar", open: "10:15 AM", close: "11:15 AM", tag: "Games" },
+  { slug: "andhra-morning", name: "Andhra Morning", open: "10:35 AM", close: "11:35 AM", tag: "Games" },
+  { slug: "sridevi", name: "Sridevi", open: "11:25 AM", close: "12:25 PM", tag: "Games" },
+  { slug: "mahadevi-morning", name: "Mahadevi Morning", open: "11:40 AM", close: "12:40 PM", tag: "Games" },
+  { slug: "time-bazar", name: "Time Bazar", open: "12:45 PM", close: "01:45 PM", tag: "Games" },
+  { slug: "madhur-day", name: "Madhur Day", open: "01:20 PM", close: "02:20 PM", tag: "Games" },
+  { slug: "sita-day", name: "Sita Day", open: "01:40 PM", close: "02:40 PM", tag: "Games" },
+  { slug: "star-tara-day", name: "Star Tara Day", open: "02:15 PM", close: "03:15 PM", tag: "Games" },
+  { slug: "ntr-bazar", name: "NTR Bazar", open: "02:45 PM", close: "03:50 PM", tag: "Games" },
+  { slug: "milan-day", name: "Milan Day", open: "02:45 PM", close: "04:45 PM", tag: "Games" },
+  { slug: "rajdhani-day", name: "Rajdhani Day", open: "03:00 PM", close: "05:00 PM", tag: "Games" },
+  { slug: "andhra-day", name: "Andhra Day", open: "03:30 PM", close: "05:30 PM", tag: "Games" },
+  { slug: "kalyan", name: "Kalyan", open: "04:10 PM", close: "06:10 PM", tag: "Games" },
+  { slug: "mahadevi", name: "Mahadevi", open: "04:25 PM", close: "06:25 PM", tag: "Games" },
+  { slug: "ntr-day", name: "NTR Day", open: "04:50 PM", close: "06:50 PM", tag: "Games" },
+  { slug: "sita-night", name: "Sita Night", open: "06:40 PM", close: "07:40 PM", tag: "Games" },
+  { slug: "sridevi-night", name: "Sridevi Night", open: "07:05 PM", close: "08:05 PM", tag: "Games" },
+  { slug: "star-tara-night", name: "Star Tara Night", open: "07:15 PM", close: "08:15 PM", tag: "Games" },
+  { slug: "mahadevi-night", name: "Mahadevi Night", open: "07:45 PM", close: "08:45 PM", tag: "Games" },
+  { slug: "madhur-night", name: "Madhur Night", open: "08:20 PM", close: "10:20 PM", tag: "Games" },
+  { slug: "supreme-night", name: "Supreme Night", open: "08:35 PM", close: "10:35 PM", tag: "Games" },
+  { slug: "andhra-night", name: "Andhra Night", open: "08:40 PM", close: "10:40 PM", tag: "Games" },
+  { slug: "ntr-night", name: "NTR Night", open: "08:50 PM", close: "10:50 PM", tag: "Games" },
+  { slug: "milan-night", name: "Milan Night", open: "08:50 PM", close: "10:50 PM", tag: "Games" },
+  { slug: "kalyan-night", name: "Kalyan Night", open: "09:25 PM", close: "11:25 PM", tag: "Games" },
+  { slug: "rajdhani-night", name: "Rajdhani Night", open: "09:30 PM", close: "11:40 PM", tag: "Games" },
+  { slug: "main-bazar", name: "Main Bazar", open: "09:45 PM", close: "11:55 PM", tag: "Games" },
+  { slug: "mangal-bazar", name: "Mangal Bazar", open: "10:05 PM", close: "11:05 PM", tag: "Games" }
+] as const;
 
 const games = [
   "Single Digit",
@@ -71,9 +66,73 @@ const games = [
   "Panel Group",
   "Cycle Pana",
   "Choice Pana"
-];
+] as const;
 
-export default function HomePage() {
+type LiveMarket = {
+  id?: string;
+  slug: string;
+  name?: string;
+  result?: string;
+  status?: string;
+  action?: string;
+  open?: string;
+  close?: string;
+  category?: string;
+};
+
+type MarketCard = {
+  slug: string;
+  name: string;
+  result: string;
+  open: string;
+  close: string;
+  tag: string;
+};
+
+function slugifyMarket(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+async function loadMarkets(): Promise<MarketCard[]> {
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/markets/list`, {
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      throw new Error(`Markets request failed: ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { ok?: boolean; data?: LiveMarket[] };
+    const liveMarkets = Array.isArray(payload?.data) ? payload.data : [];
+    const liveMap = new Map(liveMarkets.map((market) => [market.slug, market] as const));
+
+    return marketCatalog.map((fallback) => {
+      const live = liveMap.get(fallback.slug);
+      return {
+        slug: fallback.slug,
+        name: live?.name?.trim() || fallback.name,
+        result: live?.result?.trim() || "***-**-***",
+        open: live?.open?.trim() || fallback.open,
+        close: live?.close?.trim() || fallback.close,
+        tag: fallback.tag
+      };
+    });
+  } catch {
+    return marketCatalog.map((fallback) => ({
+      slug: fallback.slug,
+      name: fallback.name,
+      result: "***-**-***",
+      open: fallback.open,
+      close: fallback.close,
+      tag: fallback.tag
+    }));
+  }
+}
+
+export default async function HomePage() {
+  const markets = await loadMarkets();
+
   return (
     <div className="min-h-screen text-white">
       <main className="mx-auto flex w-full max-w-[1620px] flex-col gap-6 px-3 py-6 sm:px-5 sm:py-8 xl:px-6">
@@ -100,7 +159,7 @@ export default function HomePage() {
             <div className="text-2xl font-extrabold sm:text-3xl">Game Rate</div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <div className="rates-grid-mobile grid grid-cols-2 gap-3 xl:grid-cols-4">
             {rates.map((rate) => (
               <div key={rate.name} className="glass-card rate-card p-4 sm:p-5">
                 <div className="text-lg font-extrabold sm:text-xl">{rate.name}</div>
@@ -115,7 +174,7 @@ export default function HomePage() {
             <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Available Games</div>
             <h2 className="mt-2 text-2xl font-extrabold sm:text-3xl">Har popular game board ek hi place par</h2>
           </div>
-          <div className="grid grid-cols-3 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          <div className="popular-games-grid-mobile grid grid-cols-3 gap-3 md:grid-cols-3 xl:grid-cols-5">
             {games.map((game) => (
               <div key={game} className="glass-card p-4 text-sm font-semibold text-slate-100">{game}</div>
             ))}
@@ -126,26 +185,29 @@ export default function HomePage() {
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">All Markets</div>
-              <h2 className="mt-2 text-2xl font-extrabold sm:text-3xl">Sabhi market ab landing page par visible</h2>
+              <h2 className="mt-2 text-2xl font-extrabold sm:text-3xl">Same 33 market list jo app me dikh rahi hai</h2>
             </div>
             <a href={registerUrl} className="action-secondary w-full justify-center sm:w-auto">Register Now</a>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-3">
             {markets.map((market) => (
-              <div key={market.name} className="glass-card market-card p-5">
+              <div key={market.slug} className="glass-card market-card p-5">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-xl font-extrabold sm:text-2xl">{market.name}</h3>
+                    <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">
+                      {market.tag}
+                    </span>
                   </div>
-                  <p className="mt-2 text-sm font-semibold text-slate-300">Result: {market.result}</p>
-                  <p className="mt-3 text-sm text-slate-400">Open {market.open} • Close {market.close}</p>
+                  <h3 className="market-name-text mt-4 font-extrabold uppercase text-white">{market.name}</h3>
+                  <p className="market-result-text mt-3 font-extrabold text-orange-200">Result: {market.result}</p>
+                  <p className="market-time-text mt-3 font-semibold text-slate-300">Open {market.open} • Close {market.close}</p>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="mt-5 grid grid-cols-2 gap-2">
                   <a href={`/charts/${slugifyMarket(market.name)}?type=jodi&label=${encodeURIComponent(market.name)}`} className="action-secondary w-full justify-center text-center">Jodi Chart</a>
                   <a href={`/charts/${slugifyMarket(market.name)}?type=panna&label=${encodeURIComponent(market.name)}`} className="action-secondary w-full justify-center text-center">Panna Chart</a>
                 </div>
-                <button type="button" className="action-primary mt-4 w-full justify-center text-center">Play Now</button>
+                <a href={loginUrl} target="_blank" rel="noreferrer" className="action-primary mt-4 w-full justify-center text-center">Play Now</a>
               </div>
             ))}
           </div>

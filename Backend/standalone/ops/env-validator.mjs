@@ -26,9 +26,15 @@ export function validateEnvironment() {
     paymentsEnabled: Boolean(process.env.RAZORPAY_KEY_ID?.trim() && process.env.RAZORPAY_KEY_SECRET?.trim()),
     paymentWebhooksEnabled: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET?.trim())
   };
+  const hasEnvAdminPhone = Boolean(standaloneConfig.envAdminPhone);
+  const hasEnvAdminPassword = Boolean(standaloneConfig.envAdminPassword);
 
   if (!Number.isFinite(standaloneConfig.port) || standaloneConfig.port <= 0) {
     errors.push("PORT must be a valid positive number");
+  }
+
+  if ((hasEnvAdminPhone || hasEnvAdminPassword) && !(hasEnvAdminPhone && hasEnvAdminPassword)) {
+    errors.push("ADMIN_PHONE and ADMIN_PASSWORD must both be set together");
   }
 
   if (isStandalonePostgresEnabled() && !standaloneConfig.databaseUrl) {

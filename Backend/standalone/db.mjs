@@ -57,6 +57,18 @@ let pgPool = null;
 let pgBootstrapPromise = null;
 
 function getDefaultSeedAdmin() {
+  if (standaloneConfig.envAdminPhone && standaloneConfig.envAdminPassword) {
+    return {
+      id: "admin_1",
+      phone: standaloneConfig.envAdminPhone,
+      passwordHash: hashSecret(standaloneConfig.envAdminPassword),
+      displayName: standaloneConfig.envAdminName,
+      createdAt: "2025-04-12T10:00:00.000Z",
+      role: "admin",
+      twoFactorEnabled: true
+    };
+  }
+
   if (!standaloneConfig.allowDefaultAdminSeed) {
     return null;
   }

@@ -29,6 +29,9 @@ Important variables:
 
 - `DATABASE_PROVIDER=postgres`
 - `DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/realmatka`
+- `ADMIN_PHONE=9309782081`
+- `ADMIN_PASSWORD=your_admin_password`
+- `ADMIN_NAME=Siddhant Admin`
 - `EXPO_PUBLIC_API_BASE_URL=http://localhost:3000`
 - `EXPO_PUBLIC_APP_URL=http://localhost:8081`
 - `ADMIN_DOMAIN=http://localhost:5501`
@@ -50,7 +53,24 @@ Current backend already supports these OTP flows:
 - register OTP
 - forgot password OTP
 - withdraw OTP
-- admin 2FA OTP
+- admin authenticator 2FA
+
+## Admin credentials from env
+
+If you set these backend env vars, backend startup will automatically upsert the main admin account from env:
+
+```env
+ADMIN_PHONE=9309782081
+ADMIN_PASSWORD=621356
+ADMIN_NAME=Siddhant Admin
+```
+
+Notes:
+
+- backend plain password ko login time par compare nahi karta, startup par uska secure hash store hota hai
+- agar aap env me `ADMIN_PASSWORD` change karte ho aur backend restart/redeploy karte ho, admin login password update ho jayega
+- `ADMIN_PHONE` aur `ADMIN_PASSWORD` dono saath me set hone chahiye
+- production me default seed admin off reh sakta hai, but explicit env admin allowed hai
 
 ### Local/dev mode
 

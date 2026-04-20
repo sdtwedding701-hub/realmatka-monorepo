@@ -265,6 +265,12 @@ function normalizeChartRowsForStorage(chartType, rows) {
   return sortChartRowsChronologicallyForRows(Array.from(merged.values()));
 }
 
+function hasMeaningfulChartRows(rows) {
+  return (Array.isArray(rows) ? rows : []).some(
+    (row) => Array.isArray(row) && row.slice(1).some((cell) => !isPlaceholderChartCellForRows(cell))
+  );
+}
+
 function loadChartSeedPayloads() {
   const payloadBySlug = new Map();
   for (const dirPath of chartDataDirs) {
@@ -302,6 +308,17 @@ async function syncChartsFromFilesToPostgres(client) {
   for (const payload of chartPayloads) {
     for (const chartType of ["jodi", "panna"]) {
       const normalizedRows = normalizeChartRowsForStorage(chartType, payload[chartType]);
+      const existing = await client.query(
+        `SELECT rows_json
+         FROM charts
+         WHERE market_slug = $1 AND chart_type = $2
+         LIMIT 1`,
+        [payload.slug, chartType]
+      );
+      const existingRows = normalizeChartRowsForStorage(chartType, toChartRows(existing.rows[0]?.rows_json));
+      if (hasMeaningfulChartRows(existingRows)) {
+        continue;
+      }
       await client.query(
         `INSERT INTO charts (market_slug, chart_type, rows_json)
          VALUES ($1, $2, $3)
@@ -318,11 +335,22 @@ function syncChartsFromFilesToSqlite(db) {
      VALUES (?, ?, ?)
      ON CONFLICT(market_slug, chart_type) DO UPDATE SET rows_json = excluded.rows_json`
   );
+  const selectExistingStatement = db.prepare(
+    `SELECT rows_json
+     FROM charts
+     WHERE market_slug = ? AND chart_type = ?
+     LIMIT 1`
+  );
   const chartPayloads = loadChartSeedPayloads();
 
   for (const payload of chartPayloads) {
     for (const chartType of ["jodi", "panna"]) {
       const normalizedRows = normalizeChartRowsForStorage(chartType, payload[chartType]);
+      const existing = selectExistingStatement.get(payload.slug, chartType);
+      const existingRows = normalizeChartRowsForStorage(chartType, toChartRows(existing?.rows_json));
+      if (hasMeaningfulChartRows(existingRows)) {
+        continue;
+      }
       upsertChartStatement.run(payload.slug, chartType, JSON.stringify(normalizedRows));
     }
   }

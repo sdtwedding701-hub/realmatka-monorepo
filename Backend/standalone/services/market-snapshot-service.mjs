@@ -1,4 +1,4 @@
-import { getChartRecord, getChartRecordsForMarkets, listMarkets } from "../stores/market-store.mjs";
+import { getChartRecord, getChartRecordsForMarkets, listMarkets, updateMarketRecord } from "../stores/market-store.mjs";
 
 const MARKET_SNAPSHOT_TTL_MS = 60_000;
 
@@ -118,7 +118,20 @@ async function buildMarketSnapshot() {
     ["jodi", "panna"]
   );
   const chartLookup = buildChartLookup(charts);
-  return markets.map((market) => decorateMarketWithLookup(market, chartLookup));
+  const decoratedMarkets = markets.map((market) => decorateMarketWithLookup(market, chartLookup));
+
+  const changedResults = decoratedMarkets.filter(
+    (market, index) => String(market?.result ?? "").trim() !== String(markets[index]?.result ?? "").trim()
+  );
+  if (changedResults.length) {
+    await Promise.all(
+      changedResults.map((market) =>
+        updateMarketRecord(market.slug, { result: String(market.result ?? "***-**-***") }).catch(() => null)
+      )
+    );
+  }
+
+  return decoratedMarkets;
 }
 
 export function invalidateMarketListSnapshot() {

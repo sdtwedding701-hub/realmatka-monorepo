@@ -1,6 +1,22 @@
+import { getAppSettings, upsertAppSetting } from "../stores/admin-store.mjs";
 import { getChartRecord, getChartRecordsForMarkets, listMarkets, updateMarketRecord } from "../stores/market-store.mjs";
 
 const MARKET_SNAPSHOT_TTL_MS = 60_000;
+const MARKET_RESULT_RESET_AFTER_MINUTES = 60;
+const MARKET_RESULT_RESET_SETTING_KEY = "market_results_reset_day_india";
+const WEEKDAY_OFF_BY_SLUG = new Map([
+  ["kalyan-night", new Set([0, 6])],
+  ["main-bazar", new Set([0, 6])],
+  ["maya-bazar", new Set([0, 6])],
+  ["rajdhani-night", new Set([0, 6])],
+  ["kalyan", new Set([0])],
+  ["madhur-night", new Set([0])],
+  ["mangal-bazar", new Set([0])],
+  ["milan-day", new Set([0])],
+  ["milan-night", new Set([0])],
+  ["rajdhani-day", new Set([0])],
+  ["time-bazar", new Set([0])]
+]);
 
 let marketSnapshotCache = null;
 let marketSnapshotPromise = null;
@@ -46,7 +62,82 @@ function getCurrentMinutes() {
   return now.getHours() * 60 + now.getMinutes();
 }
 
+function getIndiaDateKey(date = getIndiaNow()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getIndiaWeekday(date = getIndiaNow()) {
+  return new Date(date).getDay();
+}
+
+function isMarketWeeklyOff(market, date = getIndiaNow()) {
+  const offDays = WEEKDAY_OFF_BY_SLUG.get(String(market?.slug ?? "").trim());
+  return Boolean(offDays && offDays.has(getIndiaWeekday(date)));
+}
+
+export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
+  if (isMarketWeeklyOff(market, date)) {
+    return {
+      phase: "closed",
+      sortBucket: 2,
+      anchor: parseClockTimeToMinutes(market?.close),
+      canPlaceBet: false,
+      isClosed: true,
+      label: "Betting is Closed for Today",
+      status: "Weekly Off",
+      action: "Closed"
+    };
+  }
+
+  const currentMinutes = date.getHours() * 60 + date.getMinutes();
+  const openMinutes = parseClockTimeToMinutes(market?.open);
+  const closeMinutes = parseClockTimeToMinutes(market?.close);
+
+  if (currentMinutes < openMinutes) {
+    return {
+      phase: "upcoming",
+      sortBucket: 1,
+      anchor: openMinutes,
+      canPlaceBet: true,
+      isClosed: false,
+      label: "Betting Running Now",
+      status: "Betting open now",
+      action: "Place Bet"
+    };
+  }
+
+  if (currentMinutes < closeMinutes) {
+    return {
+      phase: "close-running",
+      sortBucket: 0,
+      anchor: closeMinutes,
+      canPlaceBet: true,
+      isClosed: false,
+      label: "Betting is Running for Close",
+      status: "Betting open now",
+      action: "Place Bet"
+    };
+  }
+
+  return {
+    phase: "closed",
+    sortBucket: 2,
+    anchor: closeMinutes,
+    canPlaceBet: false,
+    isClosed: true,
+    label: "Betting is Closed for Today",
+    status: "Betting is Closed for Today",
+    action: "Closed"
+  };
+}
+
 function getMarketPhaseMeta(market, currentMinutes) {
+  if (isMarketWeeklyOff(market)) {
+    return { sortBucket: 2, anchor: parseClockTimeToMinutes(market?.close) };
+  }
   const openMinutes = parseClockTimeToMinutes(market?.open);
   const closeMinutes = parseClockTimeToMinutes(market?.close);
 
@@ -137,6 +228,52 @@ function isPlaceholderResult(result) {
   return !String(result ?? "").trim() || String(result ?? "").trim() === "***-**-***";
 }
 
+async function applyNightlyMarketResultReset(markets) {
+  const indiaNow = getIndiaNow();
+  const currentMinutes = indiaNow.getHours() * 60 + indiaNow.getMinutes();
+  if (currentMinutes < MARKET_RESULT_RESET_AFTER_MINUTES) {
+    return markets;
+  }
+
+  const todayKey = getIndiaDateKey(indiaNow);
+  const settings = await getAppSettings();
+  const lastResetKey = settings.find((item) => item?.key === MARKET_RESULT_RESET_SETTING_KEY)?.value ?? "";
+  if (lastResetKey === todayKey) {
+    return markets;
+  }
+
+  const marketsToReset = (Array.isArray(markets) ? markets : []).filter((market) => !isPlaceholderResult(market?.result));
+  if (marketsToReset.length) {
+    await Promise.all(
+      marketsToReset.map((market) =>
+        updateMarketRecord(market.slug, {
+          result: "***-**-***",
+          resultLockedAt: null,
+          resultLockedByUserId: null
+        })
+      )
+    );
+  }
+
+  await upsertAppSetting(MARKET_RESULT_RESET_SETTING_KEY, todayKey);
+
+  if (!marketsToReset.length) {
+    return markets;
+  }
+
+  const resetLookup = new Set(marketsToReset.map((market) => market.slug));
+  return markets.map((market) =>
+    resetLookup.has(market.slug)
+      ? {
+          ...market,
+          result: "***-**-***",
+          resultLockedAt: null,
+          resultLockedByUserId: null
+        }
+      : market
+  );
+}
+
 function deriveTodayResultFromCharts(market, jodiChart, pannaChart) {
   const storedResult = String(market?.result ?? "").trim();
   const indiaNow = getIndiaNow();
@@ -181,18 +318,20 @@ function decorateMarketWithLookup(market, chartLookup) {
 
   const jodiChart = chartLookup.get(`${market.slug}:jodi`) ?? null;
   const pannaChart = chartLookup.get(`${market.slug}:panna`) ?? null;
-  if (!jodiChart || !pannaChart) {
-    return market;
-  }
+  const runtimeMeta = getMarketRuntimeMeta(market);
+  const nextResult = jodiChart && pannaChart ? deriveTodayResultFromCharts(market, jodiChart, pannaChart) : market.result;
 
   return {
     ...market,
-    result: deriveTodayResultFromCharts(market, jodiChart, pannaChart)
+    result: nextResult,
+    status: runtimeMeta.status,
+    action: runtimeMeta.action
   };
 }
 
 async function buildMarketSnapshot() {
-  const markets = await listMarkets();
+  const seededMarkets = await listMarkets();
+  const markets = await applyNightlyMarketResultReset(seededMarkets);
   if (!markets.length) {
     return markets;
   }

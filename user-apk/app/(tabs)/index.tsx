@@ -67,6 +67,12 @@ function getCurrentMinutes() {
   return now.getHours() * 60 + now.getMinutes();
 }
 
+function isMarketForcedClosed(market: Pick<MarketItem, "status" | "action">) {
+  const status = String(market.status ?? "").toLowerCase();
+  const action = String(market.action ?? "").toLowerCase();
+  return status.includes("weekly off") || status.includes("closed for today") || action === "closed";
+}
+
 function getMarketPhase(market: Pick<MarketItem, "open" | "close">, currentMinutes: number) {
   const openMinutes = parseClockTimeToMinutes(market.open);
   const closeMinutes = parseClockTimeToMinutes(market.close);
@@ -83,7 +89,18 @@ function getMarketPhase(market: Pick<MarketItem, "open" | "close">, currentMinut
   return "closed" as const;
 }
 
-function getMarketPhaseMeta(market: Pick<MarketItem, "open" | "close">, currentMinutes: number) {
+function getMarketPhaseMeta(market: Pick<MarketItem, "open" | "close" | "status" | "action">, currentMinutes: number) {
+  if (isMarketForcedClosed(market)) {
+    return {
+      phase: "closed" as const,
+      label: "Betting is Closed for Today",
+      isClosed: true,
+      canPlaceBet: false,
+      sortBucket: 2,
+      timeAnchor: parseClockTimeToMinutes(market.close)
+    };
+  }
+
   const phase = getMarketPhase(market, currentMinutes);
   if (phase === "open-running") {
     return {

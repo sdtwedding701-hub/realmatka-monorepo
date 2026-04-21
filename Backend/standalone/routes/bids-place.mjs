@@ -1,5 +1,6 @@
 import { addBid, addWalletEntry, getUserBalance } from "../db.mjs";
 import { requireAuthenticatedUser } from "../middleware/auth-middleware.mjs";
+import { getMarketListSnapshot, getMarketRuntimeMeta } from "../services/market-snapshot-service.mjs";
 import {
   allDoublePannas,
   allSinglePannas,
@@ -22,6 +23,14 @@ const sessionlessBoards = new Set([
   "Half Sangam",
   "Full Sangam"
 ]);
+const openCutoffOnlyBoards = new Set([
+  "Jodi Digit",
+  "Jodi Digit Bulk",
+  "Red Bracket",
+  "Digit Based Jodi",
+  "Half Sangam",
+  "Full Sangam"
+]);
 
 export function options(request) {
   return corsPreflight(request);
@@ -41,6 +50,20 @@ export async function place(request) {
 
   if (!market || !boardLabel || items.length === 0) {
     return fail("Market, boardLabel, and items are required", 400, request);
+  }
+
+  const markets = await getMarketListSnapshot();
+  const marketRecord = markets.find((item) => item.name === market);
+  if (!marketRecord) {
+    return fail("Market not found", 404, request);
+  }
+
+  const marketMeta = getMarketRuntimeMeta(marketRecord);
+  if (marketMeta.phase === "closed") {
+    return fail("Betting is closed for today", 400, request);
+  }
+  if (marketMeta.phase === "close-running" && openCutoffOnlyBoards.has(boardLabel)) {
+    return fail("Open session betting is closed for this board", 400, request);
   }
 
   const totalPoints = items.reduce((sum, item) => sum + Number(item?.points ?? 0), 0);

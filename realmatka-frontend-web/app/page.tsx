@@ -1,7 +1,8 @@
+import { MarketsSection, type MarketCard } from "./markets-section";
+
 const webAppBaseUrl = "https://play.realmatka.in";
 const loginUrl = `${webAppBaseUrl}/auth/login`;
 const registerUrl = `${webAppBaseUrl}/auth/register`;
-const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.realmatka.in").replace(/\/$/, "");
 
 const rates = [
   { name: "Single Digit", rate: "10" },
@@ -14,7 +15,7 @@ const rates = [
   { name: "Full Sangam", rate: "10000" }
 ] as const;
 
-const marketCatalog = [
+const marketCatalog: MarketCard[] = [
   { slug: "ntr-morning", name: "NTR Morning", open: "09:00 AM", close: "10:00 AM", tag: "Games" },
   { slug: "sita-morning", name: "Sita Morning", open: "09:40 AM", close: "10:40 AM", tag: "Games" },
   { slug: "karnataka-day", name: "Karnataka Day", open: "09:55 AM", close: "10:55 AM", tag: "Games" },
@@ -68,84 +69,7 @@ const games = [
   "Choice Pana"
 ] as const;
 
-type LiveMarket = {
-  id?: string;
-  slug: string;
-  name?: string;
-  result?: string;
-  status?: string;
-  action?: string;
-  open?: string;
-  close?: string;
-  category?: string;
-};
-
-type MarketCard = {
-  slug: string;
-  name: string;
-  result: string;
-  open: string;
-  close: string;
-  tag: string;
-};
-
-function slugifyMarket(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
-
-async function loadMarkets(): Promise<MarketCard[]> {
-  try {
-    const response = await fetch(`${apiBaseUrl}/api/markets/list`, {
-      cache: "no-store"
-    });
-
-    if (!response.ok) {
-      throw new Error(`Markets request failed: ${response.status}`);
-    }
-
-    const payload = (await response.json()) as { ok?: boolean; data?: LiveMarket[] };
-    const liveMarkets = Array.isArray(payload?.data) ? payload.data : [];
-    const liveMap = new Map(liveMarkets.map((market) => [market.slug, market] as const));
-
-    const syncedLiveMarkets = liveMarkets.map((live) => {
-      const fallback = marketCatalog.find((item) => item.slug === live.slug);
-      return {
-        slug: live.slug,
-        name: live?.name?.trim() || fallback?.name || live.slug,
-        result: live?.result?.trim() || "***-**-***",
-        open: live?.open?.trim() || fallback?.open || "--:--",
-        close: live?.close?.trim() || fallback?.close || "--:--",
-        tag: fallback?.tag || "Games"
-      };
-    });
-
-    const missingFallbackMarkets = marketCatalog
-      .filter((fallback) => !liveMap.has(fallback.slug))
-      .map((fallback) => ({
-        slug: fallback.slug,
-        name: fallback.name,
-        result: "***-**-***",
-        open: fallback.open,
-        close: fallback.close,
-        tag: fallback.tag
-      }));
-
-    return [...syncedLiveMarkets, ...missingFallbackMarkets];
-  } catch {
-    return marketCatalog.map((fallback) => ({
-      slug: fallback.slug,
-      name: fallback.name,
-      result: "***-**-***",
-      open: fallback.open,
-      close: fallback.close,
-      tag: fallback.tag
-    }));
-  }
-}
-
-export default async function HomePage() {
-  const markets = await loadMarkets();
-
+export default function HomePage() {
   return (
     <div className="min-h-screen text-white">
       <main className="mx-auto flex w-full max-w-[1620px] flex-col gap-6 px-3 py-6 sm:px-5 sm:py-8 xl:px-6">
@@ -195,35 +119,7 @@ export default async function HomePage() {
         </section>
 
         <section id="markets" className="section-shell px-4 py-6 sm:px-6 sm:py-8 xl:px-8">
-          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">All Markets</div>
-              <h2 className="mt-2 text-2xl font-extrabold sm:text-3xl">Same 33 market list jo app me dikh rahi hai</h2>
-            </div>
-            <a href={registerUrl} className="action-secondary w-full justify-center sm:w-auto">Register Now</a>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            {markets.map((market) => (
-              <div key={market.slug} className="glass-card market-card market-card-mobile p-5">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="market-tag-mobile inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">
-                      {market.tag}
-                    </span>
-                  </div>
-                  <h3 className="market-name-text mt-4 font-extrabold uppercase text-white">{market.name}</h3>
-                  <p className="market-result-text mt-3 font-extrabold text-orange-200">Result: {market.result}</p>
-                  <p className="market-time-text mt-3 font-semibold text-slate-300">Open {market.open} • Close {market.close}</p>
-                </div>
-                <div className="market-actions-mobile mt-5 grid grid-cols-2 gap-2">
-                  <a href={`/charts/${slugifyMarket(market.name)}?type=jodi&label=${encodeURIComponent(market.name)}`} className="action-secondary market-button-mobile market-link-mobile w-full justify-center text-center">Jodi Chart</a>
-                  <a href={`/charts/${slugifyMarket(market.name)}?type=panna&label=${encodeURIComponent(market.name)}`} className="action-secondary market-button-mobile market-link-mobile w-full justify-center text-center">Panna Chart</a>
-                </div>
-                <a href={loginUrl} target="_blank" rel="noreferrer" className="action-primary market-button-mobile market-play-mobile mt-4 w-full justify-center text-center">Play Now</a>
-              </div>
-            ))}
-          </div>
+          <MarketsSection initialMarkets={marketCatalog} loginUrl={loginUrl} registerUrl={registerUrl} />
         </section>
       </main>
     </div>

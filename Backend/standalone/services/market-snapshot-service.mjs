@@ -37,41 +37,51 @@ function parseClockTimeToMinutes(value) {
   return hours * 60 + minutes;
 }
 
-function getIndiaNow() {
+function getIndiaNowParts() {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+    weekday: "short",
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
     hour12: false
   });
-  const parts = Object.fromEntries(
-    formatter.formatToParts(now).map((part) => [part.type, part.value])
-  );
 
+  return Object.fromEntries(formatter.formatToParts(now).map((part) => [part.type, part.value]));
+}
+
+function getIndiaNow() {
+  const parts = getIndiaNowParts();
   return new Date(
-    `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}+05:30`
+    Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second)
+    )
   );
 }
 
 function getCurrentMinutes() {
   const now = getIndiaNow();
-  return now.getHours() * 60 + now.getMinutes();
+  return now.getUTCHours() * 60 + now.getUTCMinutes();
 }
 
 function getIndiaDateKey(date = getIndiaNow()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
 function getIndiaWeekday(date = getIndiaNow()) {
-  return new Date(date).getDay();
+  return new Date(date).getUTCDay();
 }
 
 function isMarketWeeklyOff(market, date = getIndiaNow()) {
@@ -80,7 +90,7 @@ function isMarketWeeklyOff(market, date = getIndiaNow()) {
 }
 
 export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
-  const currentMinutes = date.getHours() * 60 + date.getMinutes();
+  const currentMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
 
   if (isMarketWeeklyOff(market, date)) {
     return {
@@ -207,10 +217,10 @@ function parseResult(result) {
 
 function getWeekStart(date) {
   const value = new Date(date);
-  const day = value.getDay();
+  const day = value.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  value.setDate(value.getDate() + diff);
-  value.setHours(0, 0, 0, 0);
+  value.setUTCDate(value.getUTCDate() + diff);
+  value.setUTCHours(0, 0, 0, 0);
   return value;
 }
 
@@ -223,13 +233,13 @@ function getWeekChartLabel(date) {
 
 function formatChartDay(date) {
   const value = new Date(date);
-  const month = value.toLocaleDateString("en-US", { month: "short" });
-  const day = String(value.getDate()).padStart(2, "0");
+  const month = value.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  const day = String(value.getUTCDate()).padStart(2, "0");
   return `${month} ${day}`;
 }
 
 function getWeekdayIndex(date) {
-  const day = new Date(date).getDay();
+  const day = new Date(date).getUTCDay();
   return day === 0 ? 6 : day - 1;
 }
 
@@ -248,7 +258,7 @@ function isPlaceholderResult(result) {
 
 async function applyNightlyMarketResultReset(markets) {
   const indiaNow = getIndiaNow();
-  const currentMinutes = indiaNow.getHours() * 60 + indiaNow.getMinutes();
+  const currentMinutes = indiaNow.getUTCHours() * 60 + indiaNow.getUTCMinutes();
   if (currentMinutes < MARKET_RESULT_RESET_AFTER_MINUTES) {
     return markets;
   }

@@ -93,63 +93,6 @@ function slugifyMarket(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-function parseClockTimeToMinutes(value: string) {
-  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
-  if (!match) {
-    return Number.MAX_SAFE_INTEGER;
-  }
-
-  let hours = Number(match[1]) % 12;
-  const minutes = Number(match[2]);
-  const meridiem = match[3].toUpperCase();
-  if (meridiem === "PM") {
-    hours += 12;
-  }
-
-  return hours * 60 + minutes;
-}
-
-function getCurrentMinutes() {
-  const now = new Date();
-  return now.getHours() * 60 + now.getMinutes();
-}
-
-function sortMarketsByCurrentPhase(markets: MarketCard[]) {
-  const currentMinutes = getCurrentMinutes();
-
-  return [...markets].sort((left, right) => {
-    const leftOpen = parseClockTimeToMinutes(left.open);
-    const leftClose = parseClockTimeToMinutes(left.close);
-    const rightOpen = parseClockTimeToMinutes(right.open);
-    const rightClose = parseClockTimeToMinutes(right.close);
-
-    const leftBucket = currentMinutes < leftOpen ? 1 : currentMinutes < leftClose ? 0 : 2;
-    const rightBucket = currentMinutes < rightOpen ? 1 : currentMinutes < rightClose ? 0 : 2;
-
-    if (leftBucket !== rightBucket) {
-      return leftBucket - rightBucket;
-    }
-
-    if (leftBucket === 0 || leftBucket === 1) {
-      const leftAnchor = leftBucket === 0 ? leftClose : leftOpen;
-      const rightAnchor = rightBucket === 0 ? rightClose : rightOpen;
-      const diff = leftAnchor - rightAnchor;
-      if (diff !== 0) {
-        return diff;
-      }
-    }
-
-    if (leftBucket === 2) {
-      const diff = leftClose - rightClose;
-      if (diff !== 0) {
-        return diff;
-      }
-    }
-
-    return left.name.localeCompare(right.name);
-  });
-}
-
 async function loadMarkets(): Promise<MarketCard[]> {
   try {
     const response = await fetch(`${apiBaseUrl}/api/markets/list`, {
@@ -164,27 +107,39 @@ async function loadMarkets(): Promise<MarketCard[]> {
     const liveMarkets = Array.isArray(payload?.data) ? payload.data : [];
     const liveMap = new Map(liveMarkets.map((market) => [market.slug, market] as const));
 
-    const syncedMarkets = marketCatalog.map((fallback) => {
-      const live = liveMap.get(fallback.slug);
+    const syncedLiveMarkets = liveMarkets.map((live) => {
+      const fallback = marketCatalog.find((item) => item.slug === live.slug);
       return {
-        slug: fallback.slug,
-        name: live?.name?.trim() || fallback.name,
+        slug: live.slug,
+        name: live?.name?.trim() || fallback?.name || live.slug,
         result: live?.result?.trim() || "***-**-***",
-        open: live?.open?.trim() || fallback.open,
-        close: live?.close?.trim() || fallback.close,
-        tag: fallback.tag
+        open: live?.open?.trim() || fallback?.open || "--:--",
+        close: live?.close?.trim() || fallback?.close || "--:--",
+        tag: fallback?.tag || "Games"
       };
     });
-    return sortMarketsByCurrentPhase(syncedMarkets);
+
+    const missingFallbackMarkets = marketCatalog
+      .filter((fallback) => !liveMap.has(fallback.slug))
+      .map((fallback) => ({
+        slug: fallback.slug,
+        name: fallback.name,
+        result: "***-**-***",
+        open: fallback.open,
+        close: fallback.close,
+        tag: fallback.tag
+      }));
+
+    return [...syncedLiveMarkets, ...missingFallbackMarkets];
   } catch {
-    return sortMarketsByCurrentPhase(marketCatalog.map((fallback) => ({
+    return marketCatalog.map((fallback) => ({
       slug: fallback.slug,
       name: fallback.name,
       result: "***-**-***",
       open: fallback.open,
       close: fallback.close,
       tag: fallback.tag
-    })));
+    }));
   }
 }
 

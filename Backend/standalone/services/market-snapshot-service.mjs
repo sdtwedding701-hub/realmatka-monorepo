@@ -20,17 +20,30 @@ function parseClockTimeToMinutes(value) {
   return hours * 60 + minutes;
 }
 
-function getCurrentMinutes() {
+function getIndiaNow() {
   const now = new Date();
-  const parts = new Intl.DateTimeFormat("en-GB", {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hour12: false
-  }).formatToParts(now);
-  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
-  return hour * 60 + minute;
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(now).map((part) => [part.type, part.value])
+  );
+
+  return new Date(
+    `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}+05:30`
+  );
+}
+
+function getCurrentMinutes() {
+  const now = getIndiaNow();
+  return now.getHours() * 60 + now.getMinutes();
 }
 
 function getMarketPhaseMeta(market, currentMinutes) {
@@ -116,7 +129,7 @@ function normalizeWeekLabel(label) {
 }
 
 function getCurrentChartRow(rows) {
-  const label = normalizeWeekLabel(getWeekChartLabel(new Date()));
+  const label = normalizeWeekLabel(getWeekChartLabel(getIndiaNow()));
   return (Array.isArray(rows) ? rows : []).find((row) => normalizeWeekLabel(row?.[0]) === label) ?? null;
 }
 
@@ -125,7 +138,8 @@ function isPlaceholderResult(result) {
 }
 
 function deriveTodayResultFromCharts(market, jodiChart, pannaChart) {
-  const currentDayIndex = getWeekdayIndex(new Date());
+  const indiaNow = getIndiaNow();
+  const currentDayIndex = getWeekdayIndex(indiaNow);
   const jodiRow = getCurrentChartRow(jodiChart?.rows);
   const pannaRow = getCurrentChartRow(pannaChart?.rows);
   if (!jodiRow || !pannaRow) {

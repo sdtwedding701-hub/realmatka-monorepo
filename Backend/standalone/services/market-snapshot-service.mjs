@@ -138,12 +138,13 @@ function isPlaceholderResult(result) {
 }
 
 function deriveTodayResultFromCharts(market, jodiChart, pannaChart) {
+  const storedResult = String(market?.result ?? "").trim();
   const indiaNow = getIndiaNow();
   const currentDayIndex = getWeekdayIndex(indiaNow);
   const jodiRow = getCurrentChartRow(jodiChart?.rows);
   const pannaRow = getCurrentChartRow(pannaChart?.rows);
   if (!jodiRow || !pannaRow) {
-    return String(market?.result ?? "").trim();
+    return storedResult;
   }
 
   const jodi = String(jodiRow[currentDayIndex + 1] ?? "").trim();
@@ -157,7 +158,7 @@ function deriveTodayResultFromCharts(market, jodiChart, pannaChart) {
     return `${openPanna}-${jodi}-***`;
   }
 
-  return "***-**-***";
+  return isPlaceholderResult(storedResult) ? "***-**-***" : storedResult;
 }
 
 function buildChartLookup(charts) {

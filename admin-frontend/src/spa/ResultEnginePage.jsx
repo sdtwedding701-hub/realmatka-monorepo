@@ -92,24 +92,27 @@ export function AdminMarketPublishList({
         <h2>All Markets Quick Publish</h2>
         <p>User app jaisi time-wise market list ke saath inline result update.</p>
       </div>
-      <div className="table-list">
+      <div className="admin-market-card-list">
         {sortedMarkets.map((market) => {
           const phaseMeta = getMarketPhaseMeta(market, currentMinutes);
           const draftValue = Object.hasOwn(marketResultDrafts, market.slug) ? marketResultDrafts[market.slug] : market.result || "";
           const rowBusy = busy === `quick-${market.slug}`;
           return (
-            <div className="data-row" key={market.slug}>
-              <div className="row-main">
-                <strong>{market.name}</strong>
-                <span>{phaseMeta.label}</span>
-                <span>Open {market.open} | Close {market.close}</span>
+            <article className="admin-market-card" key={market.slug}>
+              <div className="admin-market-card-top">
+                <div className="admin-market-copy">
+                  <span className="admin-market-eyebrow">{market.category || "Games"}</span>
+                  <strong>{market.name}</strong>
+                  <span className="admin-market-phase">{phaseMeta.label}</span>
+                  <span>Open {market.open} | Close {market.close}</span>
+                </div>
+                <div className="admin-market-result">
+                  <strong>{market.result || "***-**-***"}</strong>
+                  <span>Current Result</span>
+                </div>
               </div>
-              <div className="row-main" style={{ minWidth: 210 }}>
-                <strong>{market.result || "***-**-***"}</strong>
-                <span>Current Result</span>
-              </div>
-              <div className="row-main" style={{ minWidth: 250 }}>
-                <div className="result-slot-row" style={{ justifyContent: "flex-start" }}>
+              <div className="admin-market-entry">
+                <div className="result-slot-row admin-market-slot-row">
                   {toResultSlots(draftValue).map((value, index) => (
                     <React.Fragment key={`${market.slug}-slot-${index}`}>
                       {(index === 3 || index === 5) ? <span className="result-slot-separator">-</span> : null}
@@ -132,7 +135,7 @@ export function AdminMarketPublishList({
                   ))}
                 </div>
               </div>
-              <div className="row-actions">
+              <div className="row-actions admin-market-actions">
                 <button className="secondary" onClick={() => onSelectMarket(market.slug)}>
                   {selectedSlug === market.slug ? "Selected" : "Open Editor"}
                 </button>
@@ -140,7 +143,7 @@ export function AdminMarketPublishList({
                   {rowBusy ? "Publishing..." : "Publish"}
                 </button>
               </div>
-            </div>
+            </article>
           );
         })}
       </div>

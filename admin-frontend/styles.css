@@ -703,6 +703,86 @@ a.secondary {
   gap: 12px;
 }
 
+.admin-market-card-list {
+  margin-top: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.admin-market-card {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(15, 98, 254, 0.1), transparent 30%),
+    linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
+  display: grid;
+  gap: 16px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.admin-market-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
+}
+
+.admin-market-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.admin-market-copy,
+.admin-market-result {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-market-copy strong,
+.admin-market-result strong {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.admin-market-copy span,
+.admin-market-result span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-market-eyebrow {
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(15, 98, 254, 0.08);
+  color: var(--primary-dark) !important;
+  font-size: 11px !important;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-market-phase {
+  color: var(--success) !important;
+  font-weight: 700;
+}
+
+.admin-market-entry {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-market-slot-row {
+  justify-content: flex-start;
+}
+
+.admin-market-actions {
+  justify-content: flex-start;
+}
+
 .table-head {
   display: grid;
   grid-template-columns: 1.1fr 1fr auto;
@@ -1650,6 +1730,20 @@ button.secondary.danger {
   .data-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .admin-market-card {
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .admin-market-copy strong,
+  .admin-market-result strong {
+    font-size: 20px;
+  }
+
+  .admin-market-card-top {
+    flex-direction: column;
   }
 
   .form-grid {

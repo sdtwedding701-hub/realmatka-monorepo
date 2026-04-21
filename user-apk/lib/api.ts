@@ -142,6 +142,50 @@ export class ApiError extends Error {
   }
 }
 
+function mapUserFacingErrorMessage(message: string, fallback: string) {
+  const normalized = String(message || "").trim();
+  const lower = normalized.toLowerCase();
+
+  if (!normalized) {
+    return fallback;
+  }
+  if (lower.includes("invalid phone or password")) {
+    return "Wrong phone number ya password.";
+  }
+  if (lower.includes("invalid otp")) {
+    return "Wrong OTP. Dobara try karo.";
+  }
+  if (lower.includes("invalid authenticator code")) {
+    return "Wrong 2FA code. Dobara try karo.";
+  }
+  if (lower.includes("challenge expired") || lower.includes("setup required")) {
+    return "Session expire ho gaya. Dobara login karo.";
+  }
+  if (lower.includes("current password")) {
+    return "Current password galat hai.";
+  }
+  if (lower.includes("password") && lower.includes("match")) {
+    return "Password aur confirm password same nahi hai.";
+  }
+  if (lower.includes("api server connect nahi ho raha")) {
+    return "Server connect nahi ho raha. Thodi der baad retry karo.";
+  }
+  if (lower.includes("api server response time")) {
+    return "Server slow hai. Thodi der baad retry karo.";
+  }
+  if (lower.includes("otp")) {
+    return "OTP sahi se check karo.";
+  }
+  if (lower.includes("password")) {
+    return "Password sahi se check karo.";
+  }
+  if (lower.includes("request failed")) {
+    return fallback;
+  }
+
+  return normalized;
+}
+
 let authFailureListener: AuthFailureListener | null = null;
 const DEFAULT_GET_TIMEOUT_MS = 8_000;
 const DEFAULT_MUTATION_TIMEOUT_MS = 15_000;
@@ -532,8 +576,5 @@ export const api = {
 
 export function formatApiError(error: unknown, fallback = "Request failed") {
   const message = error instanceof Error ? error.message : fallback;
-  const requestId =
-    error instanceof ApiError ? String(error.requestId || "").trim() : "";
-
-  return requestId ? `${message} (Req ID: ${requestId})` : message;
+  return mapUserFacingErrorMessage(message, fallback);
 }

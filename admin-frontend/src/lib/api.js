@@ -87,8 +87,38 @@ export async function fetchHealth(apiBase) {
   };
 }
 
+function mapUserFacingError(message, fallback) {
+  const normalized = String(message || "").trim();
+  const lower = normalized.toLowerCase();
+
+  if (!normalized) {
+    return fallback;
+  }
+  if (lower.includes("invalid phone or password")) {
+    return "Wrong phone number ya password.";
+  }
+  if (lower.includes("invalid otp")) {
+    return "Wrong OTP. Dobara try karo.";
+  }
+  if (lower.includes("invalid authenticator code")) {
+    return "Wrong 2FA code. Dobara try karo.";
+  }
+  if (lower.includes("challenge expired") || lower.includes("setup required")) {
+    return "Session expire ho gaya. Dobara login karo.";
+  }
+  if (lower.includes("admin access required")) {
+    return "Admin access required.";
+  }
+  if (lower.includes("api server connect nahi ho raha")) {
+    return "Server connect nahi ho raha. Thodi der baad retry karo.";
+  }
+  if (lower.includes("request failed")) {
+    return fallback;
+  }
+
+  return normalized;
+}
+
 export function formatApiError(error, fallback = "Request failed") {
-  const message = error?.message || fallback;
-  const requestId = String(error?.requestId || "").trim();
-  return requestId ? `${message} (Req ID: ${requestId})` : message;
+  return mapUserFacingError(error?.message || fallback, fallback);
 }

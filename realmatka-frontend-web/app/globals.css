@@ -56,7 +56,7 @@ body {
 }
 
 .market-card {
-  min-height: 250px;
+  min-height: 0;
 }
 
 .market-card-layout {
@@ -106,12 +106,8 @@ body {
     min-height: 148px;
   }
 
-  .market-card {
-    min-height: 286px;
-  }
-
   .market-card-mobile {
-    padding: 1.1rem;
+    padding: 1rem 1.1rem;
     border-radius: 1.2rem;
   }
 

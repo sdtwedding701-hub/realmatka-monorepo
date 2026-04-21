@@ -29,12 +29,11 @@ export default function ProfileScreen() {
   const appBaseUrl = String(process.env.EXPO_PUBLIC_APP_URL || "https://play.realmatka.in")
     .trim()
     .replace(/\/+$/, "");
-  const schemeLink = `realmatka://auth/register?ref=${encodeURIComponent(referralCode)}`;
   const referralWebBaseUrl = String(process.env.EXPO_PUBLIC_REFERRAL_WEB_URL || appBaseUrl || "https://play.realmatka.in")
     .trim()
     .replace(/\/+$/, "");
   const referralWebLink = referralWebBaseUrl ? `${referralWebBaseUrl}/auth/register?ref=${encodeURIComponent(referralCode)}` : "";
-  const shareMessage = `Real Matka join karo.\n\nRegister here: ${referralWebLink}\nReferral code auto-fill ho jayega.\n\nReferral code: ${referralCode}\nAgar app installed hai to ye app link bhi use kar sakte ho: ${schemeLink}`;
+  const shareMessage = `Real Matka join karo.\n\nRegister here: ${referralWebLink}\nReferral code auto-fill ho jayega.\n\nReferral code: ${referralCode}`;
 
   useFocusEffect(
     useCallback(() => {

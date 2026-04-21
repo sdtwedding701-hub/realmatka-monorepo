@@ -69,8 +69,6 @@ export default function RegisterScreen() {
           <SurfaceCard>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>Reference code optional hai. Account create karne se pehle mobile OTP verify karna hoga.</Text>
-            {referenceCode ? <Text style={styles.autoReferralHint}>Referral code auto-filled hai. Is account par yehi code apply hoga.</Text> : null}
-
             <View style={styles.fieldWrap}>
               <Text style={styles.label}>First Name</Text>
               <TextInput

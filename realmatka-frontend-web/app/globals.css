@@ -59,19 +59,38 @@ body {
   min-height: 250px;
 }
 
-.market-chart-link {
-  @apply inline-flex items-center justify-center rounded-full border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-semibold text-sky-100 transition;
-}
-
-.market-chart-link:hover {
-  @apply border-sky-200/30 bg-sky-300/15 text-white;
-}
-
-.market-actions-mobile {
+.market-card-layout {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.7rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
   align-items: center;
+  min-height: 100%;
+}
+
+.market-card-copy {
+  min-width: 0;
+}
+
+.market-links-stack {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.market-chart-text-link {
+  color: #dbeafe;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.35rem;
+}
+
+.market-chart-text-link:hover {
+  color: #ffffff;
+}
+
+.market-play-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @media (max-width: 640px) {
@@ -112,10 +131,10 @@ body {
     line-height: 1.9rem;
   }
 
-  .market-actions-mobile {
-    margin-top: 0.85rem;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    justify-items: center;
+  .market-card-layout {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.9rem;
+    align-items: center;
   }
 
   .market-button-mobile {
@@ -123,17 +142,18 @@ body {
     font-size: 0.95rem;
   }
 
-  .market-chart-link {
-    min-height: 42px;
-    width: 100%;
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-    font-size: 0.88rem;
+  .market-links-stack {
+    margin-top: 0.8rem;
+    gap: 0.45rem;
+  }
+
+  .market-chart-text-link {
+    font-size: 0.94rem;
+    line-height: 1.2rem;
   }
 
   .market-play-mobile {
-    min-width: 0;
-    width: 100%;
+    min-width: 118px;
     justify-content: center;
     padding-left: 0.9rem;
     padding-right: 0.9rem;

@@ -184,14 +184,18 @@ export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: Market
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         {orderedMarkets.map((market) => (
           <div key={market.slug} className="glass-card market-card market-card-mobile p-5">
-            <div>
-              <h3 className="market-name-text font-extrabold uppercase text-white">{market.name}</h3>
-              <p className="market-result-text mt-3 font-extrabold text-orange-200">Result: {market.result || "***-**-***"}</p>
-            </div>
-            <div className="market-actions-mobile mt-5">
-              <a href={`/charts/${slugifyMarket(market.name)}?type=jodi&label=${encodeURIComponent(market.name)}`} className="market-chart-link w-full text-center">Jodi Chart</a>
-              <a href={`/charts/${slugifyMarket(market.name)}?type=panna&label=${encodeURIComponent(market.name)}`} className="market-chart-link w-full text-center">Panna Chart</a>
-              <a href={loginUrl} target="_blank" rel="noreferrer" className="action-primary market-button-mobile market-play-mobile w-full text-center">Play Now</a>
+            <div className="market-card-layout">
+              <div className="market-card-copy">
+                <h3 className="market-name-text font-extrabold uppercase text-white">{market.name}</h3>
+                <p className="market-result-text mt-3 font-extrabold text-orange-200">Result: {market.result || "***-**-***"}</p>
+                <div className="market-links-stack mt-4">
+                  <a href={`/charts/${slugifyMarket(market.name)}?type=jodi&label=${encodeURIComponent(market.name)}`} className="market-chart-text-link">Jodi Chart</a>
+                  <a href={`/charts/${slugifyMarket(market.name)}?type=panna&label=${encodeURIComponent(market.name)}`} className="market-chart-text-link">Panna Chart</a>
+                </div>
+              </div>
+              <div className="market-play-wrap">
+                <a href={loginUrl} target="_blank" rel="noreferrer" className="action-primary market-button-mobile market-play-mobile text-center">Play Now</a>
+              </div>
             </div>
           </div>
         ))}

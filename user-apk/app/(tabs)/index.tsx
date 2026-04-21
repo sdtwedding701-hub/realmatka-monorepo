@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Easing, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { marketCatalog } from "../../data/mock";
@@ -31,9 +31,6 @@ type MarketItem = {
 };
 
 const HOME_SOFT_REFRESH_INTERVAL_MS = 120_000;
-const CLOCK_REFRESH_INTERVAL_MS = 60_000;
-const MARKET_DAY_ROLLOVER_MINUTES = 60;
-
 const FALLBACK_MARKETS: MarketItem[] = marketCatalog.map((fallback) => ({
   id: fallback.slug,
   slug: fallback.slug,
@@ -46,136 +43,23 @@ const FALLBACK_MARKETS: MarketItem[] = marketCatalog.map((fallback) => ({
   category: fallback.category
 }));
 
-function parseClockTimeToMinutes(value: string) {
-  const match = value.trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
-  if (!match) {
-    return Number.MAX_SAFE_INTEGER;
-  }
-
-  let hours = Number(match[1]) % 12;
-  const minutes = Number(match[2]);
-  const meridiem = match[3].toUpperCase();
-
-  if (meridiem === "PM") {
-    hours += 12;
-  }
-
-  return hours * 60 + minutes;
-}
-
-function getCurrentMinutes() {
-  const now = new Date();
-  return now.getHours() * 60 + now.getMinutes();
-}
-
 function isMarketForcedClosed(market: Pick<MarketItem, "status" | "action">) {
   const status = String(market.status ?? "").toLowerCase();
   const action = String(market.action ?? "").toLowerCase();
   return status.includes("weekly off") || status.includes("closed for today") || action === "closed";
 }
 
-function getMarketPhase(market: Pick<MarketItem, "open" | "close">, currentMinutes: number) {
-  const openMinutes = parseClockTimeToMinutes(market.open);
-  const closeMinutes = parseClockTimeToMinutes(market.close);
+function getMarketDisplayMeta(market: Pick<MarketItem, "status" | "action">) {
+  const isClosed = isMarketForcedClosed(market);
+  const normalizedStatus = String(market.status ?? "").trim();
+  const normalizedAction = String(market.action ?? "").trim();
 
-  if (openMinutes === Number.MAX_SAFE_INTEGER || closeMinutes === Number.MAX_SAFE_INTEGER) {
-    return "upcoming" as const;
-  }
-  if (currentMinutes < openMinutes) {
-    return "open-running" as const;
-  }
-  if (currentMinutes < closeMinutes) {
-    return "close-running" as const;
-  }
-  return "closed" as const;
-}
-
-function getMarketPhaseMeta(market: Pick<MarketItem, "open" | "close" | "status" | "action">, currentMinutes: number) {
-  if (isMarketForcedClosed(market)) {
-    return {
-      phase: "closed" as const,
-      label: "Betting is Closed for Today",
-      isClosed: true,
-      canPlaceBet: false,
-      sortBucket: 2,
-      timeAnchor: parseClockTimeToMinutes(market.close)
-    };
-  }
-
-  if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
-    return {
-      phase: "open-running" as const,
-      label: "Betting Running Now",
-      isClosed: false,
-      canPlaceBet: true,
-      sortBucket: 0,
-      timeAnchor: 0
-    };
-  }
-
-  const phase = getMarketPhase(market, currentMinutes);
-  if (phase === "open-running") {
-    return {
-      phase,
-      label: "Betting Running Now",
-      isClosed: false,
-      canPlaceBet: true,
-      sortBucket: 1,
-      timeAnchor: parseClockTimeToMinutes(market.open)
-    };
-  }
-  if (phase === "close-running") {
-    return {
-      phase,
-      label: "Betting is Running for Close",
-      isClosed: false,
-      canPlaceBet: true,
-      sortBucket: 0,
-      timeAnchor: parseClockTimeToMinutes(market.close)
-    };
-  }
   return {
-    phase,
-    label: "Betting is Closed for Today",
-    isClosed: true,
-    canPlaceBet: false,
-    sortBucket: 2,
-    timeAnchor: parseClockTimeToMinutes(market.close)
-  };
-}
-
-function sortMarketsByTime(markets: MarketItem[], currentMinutes: number) {
-  return [...markets].sort((left, right) => {
-    const leftMeta = getMarketPhaseMeta(left, currentMinutes);
-    const rightMeta = getMarketPhaseMeta(right, currentMinutes);
-
-    if (leftMeta.sortBucket !== rightMeta.sortBucket) {
-      return leftMeta.sortBucket - rightMeta.sortBucket;
-    }
-
-    if (leftMeta.phase === "open-running") {
-      const openDiff = parseClockTimeToMinutes(left.open) - parseClockTimeToMinutes(right.open);
-      if (openDiff !== 0) {
-        return openDiff;
-      }
-    }
-
-    if (leftMeta.phase === "close-running") {
-      const closeDiff = parseClockTimeToMinutes(left.close) - parseClockTimeToMinutes(right.close);
-      if (closeDiff !== 0) {
-        return closeDiff;
-      }
-    }
-
-    if (leftMeta.phase === "closed") {
-      const closedDiff = parseClockTimeToMinutes(left.close) - parseClockTimeToMinutes(right.close);
-      if (closedDiff !== 0) {
-        return closedDiff;
-      }
-    }
-
-    return left.name.localeCompare(right.name);
-  });
+    label: normalizedStatus || (isClosed ? "Betting is Closed for Today" : "Betting Running Now"),
+    isClosed,
+    canPlaceBet: !isClosed && normalizedAction.toLowerCase() !== "closed",
+    phase: isClosed ? "closed" : "close-running"
+  } as const;
 }
 
 export default function HomeScreen() {
@@ -189,7 +73,6 @@ export default function HomeScreen() {
   const [error, setError] = useState("");
   const [noticeText, setNoticeText] = useState("Notice: Market open-close time change ho sakta hai, bet place karne se pehle check karein.");
   const [selectedChartMarket, setSelectedChartMarket] = useState<Pick<MarketItem, "slug" | "name"> | null>(null);
-  const [currentMinutes, setCurrentMinutes] = useState(() => getCurrentMinutes());
   useEffect(() => {
     const cachedMarkets = getCachedMarkets();
     const initialMarkets = cachedMarkets?.length ? cachedMarkets : FALLBACK_MARKETS;
@@ -223,13 +106,6 @@ export default function HomeScreen() {
     })();
   }, []);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentMinutes(getCurrentMinutes());
-    }, CLOCK_REFRESH_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
       if (Date.now() - lastSoftRefreshAtRef.current < HOME_SOFT_REFRESH_INTERVAL_MS) {
@@ -240,7 +116,7 @@ export default function HomeScreen() {
     }, [])
   );
 
-  const listedMarkets = useMemo(() => sortMarketsByTime(markets, currentMinutes), [markets, currentMinutes]);
+  const listedMarkets = markets;
   const isCompactScreen = height < 760;
   const showHardError = listedMarkets.length === 0 && Boolean(error);
 
@@ -300,7 +176,7 @@ export default function HomeScreen() {
               </View>
             ) : null}
             {listedMarkets.map((market) => {
-              const phaseMeta = getMarketPhaseMeta(market, currentMinutes);
+              const phaseMeta = getMarketDisplayMeta(market);
               const isClosed = phaseMeta.isClosed;
               const hasResult = Boolean(market.result?.trim());
               const canPlaceBet = phaseMeta.canPlaceBet;
@@ -462,7 +338,7 @@ export default function HomeScreen() {
       setMarkets(nextMarkets);
       lastGoodMarketsRef.current = nextMarkets;
       setCachedMarkets(nextMarkets);
-      void prefetchChartPreview(sortMarketsByTime(nextMarkets, getCurrentMinutes()).slice(0, 4));
+      void prefetchChartPreview(nextMarkets.slice(0, 4));
     } catch (loadError) {
       setError(formatApiError(loadError, "Unable to load markets"));
       if (lastGoodMarketsRef.current.length > 0) {

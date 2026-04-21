@@ -59,6 +59,21 @@ body {
   min-height: 250px;
 }
 
+.market-chart-link {
+  @apply inline-flex items-center justify-center rounded-full border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-semibold text-sky-100 transition;
+}
+
+.market-chart-link:hover {
+  @apply border-sky-200/30 bg-sky-300/15 text-white;
+}
+
+.market-actions-mobile {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  align-items: center;
+}
+
 @media (max-width: 640px) {
   .section-shell {
     @apply rounded-[22px];
@@ -97,13 +112,10 @@ body {
     line-height: 1.9rem;
   }
 
-  .market-time-text {
-    display: none;
-  }
-
   .market-actions-mobile {
-    gap: 0.7rem;
     margin-top: 0.85rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-items: center;
   }
 
   .market-button-mobile {
@@ -111,25 +123,20 @@ body {
     font-size: 0.95rem;
   }
 
-  .market-link-mobile {
-    min-height: auto;
-    justify-content: flex-start;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-    border-radius: 0;
-    color: #dbeafe;
-    font-size: 1rem;
-    font-weight: 700;
+  .market-chart-link {
+    min-height: 42px;
+    width: 100%;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    font-size: 0.88rem;
   }
 
   .market-play-mobile {
-    width: fit-content;
-    min-width: 148px;
-    justify-content: flex-start;
-    padding-left: 1.1rem;
-    padding-right: 1.1rem;
+    min-width: 0;
+    width: 100%;
+    justify-content: center;
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
   }
 
   .rates-grid-mobile {

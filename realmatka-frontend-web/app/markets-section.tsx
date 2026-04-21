@@ -185,20 +185,14 @@ export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: Market
         {orderedMarkets.map((market) => (
           <div key={market.slug} className="glass-card market-card market-card-mobile p-5">
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="market-tag-mobile inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">
-                  {market.tag}
-                </span>
-              </div>
-              <h3 className="market-name-text mt-4 font-extrabold uppercase text-white">{market.name}</h3>
+              <h3 className="market-name-text font-extrabold uppercase text-white">{market.name}</h3>
               <p className="market-result-text mt-3 font-extrabold text-orange-200">Result: {market.result || "***-**-***"}</p>
-              <p className="market-time-text mt-3 font-semibold text-slate-300">Open {market.open} • Close {market.close}</p>
             </div>
-            <div className="market-actions-mobile mt-5 grid grid-cols-2 gap-2">
-              <a href={`/charts/${slugifyMarket(market.name)}?type=jodi&label=${encodeURIComponent(market.name)}`} className="action-secondary market-button-mobile market-link-mobile w-full justify-center text-center">Jodi Chart</a>
-              <a href={`/charts/${slugifyMarket(market.name)}?type=panna&label=${encodeURIComponent(market.name)}`} className="action-secondary market-button-mobile market-link-mobile w-full justify-center text-center">Panna Chart</a>
+            <div className="market-actions-mobile mt-5">
+              <a href={`/charts/${slugifyMarket(market.name)}?type=jodi&label=${encodeURIComponent(market.name)}`} className="market-chart-link w-full text-center">Jodi Chart</a>
+              <a href={`/charts/${slugifyMarket(market.name)}?type=panna&label=${encodeURIComponent(market.name)}`} className="market-chart-link w-full text-center">Panna Chart</a>
+              <a href={loginUrl} target="_blank" rel="noreferrer" className="action-primary market-button-mobile market-play-mobile w-full text-center">Play Now</a>
             </div>
-            <a href={loginUrl} target="_blank" rel="noreferrer" className="action-primary market-button-mobile market-play-mobile mt-4 w-full justify-center text-center">Play Now</a>
           </div>
         ))}
       </div>

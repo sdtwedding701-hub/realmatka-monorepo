@@ -53,11 +53,7 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
           setup: data.setup || null
         });
         setOtp("");
-        setMessage(
-          data.setupRequired
-            ? "Authenticator setup complete karo aur app ka 6 digit code enter karo."
-            : "Authenticator app ka 6 digit code enter karo. Agar account add nahi hai to niche wali key se setup kar lo."
-        );
+        setMessage("Authenticator app ka 6 digit code enter karo.");
         return;
       }
       if (!isAllowedAdminRole(data.user?.role)) {
@@ -110,11 +106,10 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
         <div className="brand login-brand">
           <span className="brand-badge">Super Admin</span>
           <h1>Real Matka Control Room</h1>
-          <p>Secure super admin workspace for results, requests, reports, operators, and daily monitoring.</p>
         </div>
         <div className="panel-head">
           <h2>Super Admin Login</h2>
-          <p>{challenge ? "Password verify ho gaya. Ab 2FA code se login complete karo." : "Secure operator access with structured React dashboard and legacy fallback pages."}</p>
+          <p>{challenge ? "Password verify ho gaya. Ab 2FA code dalo." : ""}</p>
         </div>
         <form className="form-grid" onSubmit={handleSubmit}>
           <label>
@@ -131,14 +126,6 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
                 <span>Authenticator Code</span>
                 <input autoFocus inputMode="numeric" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value)} type="text" />
               </label>
-              {challenge?.setup ? (
-                <div className="sidebar-note login-note">
-                  <strong>{challenge.setupRequired ? "Google Authenticator Setup" : "Authenticator Setup Key"}</strong>
-                  <div>App me manual setup choose karo.</div>
-                  <div>Account: <strong>{challenge.setup.accountName}</strong></div>
-                  <div>Key: <strong>{challenge.setup.displaySecret}</strong></div>
-                </div>
-              ) : null}
               <div className="actions">
                 <button type="submit" className="primary">Verify 2FA</button>
                 <button
@@ -156,8 +143,7 @@ export function LoginScreen({ apiBase, setApiBase, setToken, bootError }) {
             </>
           ) : <button type="submit" className="primary">Login</button>}
         </form>
-        <p className="sidebar-note login-note">React dashboard core pages live hain. Legacy operator pages sidebar se open ho sakti hain.</p>
-        <p className={`message ${message ? "error" : ""}`}>{message}</p>
+        {message ? <p className="message error">{message}</p> : null}
       </section>
     </div>
   );

@@ -67,6 +67,7 @@ export function App() {
   const [route, setRoute] = useState(getHashRoute());
   const [me, setMe] = useState(null);
   const [bootError, setBootError] = useState("");
+  const [authBooting, setAuthBooting] = useState(Boolean(getAdminToken()));
 
   useEffect(() => {
     const onHashChange = () => setRoute(getHashRoute());
@@ -77,12 +78,15 @@ export function App() {
   useEffect(() => {
     if (!token) {
       setMe(null);
+      setAuthBooting(false);
       return;
     }
+    setAuthBooting(true);
     const expiresAt = getAdminSessionExpiry();
     if (expiresAt && expiresAt <= Date.now()) {
       clearSession();
       setToken("");
+      setAuthBooting(false);
       return;
     }
     fetchApi(apiBase, "/api/auth/me", token)
@@ -92,13 +96,27 @@ export function App() {
         }
         setMe(data);
         setBootError("");
+        setAuthBooting(false);
       })
       .catch((error) => {
         setBootError(formatApiError(error, "Unable to verify admin session"));
         clearSession();
         setToken("");
+        setAuthBooting(false);
       });
   }, [apiBase, token]);
+
+  if (token && authBooting) {
+    return (
+      <div className="login-shell">
+        <section className="panel login-card">
+          <div className="panel-head">
+            <h2>Checking session...</h2>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   if (!token || !me) {
     return <LoginScreen apiBase={apiBase} setApiBase={setApiBase} setToken={setToken} bootError={bootError} />;

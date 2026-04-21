@@ -262,10 +262,10 @@ export default async function HomePage() {
                   <p className="market-time-text mt-3 font-semibold text-slate-300">Open {market.open} • Close {market.close}</p>
                 </div>
                 <div className="market-actions-mobile mt-5 grid grid-cols-2 gap-2">
-                  <a href={`/charts/${slugifyMarket(market.name)}?type=jodi&label=${encodeURIComponent(market.name)}`} className="action-secondary market-button-mobile w-full justify-center text-center">Jodi Chart</a>
-                  <a href={`/charts/${slugifyMarket(market.name)}?type=panna&label=${encodeURIComponent(market.name)}`} className="action-secondary market-button-mobile w-full justify-center text-center">Panna Chart</a>
+                  <a href={`/charts/${slugifyMarket(market.name)}?type=jodi&label=${encodeURIComponent(market.name)}`} className="action-secondary market-button-mobile market-link-mobile w-full justify-center text-center">Jodi Chart</a>
+                  <a href={`/charts/${slugifyMarket(market.name)}?type=panna&label=${encodeURIComponent(market.name)}`} className="action-secondary market-button-mobile market-link-mobile w-full justify-center text-center">Panna Chart</a>
                 </div>
-                <a href={loginUrl} target="_blank" rel="noreferrer" className="action-primary market-button-mobile mt-4 w-full justify-center text-center">Play Now</a>
+                <a href={loginUrl} target="_blank" rel="noreferrer" className="action-primary market-button-mobile market-play-mobile mt-4 w-full justify-center text-center">Play Now</a>
               </div>
             ))}
           </div>

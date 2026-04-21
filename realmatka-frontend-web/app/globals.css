@@ -88,27 +88,48 @@ body {
   }
 
   .market-name-text {
-    font-size: 1.72rem;
-    line-height: 2.05rem;
+    font-size: 1.88rem;
+    line-height: 2.18rem;
   }
 
   .market-result-text {
-    font-size: 1.28rem;
-    line-height: 1.75rem;
+    font-size: 1.42rem;
+    line-height: 1.9rem;
   }
 
   .market-time-text {
-    font-size: 1.08rem;
-    line-height: 1.55rem;
+    display: none;
   }
 
   .market-actions-mobile {
     gap: 0.7rem;
+    margin-top: 0.85rem;
   }
 
   .market-button-mobile {
-    min-height: 46px;
+    min-height: 42px;
     font-size: 0.95rem;
+  }
+
+  .market-link-mobile {
+    min-height: auto;
+    justify-content: flex-start;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    color: #dbeafe;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .market-play-mobile {
+    width: fit-content;
+    min-width: 148px;
+    justify-content: flex-start;
+    padding-left: 1.1rem;
+    padding-right: 1.1rem;
   }
 
   .rates-grid-mobile {

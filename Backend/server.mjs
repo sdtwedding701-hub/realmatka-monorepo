@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
 import { logger } from "./standalone/ops/logger.mjs";
 import { validateEnvironment } from "./standalone/ops/env-validator.mjs";
-import { getHealthSnapshot } from "./standalone/ops/health-service.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -451,8 +450,12 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === "/health") {
-      const snapshot = await getHealthSnapshot({ startedAt, routesManifestPath });
-      sendJson(res, 200, snapshot);
+      sendJson(res, 200, {
+        ok: true,
+        status: "ok",
+        service: "realmatka-api",
+        timestamp: new Date().toISOString()
+      });
       return;
     }
 

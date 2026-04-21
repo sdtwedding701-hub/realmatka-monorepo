@@ -82,19 +82,6 @@ function isMarketWeeklyOff(market, date = getIndiaNow()) {
 export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
   const currentMinutes = date.getHours() * 60 + date.getMinutes();
 
-  if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
-    return {
-      phase: "closed",
-      sortBucket: 2,
-      anchor: parseClockTimeToMinutes(market?.close),
-      canPlaceBet: false,
-      isClosed: true,
-      label: "Betting is Closed for Today",
-      status: "Betting is Closed for Today",
-      action: "Closed"
-    };
-  }
-
   if (isMarketWeeklyOff(market, date)) {
     return {
       phase: "closed",
@@ -105,6 +92,19 @@ export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
       label: "Betting is Closed for Today",
       status: "Weekly Off",
       action: "Closed"
+    };
+  }
+
+  if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
+    return {
+      phase: "open-running",
+      sortBucket: 0,
+      anchor: 0,
+      canPlaceBet: true,
+      isClosed: false,
+      label: "Betting Running Now",
+      status: "Betting open now",
+      action: "Place Bet"
     };
   }
 
@@ -150,11 +150,11 @@ export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
 }
 
 function getMarketPhaseMeta(market, currentMinutes) {
-  if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
-    return { sortBucket: 2, anchor: parseClockTimeToMinutes(market?.close) };
-  }
   if (isMarketWeeklyOff(market)) {
     return { sortBucket: 2, anchor: parseClockTimeToMinutes(market?.close) };
+  }
+  if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
+    return { sortBucket: 0, anchor: 0 };
   }
   const openMinutes = parseClockTimeToMinutes(market?.open);
   const closeMinutes = parseClockTimeToMinutes(market?.close);

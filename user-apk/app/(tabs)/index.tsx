@@ -91,7 +91,7 @@ function getMarketPhase(market: Pick<MarketItem, "open" | "close">, currentMinut
 }
 
 function getMarketPhaseMeta(market: Pick<MarketItem, "open" | "close" | "status" | "action">, currentMinutes: number) {
-  if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
+  if (isMarketForcedClosed(market)) {
     return {
       phase: "closed" as const,
       label: "Betting is Closed for Today",
@@ -102,14 +102,14 @@ function getMarketPhaseMeta(market: Pick<MarketItem, "open" | "close" | "status"
     };
   }
 
-  if (isMarketForcedClosed(market)) {
+  if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
     return {
-      phase: "closed" as const,
-      label: "Betting is Closed for Today",
-      isClosed: true,
-      canPlaceBet: false,
-      sortBucket: 2,
-      timeAnchor: parseClockTimeToMinutes(market.close)
+      phase: "open-running" as const,
+      label: "Betting Running Now",
+      isClosed: false,
+      canPlaceBet: true,
+      sortBucket: 0,
+      timeAnchor: 0
     };
   }
 

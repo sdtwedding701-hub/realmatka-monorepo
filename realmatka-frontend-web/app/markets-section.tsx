@@ -72,9 +72,9 @@ function sortMarketsByCurrentPhase(markets: MarketCard[]) {
     const rightClose = parseClockTimeToMinutes(right.close);
 
     const leftBucket =
-      currentMinutes < MARKET_DAY_ROLLOVER_MINUTES ? 2 : currentMinutes < leftOpen ? 1 : currentMinutes < leftClose ? 0 : 2;
+      currentMinutes < MARKET_DAY_ROLLOVER_MINUTES ? 0 : currentMinutes < leftOpen ? 1 : currentMinutes < leftClose ? 0 : 2;
     const rightBucket =
-      currentMinutes < MARKET_DAY_ROLLOVER_MINUTES ? 2 : currentMinutes < rightOpen ? 1 : currentMinutes < rightClose ? 0 : 2;
+      currentMinutes < MARKET_DAY_ROLLOVER_MINUTES ? 0 : currentMinutes < rightOpen ? 1 : currentMinutes < rightClose ? 0 : 2;
 
     if (leftBucket !== rightBucket) {
       return leftBucket - rightBucket;

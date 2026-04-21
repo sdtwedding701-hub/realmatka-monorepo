@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { fetchApi as baseFetchApi, fetchHealth, formatApiError, normalizeAdminApiBase } from "../lib/api.js";
+import { fetchApi as baseFetchApi, formatApiError, normalizeAdminApiBase } from "../lib/api.js";
 import { clearAdminSession, getAdminSessionExpiry, getAdminToken } from "../lib/session.js";
 import { LoginScreen } from "./LoginScreen.jsx";
 import { AdminShell } from "./AdminShell.jsx";
@@ -227,10 +227,9 @@ function DashboardPage({ apiBase, token }) {
       fetchApi(apiBase, "/api/admin/dashboard-summary", token),
       fetchApi(apiBase, "/api/admin/reports-summary", token),
       fetchApi(apiBase, "/api/admin/users", token),
-      fetchApi(apiBase, "/api/admin/monitoring-summary", token),
-      fetchHealth(apiBase)
+      fetchApi(apiBase, "/api/admin/monitoring-summary", token)
     ])
-      .then(([summary, reports, users, monitoring, health]) => setState({ loading: false, error: "", summary, reports, users, monitoring, health }))
+      .then(([summary, reports, users, monitoring]) => setState({ loading: false, error: "", summary, reports, users, monitoring, health: null }))
       .catch((error) =>
         setState({
           loading: false,
@@ -996,9 +995,14 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
   const marketStorageKey = isChartsMode ? "realmatka_admin_all_chart_market" : "realmatka_admin_result_market";
 
   useEffect(() => {
-    Promise.all([fetchApi(apiBase, "/api/markets/list", token), fetchApi(apiBase, "/api/admin/audit-logs", token)])
-      .then(([markets, auditLogs]) => {
-        setState({ loading: false, error: "", markets, auditLogs });
+    let cancelled = false;
+
+    fetchApi(apiBase, "/api/markets/list", token)
+      .then((markets) => {
+        if (cancelled) {
+          return;
+        }
+        setState((current) => ({ ...current, loading: false, error: "", markets }));
         const savedSlug = typeof window !== "undefined" ? window.localStorage.getItem(marketStorageKey) : "";
         const matchingSavedMarket = savedSlug ? markets.find((market) => market.slug === savedSlug) : null;
         if (matchingSavedMarket) {
@@ -1006,8 +1010,23 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
         } else if (markets[0]) {
           setSelectedSlug(markets[0].slug);
         }
+        fetchApi(apiBase, "/api/admin/audit-logs", token)
+          .then((auditLogs) => {
+            if (!cancelled) {
+              setState((current) => ({ ...current, auditLogs }));
+            }
+          })
+          .catch(() => {});
       })
-      .catch((error) => setState({ loading: false, error: formatApiError(error, "Result engine load failed"), markets: [], auditLogs: [] }));
+      .catch((error) => {
+        if (!cancelled) {
+          setState({ loading: false, error: formatApiError(error, "Result engine load failed"), markets: [], auditLogs: [] });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [apiBase, token, marketStorageKey]);
 
   useEffect(() => {
@@ -1217,24 +1236,28 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
         apiBase,
         chartType,
         fetchApi,
+        fetchChartAfterPublish: true,
         marketForm,
         normalizeChartEditorRows,
         previousResult: selectedMarket?.result || "",
         selectedSlug,
         token
       });
-      const [markets, auditLogs, latestExposure] = await Promise.all([
-        fetchApi(apiBase, "/api/markets/list", token),
-        fetchApi(apiBase, "/api/admin/audit-logs", token),
-        fetchApi(apiBase, `/api/admin/market-exposure?slug=${selectedSlug}`, token).catch(() => null)
-      ]);
-      setState((current) => ({ ...current, markets, auditLogs }));
+      const latestExposure = await fetchApi(apiBase, `/api/admin/market-exposure?slug=${selectedSlug}`, token).catch(() => null);
+      setState((current) => ({ ...current, markets: result.markets }));
       setExposure(latestExposure);
       setSavedRows(result.rows);
-      const normalizedRows = result.normalizedRows;
-      setChartDraftRows(normalizedRows);
-      setEditorWeekLabel(normalizedRows[normalizedRows.length - 1]?.[0] || "");
+      if (result.normalizedRows.length) {
+        const normalizedRows = result.normalizedRows;
+        setChartDraftRows(normalizedRows);
+        setEditorWeekLabel(normalizedRows[normalizedRows.length - 1]?.[0] || "");
+      }
       setLastSettlement(result.lastSettlement);
+      fetchApi(apiBase, "/api/admin/audit-logs", token)
+        .then((auditLogs) => {
+          setState((current) => ({ ...current, auditLogs }));
+        })
+        .catch(() => {});
       if (result.didPublishOpenResult) {
         setMessage(result.previousResult && /^[0-9]{3}-[0-9]{2}-[0-9]{3}$/.test(result.previousResult) ? "Half result restore ho gaya. Close-side settlements reverse ho gayi." : "Open result publish ho gaya. Open-side settlements refresh ho gayi.");
       } else if (!result.didSettle) {
@@ -1257,6 +1280,7 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
         apiBase,
         chartType,
         fetchApi,
+        fetchChartAfterPublish: false,
         marketForm: {
           result: String(marketResultDrafts[market.slug] ?? market.result ?? "").trim(),
           status: market.status,
@@ -1270,16 +1294,17 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
         selectedSlug: market.slug,
         token
       });
-      const [markets, auditLogs, latestExposure] = await Promise.all([
-        fetchApi(apiBase, "/api/markets/list", token),
-        fetchApi(apiBase, "/api/admin/audit-logs", token),
-        selectedSlug === market.slug ? fetchApi(apiBase, `/api/admin/market-exposure?slug=${market.slug}`, token).catch(() => null) : Promise.resolve(exposure)
-      ]);
-      setState((current) => ({ ...current, markets, auditLogs }));
+      const latestExposure = selectedSlug === market.slug ? await fetchApi(apiBase, `/api/admin/market-exposure?slug=${market.slug}`, token).catch(() => null) : exposure;
+      setState((current) => ({ ...current, markets: result.markets }));
       setExposure(latestExposure);
       setMarketResultDrafts((current) => ({ ...current, [market.slug]: String(marketResultDrafts[market.slug] ?? "").trim() }));
+      fetchApi(apiBase, "/api/admin/audit-logs", token)
+        .then((auditLogs) => {
+          setState((current) => ({ ...current, auditLogs }));
+        })
+        .catch(() => {});
       if (selectedSlug === market.slug) {
-        const selectedMarket = markets.find((item) => item.slug === market.slug);
+        const selectedMarket = result.markets.find((item) => item.slug === market.slug);
         if (selectedMarket) {
           setMarketForm({
             result: selectedMarket.result || "",

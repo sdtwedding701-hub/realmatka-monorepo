@@ -367,6 +367,7 @@ export async function publishMarketResult({
   apiBase,
   chartType,
   fetchApi,
+  fetchChartAfterPublish = true,
   marketForm,
   normalizeChartEditorRows,
   previousResult,
@@ -394,17 +395,15 @@ export async function publishMarketResult({
       })
     : { settlement: null };
 
-  const [markets, auditLogs, chart] = await Promise.all([
+  const [markets, chart] = await Promise.all([
     fetchApi(apiBase, "/api/markets/list", token),
-    fetchApi(apiBase, "/api/admin/audit-logs", token),
-    fetchApi(apiBase, `/api/charts/${selectedSlug}?type=${chartType}`, token)
+    fetchChartAfterPublish ? fetchApi(apiBase, `/api/charts/${selectedSlug}?type=${chartType}`, token) : Promise.resolve(null)
   ]);
 
-  const rows = chart.rows || [];
-  const normalizedRows = normalizeChartEditorRows(chartType, rows);
+  const rows = chart?.rows || [];
+  const normalizedRows = chart ? normalizeChartEditorRows(chartType, rows) : [];
 
   return {
-    auditLogs,
     didSettle: shouldResettle,
     didPublishOpenResult: isOpenResult,
     didResetPlaceholder: isPlaceholder,

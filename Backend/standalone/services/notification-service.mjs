@@ -1,4 +1,4 @@
-import { listNotificationsForUser, registerNotificationDevice } from "../stores/notification-store.mjs";
+import { listNotificationsForUser, markNotificationsReadForUser, registerNotificationDevice } from "../stores/notification-store.mjs";
 
 export async function getNotificationHistory(userId, options = {}) {
   return listNotificationsForUser(userId, options.limit);
@@ -14,4 +14,8 @@ export async function registerUserNotificationDevice(userId, platform, token) {
 
   const device = await registerNotificationDevice(userId, normalizedPlatform, normalizedToken);
   return { ok: true, data: device };
+}
+
+export async function markUserNotificationsRead(userId, options = {}) {
+  return markNotificationsReadForUser(userId, options);
 }

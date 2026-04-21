@@ -17,9 +17,63 @@ import {
   updateUserApprovalStatus,
   updateWalletEntryAdmin
 } from "../stores/admin-store.mjs";
+import { sendUserNotification } from "./notification-events-service.mjs";
 
 function roundAmount(value) {
   return Math.round(Number(value || 0) * 100) / 100;
+}
+
+async function sendWalletActionNotification(entry, action, settlementEntry = null) {
+  const userId = String(entry?.userId ?? settlementEntry?.userId ?? "").trim();
+  if (!userId) {
+    return;
+  }
+
+  const type = String(entry?.type ?? settlementEntry?.type ?? "").toUpperCase();
+  const amount = roundAmount(Number(entry?.amount ?? settlementEntry?.amount ?? 0));
+
+  if (action === "approve" && type === "DEPOSIT") {
+    await sendUserNotification({
+      userId,
+      title: "Deposit approved",
+      body: `Rs ${amount.toFixed(2)} successfully added to your wallet.`,
+      channel: "wallet",
+      url: "/wallet/history"
+    });
+    return;
+  }
+
+  if (action === "approve" && type === "WITHDRAW") {
+    await sendUserNotification({
+      userId,
+      title: "Withdraw approved",
+      body: `Your withdraw request of Rs ${amount.toFixed(2)} has been approved.`,
+      channel: "wallet",
+      url: "/wallet/history"
+    });
+    return;
+  }
+
+  if (action === "reject" && type === "DEPOSIT") {
+    await sendUserNotification({
+      userId,
+      title: "Deposit rejected",
+      body: `Your deposit request of Rs ${amount.toFixed(2)} was rejected.`,
+      channel: "wallet",
+      url: "/wallet/history"
+    });
+    return;
+  }
+
+  if (action === "reject" && type === "WITHDRAW") {
+    await sendUserNotification({
+      userId,
+      title: "Withdraw rejected",
+      body: `Your withdraw request of Rs ${amount.toFixed(2)} was rejected.`,
+      channel: "wallet",
+      url: "/wallet/history"
+    });
+  }
 }
 
 function buildUserLedgerSummary(walletEntries, bids, walletBalance) {
@@ -160,6 +214,7 @@ export async function processWalletRequestAction({ requestId, action, note, refe
       if (!updated) {
         return { ok: false, status: 404, error: "Wallet request not found" };
       }
+      await sendWalletActionNotification(updated, "reject");
       return {
         ok: true,
         request: updated,
@@ -181,6 +236,7 @@ export async function processWalletRequestAction({ requestId, action, note, refe
       return { ok: false, status: 404, error: "Wallet request not found" };
     }
     const patchedRequest = await updateWalletEntryAdmin(resolved.request.id, { note, referenceId, proofUrl });
+    await sendWalletActionNotification(patchedRequest || resolved.request, action, resolved.settlementEntry);
     return {
       ok: true,
       request: patchedRequest || resolved.request,
@@ -222,6 +278,17 @@ export async function createWalletAdjustment({ userId, mode, amount }) {
     amount,
     beforeBalance,
     afterBalance: mode === "credit" ? beforeBalance + amount : beforeBalance - amount
+  });
+
+  await sendUserNotification({
+    userId,
+    title: mode === "credit" ? "Wallet credited" : "Wallet debited",
+    body:
+      mode === "credit"
+        ? `Rs ${amount.toFixed(2)} added to your wallet by admin.`
+        : `Rs ${amount.toFixed(2)} deducted from your wallet by admin.`,
+    channel: "wallet",
+    url: "/wallet/history"
   });
 
   return { ok: true, entry };

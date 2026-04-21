@@ -7,6 +7,7 @@ import {
   markSupportMessagesReadByUser,
   updateSupportConversationStatus
 } from "../stores/chat-store.mjs";
+import { sendUserNotification } from "./notification-events-service.mjs";
 
 export async function getUserConversation(userId, options = {}) {
   const bundle = await getSupportConversationBundleForUser(userId, options);
@@ -77,6 +78,14 @@ export async function sendAdminSupportMessage(adminUserId, conversationId, text)
     text: normalizedText,
     readByUser: false,
     readByAdmin: true
+  });
+
+  await sendUserNotification({
+    userId: details.conversation.userId,
+    title: "Support reply received",
+    body: normalizedText.length > 80 ? `${normalizedText.slice(0, 77)}...` : normalizedText,
+    channel: "support",
+    url: "/chat"
   });
 
   return { ok: true, data: { conversationId: normalizedConversationId, message } };

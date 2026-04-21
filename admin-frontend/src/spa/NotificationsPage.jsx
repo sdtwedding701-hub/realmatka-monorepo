@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 const NOTIFICATIONS_PAGE_SIZE = 100;
+const NOTIFICATION_CHANNELS = ["general", "wallet", "result", "security", "support"];
 
 export function NotificationsPage({ apiBase, fetchApi, formatDate, PageHeader, PageState, token }) {
   const [state, setState] = useState({
@@ -122,7 +123,16 @@ export function NotificationsPage({ apiBase, fetchApi, formatDate, PageHeader, P
       <section className="panel">
         <div className="form-grid">
           <label><span>Title</span><input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
-          <label><span>Channel</span><input value={form.channel} onChange={(event) => setForm({ ...form, channel: event.target.value })} /></label>
+          <label>
+            <span>Channel</span>
+            <select value={form.channel} onChange={(event) => setForm({ ...form, channel: event.target.value })}>
+              {NOTIFICATION_CHANNELS.map((channel) => (
+                <option key={channel} value={channel}>
+                  {channel}
+                </option>
+              ))}
+            </select>
+          </label>
           <label><span>Target User</span><select value={form.userId} onChange={(event) => setForm({ ...form, userId: event.target.value })}><option value="">All Users</option>{state.users.filter((user) => user.role !== "admin").map((user) => <option key={user.id} value={user.id}>{user.name} ({user.phone})</option>)}</select></label>
           <label className="wide"><span>Message</span><textarea rows={4} value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} /></label>
         </div>

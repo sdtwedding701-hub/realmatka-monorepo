@@ -2,7 +2,7 @@ import { applyReferralLossCommission, addWalletEntry, getUserBalance, getUsersLi
 import { getBidsForMarket, updateBidSettlement } from "../stores/bids-store.mjs";
 import { getChartRecord, upsertChartRecord } from "../stores/market-store.mjs";
 import { getPannaType } from "../matka-rules.mjs";
-import { notifyUsers } from "../push.mjs";
+import { sendUserNotifications } from "./notification-events-service.mjs";
 
 export const payoutRates = {
   "Single Digit": 10,
@@ -38,13 +38,14 @@ export async function sendMarketResultBroadcast(market, result) {
   const targets = users.filter((user) => user.role !== "admin" && user.approvalStatus === "Approved" && !user.blockedAt && !user.deactivatedAt);
   if (!targets.length) return { attemptedUsers: 0, pushed: 0, created: 0 };
 
-  const dispatch = await notifyUsers(
+  const dispatch = await sendUserNotifications(
     targets.map((user) => ({
       userId: user.id,
       title: `${market.name} result updated`,
       body: `${market.name} result: ${result}`,
-      channel: "market",
-      data: { url: `/charts/${market.slug}`, marketSlug: market.slug, marketName: market.name, result }
+      channel: "result",
+      url: `/charts/${market.slug}`,
+      data: { marketSlug: market.slug, marketName: market.name, result }
     }))
   );
 
@@ -390,11 +391,12 @@ export async function settlePendingBidsForMarket(market) {
     body: entry.wins > 0
       ? `${market.result} declared. You won ${entry.wins} bid${entry.wins > 1 ? "s" : ""} and Rs ${roundAmount(entry.payout)} credited to wallet.`
       : `${market.result} declared. Your bids for ${market.name} are settled.`,
-    channel: "market",
-    data: { url: `/charts/${market.slug}`, marketSlug: market.slug, marketName: market.name, result: market.result }
+    channel: "result",
+    url: `/charts/${market.slug}`,
+    data: { marketSlug: market.slug, marketName: market.name, result: market.result }
   }));
 
-  if (notificationEntries.length) await notifyUsers(notificationEntries);
+  if (notificationEntries.length) await sendUserNotifications(notificationEntries);
   return { processed, won, lost, wins: won, losses: lost, skipped, totalPayout: roundAmount(totalPayout) };
 }
 

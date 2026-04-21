@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.realmatka.in").replace(/\/$/, "");
 const REFRESH_INTERVAL_MS = 60_000;
+const MARKET_DAY_ROLLOVER_MINUTES = 60;
 
 type LiveMarket = {
   slug: string;
@@ -70,8 +71,10 @@ function sortMarketsByCurrentPhase(markets: MarketCard[]) {
     const rightOpen = parseClockTimeToMinutes(right.open);
     const rightClose = parseClockTimeToMinutes(right.close);
 
-    const leftBucket = currentMinutes < leftOpen ? 1 : currentMinutes < leftClose ? 0 : 2;
-    const rightBucket = currentMinutes < rightOpen ? 1 : currentMinutes < rightClose ? 0 : 2;
+    const leftBucket =
+      currentMinutes < MARKET_DAY_ROLLOVER_MINUTES ? 2 : currentMinutes < leftOpen ? 1 : currentMinutes < leftClose ? 0 : 2;
+    const rightBucket =
+      currentMinutes < MARKET_DAY_ROLLOVER_MINUTES ? 2 : currentMinutes < rightOpen ? 1 : currentMinutes < rightClose ? 0 : 2;
 
     if (leftBucket !== rightBucket) {
       return leftBucket - rightBucket;

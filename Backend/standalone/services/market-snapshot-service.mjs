@@ -4,6 +4,7 @@ import { getChartRecord, getChartRecordsForMarkets, listMarkets, updateMarketRec
 const MARKET_SNAPSHOT_TTL_MS = 60_000;
 const MARKET_RESULT_RESET_AFTER_MINUTES = 60;
 const MARKET_RESULT_RESET_SETTING_KEY = "market_results_reset_day_india";
+const MARKET_DAY_ROLLOVER_MINUTES = 60;
 const WEEKDAY_OFF_BY_SLUG = new Map([
   ["kalyan-night", new Set([0, 6])],
   ["main-bazar", new Set([0, 6])],
@@ -79,6 +80,21 @@ function isMarketWeeklyOff(market, date = getIndiaNow()) {
 }
 
 export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
+  const currentMinutes = date.getHours() * 60 + date.getMinutes();
+
+  if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
+    return {
+      phase: "closed",
+      sortBucket: 2,
+      anchor: parseClockTimeToMinutes(market?.close),
+      canPlaceBet: false,
+      isClosed: true,
+      label: "Betting is Closed for Today",
+      status: "Betting is Closed for Today",
+      action: "Closed"
+    };
+  }
+
   if (isMarketWeeklyOff(market, date)) {
     return {
       phase: "closed",
@@ -92,7 +108,6 @@ export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
     };
   }
 
-  const currentMinutes = date.getHours() * 60 + date.getMinutes();
   const openMinutes = parseClockTimeToMinutes(market?.open);
   const closeMinutes = parseClockTimeToMinutes(market?.close);
 
@@ -135,6 +150,9 @@ export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
 }
 
 function getMarketPhaseMeta(market, currentMinutes) {
+  if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
+    return { sortBucket: 2, anchor: parseClockTimeToMinutes(market?.close) };
+  }
   if (isMarketWeeklyOff(market)) {
     return { sortBucket: 2, anchor: parseClockTimeToMinutes(market?.close) };
   }

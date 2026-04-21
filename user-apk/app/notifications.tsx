@@ -1,4 +1,4 @@
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
@@ -25,6 +25,7 @@ export default function NotificationsScreen() {
   const [items, setItems] = useState<NotificationEntry[]>(() => (sessionToken ? getCachedNotifications(sessionToken) ?? [] : []));
   const [loading, setLoading] = useState(() => !(sessionToken && getCachedNotifications(sessionToken)?.length));
   const [refreshing, setRefreshing] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
   const [error, setError] = useState("");
   const inFlightRef = useRef<Promise<void> | null>(null);
 
@@ -102,6 +103,11 @@ export default function NotificationsScreen() {
         <View style={styles.hero}>
           <Text style={styles.heading}>Notification Center</Text>
           <Text style={styles.subheading}>Result, wallet, security aur support related updates yahan history me save rahenge.</Text>
+          {!loading && items.some((item) => !item.read) ? (
+            <Pressable disabled={markingAll} onPress={() => void markAllAsRead()} style={[styles.markAllButton, markingAll && styles.markAllButtonDisabled]}>
+              <Text style={styles.markAllText}>{markingAll ? "Updating..." : "Mark all as read"}</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {loading ? (
@@ -128,16 +134,21 @@ export default function NotificationsScreen() {
 
         {!loading && !error
           ? items.map((item) => (
-              <SurfaceCard key={item.id} style={styles.itemCard}>
+              <Pressable key={item.id} onPress={() => void openNotification(item)}>
+                <SurfaceCard style={[styles.itemCard, !item.read && styles.itemCardUnread]}>
                 <View style={styles.badgeRow}>
                   <View style={styles.channelBadge}>
                     <Text style={styles.channelText}>{item.channel || "general"}</Text>
                   </View>
-                  <Text style={styles.timeText}>{formatDate(item.createdAt)}</Text>
+                  <View style={styles.badgeMeta}>
+                    {!item.read ? <View style={styles.unreadDot} /> : null}
+                    <Text style={styles.timeText}>{formatDate(item.createdAt)}</Text>
+                  </View>
                 </View>
                 <Text style={styles.title}>{item.title}</Text>
                 <Text style={styles.body}>{item.body}</Text>
-              </SurfaceCard>
+                </SurfaceCard>
+              </Pressable>
             ))
           : null}
       </AppScreen>
@@ -173,6 +184,58 @@ export default function NotificationsScreen() {
       setLoading(false);
     }
   }
+
+  async function openNotification(item: NotificationEntry) {
+    if (sessionToken && !item.read) {
+      try {
+        await api.markNotificationsRead(sessionToken, item.id);
+      } catch {
+        // Ignore read-state failures and still navigate.
+      }
+
+      const nextItems = items.map((entry) => (entry.id === item.id ? { ...entry, read: true } : entry));
+      setItems(nextItems);
+      setCachedNotifications(sessionCacheKey, nextItems);
+    }
+
+    router.push(getNotificationRoute(item));
+  }
+
+  async function markAllAsRead() {
+    if (!sessionToken) {
+      return;
+    }
+
+    try {
+      setMarkingAll(true);
+      await api.markNotificationsRead(sessionToken);
+      const nextItems = items.map((item) => ({ ...item, read: true }));
+      setItems(nextItems);
+      setCachedNotifications(sessionCacheKey, nextItems);
+      setError("");
+    } catch (markError) {
+      setError(formatApiError(markError, "Notifications read state update nahi hui."));
+    } finally {
+      setMarkingAll(false);
+    }
+  }
+}
+
+function getNotificationRoute(item: NotificationEntry) {
+  const channel = String(item.channel || "").trim().toLowerCase();
+  if (channel === "wallet") {
+    return "/wallet/history";
+  }
+  if (channel === "support") {
+    return "/chat";
+  }
+  if (channel === "result") {
+    return "/charts";
+  }
+  if (channel === "security") {
+    return "/profile";
+  }
+  return "/notifications";
 }
 
 function formatDate(value: string) {
@@ -196,6 +259,24 @@ const styles = StyleSheet.create({
   hero: {
     gap: 6,
     marginBottom: 6
+  },
+  markAllButton: {
+    alignSelf: "center",
+    marginTop: 6,
+    minHeight: 38,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.infoSoft
+  },
+  markAllButtonDisabled: {
+    opacity: 0.6
+  },
+  markAllText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "800"
   },
   heading: {
     color: colors.textPrimary,
@@ -238,11 +319,21 @@ const styles = StyleSheet.create({
   itemCard: {
     gap: 10
   },
+  itemCardUnread: {
+    borderWidth: 1,
+    borderColor: "#c7d7fe",
+    backgroundColor: "#f8fbff"
+  },
   badgeRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     gap: 12
+  },
+  badgeMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
   },
   channelBadge: {
     borderRadius: 999,
@@ -255,6 +346,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     textTransform: "uppercase"
+  },
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: "#2563eb"
   },
   timeText: {
     color: colors.textMuted,

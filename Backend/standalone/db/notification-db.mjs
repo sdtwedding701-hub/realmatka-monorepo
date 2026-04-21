@@ -48,6 +48,57 @@ export async function listNotificationsForUser(userId, limit = 50) {
   }
 }
 
+export async function markNotificationsReadForUser(userId, options = {}) {
+  const notificationId = String(options.notificationId ?? "").trim();
+
+  try {
+    const pool = await __internalGetReadyPgPool();
+    if (notificationId) {
+      const result = await pool.query(
+        `UPDATE notifications
+         SET read = TRUE
+         WHERE user_id = $1
+           AND id = $2
+           AND read = FALSE`,
+        [userId, notificationId]
+      );
+      return { updatedCount: Number(result.rowCount || 0) };
+    }
+
+    const result = await pool.query(
+      `UPDATE notifications
+       SET read = TRUE
+       WHERE user_id = $1
+         AND read = FALSE`,
+      [userId]
+    );
+    return { updatedCount: Number(result.rowCount || 0) };
+  } catch {
+    if (notificationId) {
+      const result = __internalGetSqlite()
+        .prepare(
+          `UPDATE notifications
+           SET read = 1
+           WHERE user_id = ?
+             AND id = ?
+             AND read = 0`
+        )
+        .run(userId, notificationId);
+      return { updatedCount: Number(result.changes || 0) };
+    }
+
+    const result = __internalGetSqlite()
+      .prepare(
+        `UPDATE notifications
+         SET read = 1
+         WHERE user_id = ?
+           AND read = 0`
+      )
+      .run(userId);
+    return { updatedCount: Number(result.changes || 0) };
+  }
+}
+
 export async function registerNotificationDevice(userId, platform, token) {
   const createdAt = __internalNowIso();
   const updatedAt = createdAt;

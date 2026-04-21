@@ -32,6 +32,7 @@ type MarketItem = {
 
 const HOME_SOFT_REFRESH_INTERVAL_MS = 120_000;
 const CLOCK_REFRESH_INTERVAL_MS = 60_000;
+const MARKET_DAY_ROLLOVER_MINUTES = 60;
 
 const FALLBACK_MARKETS: MarketItem[] = marketCatalog.map((fallback) => ({
   id: fallback.slug,
@@ -90,6 +91,17 @@ function getMarketPhase(market: Pick<MarketItem, "open" | "close">, currentMinut
 }
 
 function getMarketPhaseMeta(market: Pick<MarketItem, "open" | "close" | "status" | "action">, currentMinutes: number) {
+  if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
+    return {
+      phase: "closed" as const,
+      label: "Betting is Closed for Today",
+      isClosed: true,
+      canPlaceBet: false,
+      sortBucket: 2,
+      timeAnchor: parseClockTimeToMinutes(market.close)
+    };
+  }
+
   if (isMarketForcedClosed(market)) {
     return {
       phase: "closed" as const,

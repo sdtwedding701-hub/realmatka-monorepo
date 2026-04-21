@@ -529,6 +529,14 @@ export const api = {
     });
   },
 
+  markNotificationsRead(token: string, notificationId?: string) {
+    return request<{ updatedCount: number }>("/api/notifications/read", {
+      method: "POST",
+      token,
+      body: notificationId ? { notificationId } : {}
+    });
+  },
+
   getSupportConversation(token: string, limit = 80) {
     return request<{
       conversation: { id: string; status: string };

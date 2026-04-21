@@ -248,7 +248,7 @@ export default async function HomePage() {
             <a href={registerUrl} className="action-secondary w-full justify-center sm:w-auto">Register Now</a>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1">
             {markets.map((market) => (
               <div key={market.slug} className="glass-card market-card market-card-mobile p-5">
                 <div>

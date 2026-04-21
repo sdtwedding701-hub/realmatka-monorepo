@@ -140,7 +140,7 @@ function sortMarketsByCurrentPhase(markets: MarketCard[]) {
     }
 
     if (leftBucket === 2) {
-      const diff = rightClose - leftClose;
+      const diff = leftClose - rightClose;
       if (diff !== 0) {
         return diff;
       }

@@ -139,7 +139,7 @@ function sortMarketsByTime(markets: MarketItem[], currentMinutes: number) {
     }
 
     if (leftMeta.phase === "closed") {
-      const closedDiff = parseClockTimeToMinutes(right.close) - parseClockTimeToMinutes(left.close);
+      const closedDiff = parseClockTimeToMinutes(left.close) - parseClockTimeToMinutes(right.close);
       if (closedDiff !== 0) {
         return closedDiff;
       }

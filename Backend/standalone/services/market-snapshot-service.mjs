@@ -56,7 +56,7 @@ function sortMarketsByCurrentPhase(markets) {
     }
 
     if (leftMeta.sortBucket === 2) {
-      const diff = rightMeta.anchor - leftMeta.anchor;
+      const diff = leftMeta.anchor - rightMeta.anchor;
       if (diff !== 0) {
         return diff;
       }

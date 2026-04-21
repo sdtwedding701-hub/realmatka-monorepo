@@ -26,13 +26,15 @@ export default function ProfileScreen() {
   const referredCount = referralStats?.referredCount ?? 0;
   const referralIncomeTotal = referralStats?.referralIncomeTotal ?? 0;
   const referredUsers = referralStats?.referredUsers ?? [];
-  const appBaseUrl = String(process.env.EXPO_PUBLIC_APP_URL || "").trim().replace(/\/+$/, "");
+  const appBaseUrl = String(process.env.EXPO_PUBLIC_APP_URL || "https://play.realmatka.in")
+    .trim()
+    .replace(/\/+$/, "");
   const schemeLink = `realmatka://auth/register?ref=${encodeURIComponent(referralCode)}`;
-  const referralWebBaseUrl = String(process.env.EXPO_PUBLIC_REFERRAL_WEB_URL || appBaseUrl).trim().replace(/\/+$/, "");
+  const referralWebBaseUrl = String(process.env.EXPO_PUBLIC_REFERRAL_WEB_URL || appBaseUrl || "https://play.realmatka.in")
+    .trim()
+    .replace(/\/+$/, "");
   const referralWebLink = referralWebBaseUrl ? `${referralWebBaseUrl}/auth/register?ref=${encodeURIComponent(referralCode)}` : "";
-  const shareMessage = referralWebLink
-    ? `Real Matka join karo.\n\nRegister here: ${referralWebLink}\nReferral code auto-fill ho jayega.\nRegister ke baad app download karke login kar lo.\n\nReferral code: ${referralCode}\nInstalled app deep link: ${schemeLink}`
-    : `Real Matka join karo.\n\nReferral code: ${referralCode}\nAgar app installed hai to yeh link khol sakte ho: ${schemeLink}`;
+  const shareMessage = `Real Matka join karo.\n\nRegister here: ${referralWebLink}\nReferral code auto-fill ho jayega.\n\nReferral code: ${referralCode}\nAgar app installed hai to ye app link bhi use kar sakte ho: ${schemeLink}`;
 
   useFocusEffect(
     useCallback(() => {

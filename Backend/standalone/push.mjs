@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
 import { createNotification, listEnabledNotificationDevicesByUserIds } from "./db.mjs";
+import { logger } from "./ops/logger.mjs";
 
 function chunkArray(items, size) {
   const chunks = [];
@@ -37,6 +38,12 @@ function getFirebaseAdminConfig() {
 function getFirebaseMessagingClient() {
   const config = getFirebaseAdminConfig();
   if (!config) {
+    logger.warn("FCM config missing", {
+      hasServiceAccountJson: Boolean(String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()),
+      hasProjectId: Boolean(String(process.env.FIREBASE_PROJECT_ID || "").trim()),
+      hasClientEmail: Boolean(String(process.env.FIREBASE_CLIENT_EMAIL || "").trim()),
+      hasPrivateKey: Boolean(String(process.env.FIREBASE_PRIVATE_KEY || "").trim())
+    });
     return null;
   }
 
@@ -70,6 +77,7 @@ async function sendFcmBatch(messages) {
     throw new Error("Firebase Admin SDK is not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY.");
   }
 
+  logger.info("Sending FCM batch", { messageCount: messages.length });
   return messaging.sendEach(messages);
 }
 
@@ -87,6 +95,11 @@ export async function notifyUsers(entries) {
   if (!normalizedEntries.length) {
     return { created: [], pushed: 0, attempted: 0, errors: [] };
   }
+
+  logger.info("Preparing notifications", {
+    entryCount: normalizedEntries.length,
+    channels: [...new Set(normalizedEntries.map((entry) => entry.channel))]
+  });
 
   const created = await Promise.all(
     normalizedEntries.map((entry) =>
@@ -139,17 +152,41 @@ export async function notifyUsers(entries) {
   const errors = [];
   let pushed = 0;
 
+  logger.info("Resolved notification devices", {
+    entryCount: normalizedEntries.length,
+    createdCount: created.length,
+    deviceCount: devices.length,
+    messageCount: messages.length
+  });
+
   for (const chunk of chunkArray(messages, 100)) {
     try {
       const batchResponse = await sendFcmBatch(chunk);
       pushed += Number(batchResponse?.successCount || 0);
+      logger.info("FCM batch result", {
+        attempted: chunk.length,
+        successCount: Number(batchResponse?.successCount || 0),
+        failureCount: Number(batchResponse?.failureCount || 0)
+      });
       (Array.isArray(batchResponse?.responses) ? batchResponse.responses : [])
         .filter((response) => !response?.success)
-        .forEach((response) => errors.push(response?.error?.message || "FCM push send failed"));
+        .forEach((response) => {
+          const message = response?.error?.message || "FCM push send failed";
+          errors.push(message);
+          logger.warn("FCM delivery error", { message });
+        });
     } catch (error) {
       errors.push(error instanceof Error ? error.message : "Push send failed");
+      logger.error("FCM batch request failed", { error, attempted: chunk.length });
     }
   }
+
+  logger.info("Notification dispatch completed", {
+    createdCount: created.length,
+    pushed,
+    attempted: messages.length,
+    errorCount: errors.length
+  });
 
   return {
     created,

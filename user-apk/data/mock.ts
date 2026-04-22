@@ -23,14 +23,12 @@ export const rules = [
 ] as const;
 
 export const drawerItems = [
-  { label: "Home", href: "/(tabs)", icon: "home-outline" },
-  { label: "Bonus", href: "/bonus", icon: "gift-outline" },
-  { label: "Wallet", href: "/wallet/history", icon: "wallet-outline" },
   { label: "Profile", href: "/profile", icon: "person-outline" },
   { label: "Game Rates", href: "/game-rates", icon: "grid-outline" },
+  { label: "Bonus", href: "/bonus", icon: "gift-outline" },
+  { label: "Home", href: "/(tabs)", icon: "home-outline" },
+  { label: "Wallet", href: "/wallet/history", icon: "wallet-outline" },
   { label: "Notifications", href: "/notifications", icon: "notifications-outline" },
-  { label: "Bid History", href: "/(tabs)/history", icon: "receipt-outline" },
-  { label: "All Bids", href: "/(tabs)/bids", icon: "layers-outline" },
   { label: "Change Password", href: "/security/reset-password", icon: "lock-closed-outline" },
   { label: "Update PIN", href: "/security/update-pin", icon: "key-outline" },
   { label: "Rules", href: "/rules", icon: "document-text-outline" }

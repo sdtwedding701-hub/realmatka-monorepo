@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.realmatka.in").replace(/\/$/, "");
 const REFRESH_INTERVAL_MS = 60_000;
-const MARKET_DAY_ROLLOVER_MINUTES = 60;
+const MARKET_DAY_ROLLOVER_MINUTES = 30;
 
 type LiveMarket = {
   slug: string;

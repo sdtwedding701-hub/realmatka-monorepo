@@ -186,7 +186,7 @@ export function Field({ placeholder, secureTextEntry }: { placeholder: string; s
 }
 
 export function DrawerSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { currentUser, logout, walletBalance } = useAppState();
+  const { currentUser, logout } = useAppState();
 
   return (
     <Modal animationType="fade" onRequestClose={onClose} transparent visible={open}>
@@ -204,17 +204,6 @@ export function DrawerSheet({ open, onClose }: { open: boolean; onClose: () => v
               <Ionicons color={colors.textPrimary} name="close" size={24} />
             </Pressable>
           </View>
-
-          <View style={styles.drawerWalletCard}>
-            <View>
-              <Text style={styles.drawerWalletLabel}>Available Balance</Text>
-              <Text style={styles.drawerWalletValue}>Rs {walletBalance}</Text>
-            </View>
-            <View style={styles.drawerWalletBadge}>
-              <Text style={styles.drawerWalletBadgeText}>{currentUser?.role?.toUpperCase() ?? "USER"}</Text>
-            </View>
-          </View>
-
           <ScrollView showsVerticalScrollIndicator={false}>
             {drawerItems.map((item) => (
               <Link asChild href={item.href} key={item.label} onPress={onClose}>

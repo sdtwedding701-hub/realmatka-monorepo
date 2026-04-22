@@ -2,9 +2,9 @@ import { getAppSettings, upsertAppSetting } from "../stores/admin-store.mjs";
 import { getChartRecord, getChartRecordsForMarkets, listMarkets, updateMarketRecord } from "../stores/market-store.mjs";
 
 const MARKET_SNAPSHOT_TTL_MS = 60_000;
-const MARKET_RESULT_RESET_AFTER_MINUTES = 60;
+const MARKET_RESULT_RESET_AFTER_MINUTES = 30;
 const MARKET_RESULT_RESET_SETTING_KEY = "market_results_reset_day_india";
-const MARKET_DAY_ROLLOVER_MINUTES = 60;
+const MARKET_DAY_ROLLOVER_MINUTES = 30;
 const WEEKDAY_OFF_BY_SLUG = new Map([
   ["kalyan-night", new Set([0, 6])],
   ["main-bazar", new Set([0, 6])],

@@ -22,7 +22,7 @@ export function isValidNotificationChannel(value) {
   return NOTIFICATION_CHANNELS.includes(String(value ?? "").trim().toLowerCase());
 }
 
-export async function sendUserNotification({ userId, title, body, channel = "general", url = "/notifications", data = {} }) {
+export async function sendUserNotification({ userId, title, body, channel = "general", url = "/notifications", data = {}, persist = true }) {
   const normalizedUserId = String(userId ?? "").trim();
   const normalizedTitle = String(title ?? "").trim();
   const normalizedBody = String(body ?? "").trim();
@@ -37,6 +37,7 @@ export async function sendUserNotification({ userId, title, body, channel = "gen
       title: normalizedTitle,
       body: normalizedBody,
       channel: normalizeNotificationChannel(channel),
+      persist,
       data: {
         url: normalizeNotificationUrl(url),
         ...data
@@ -52,6 +53,7 @@ export async function sendUserNotifications(entries) {
       title: String(entry?.title ?? "").trim(),
       body: String(entry?.body ?? "").trim(),
       channel: normalizeNotificationChannel(entry?.channel),
+      persist: entry?.persist !== false,
       data: {
         url: normalizeNotificationUrl(entry?.url),
         ...(entry?.data && typeof entry.data === "object" ? entry.data : {})

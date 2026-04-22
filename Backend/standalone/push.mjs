@@ -88,7 +88,8 @@ export async function notifyUsers(entries) {
       title: String(entry?.title || "").trim(),
       body: String(entry?.body || "").trim(),
       channel: String(entry?.channel || "general").trim(),
-      data: entry?.data && typeof entry.data === "object" ? entry.data : {}
+      data: entry?.data && typeof entry.data === "object" ? entry.data : {},
+      persist: entry?.persist !== false
     }))
     .filter((entry) => entry.userId && entry.title && entry.body);
 
@@ -98,18 +99,21 @@ export async function notifyUsers(entries) {
 
   logger.info("Preparing notifications", {
     entryCount: normalizedEntries.length,
-    channels: [...new Set(normalizedEntries.map((entry) => entry.channel))]
+    channels: [...new Set(normalizedEntries.map((entry) => entry.channel))],
+    persistedCount: normalizedEntries.filter((entry) => entry.persist).length
   });
 
   const created = await Promise.all(
-    normalizedEntries.map((entry) =>
-      createNotification({
-        userId: entry.userId,
-        title: entry.title,
-        body: entry.body,
-        channel: entry.channel
-      })
-    )
+    normalizedEntries
+      .filter((entry) => entry.persist)
+      .map((entry) =>
+        createNotification({
+          userId: entry.userId,
+          title: entry.title,
+          body: entry.body,
+          channel: entry.channel
+        })
+      )
   );
 
   const devices = await listEnabledNotificationDevicesByUserIds(normalizedEntries.map((entry) => entry.userId));

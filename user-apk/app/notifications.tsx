@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
 import { api, formatApiError } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
@@ -26,8 +26,10 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(() => !(sessionToken && getCachedNotifications(sessionToken)?.length));
   const [refreshing, setRefreshing] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
+  const [allNotificationsEnabled, setAllNotificationsEnabled] = useState(true);
   const [error, setError] = useState("");
   const inFlightRef = useRef<Promise<void> | null>(null);
+  const visibleItems = items.filter((item) => String(item.channel || "").trim().toLowerCase() !== "result");
 
   useFocusEffect(
     useCallback(() => {
@@ -98,17 +100,32 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.page}>
-      <BackHeader title="Notifications" subtitle="Market result aur system updates yahan milenge." />
+      <BackHeader title="Notifications" subtitle="Wallet, security aur support updates yahan milenge." />
       <AppScreen onRefresh={sessionToken ? () => void refreshNow() : undefined} refreshing={refreshing} showPromo={false}>
         <View style={styles.hero}>
           <Text style={styles.heading}>Notification Center</Text>
-          <Text style={styles.subheading}>Result, wallet, security aur support related updates yahan history me save rahenge.</Text>
-          {!loading && items.some((item) => !item.read) ? (
+          <Text style={styles.subheading}>Wallet, security aur support related updates yahan history me save rahenge.</Text>
+          {!loading && visibleItems.some((item) => !item.read) ? (
             <Pressable disabled={markingAll} onPress={() => void markAllAsRead()} style={[styles.markAllButton, markingAll && styles.markAllButtonDisabled]}>
               <Text style={styles.markAllText}>{markingAll ? "Updating..." : "Mark all as read"}</Text>
             </Pressable>
           ) : null}
         </View>
+
+        <SurfaceCard style={styles.settingsCard}>
+          <View style={styles.settingsRow}>
+            <View style={styles.settingsTextWrap}>
+              <Text style={styles.settingsTitle}>All Notifications</Text>
+              <Text style={styles.settingsSubtitle}>Receive all notifications.</Text>
+            </View>
+            <Switch
+              onValueChange={setAllNotificationsEnabled}
+              thumbColor={colors.surface}
+              trackColor={{ false: colors.border, true: colors.success }}
+              value={allNotificationsEnabled}
+            />
+          </View>
+        </SurfaceCard>
 
         {loading ? (
           <SurfaceCard style={styles.stateCard}>
@@ -126,14 +143,14 @@ export default function NotificationsScreen() {
           </SurfaceCard>
         ) : null}
 
-        {!loading && !error && !items.length ? (
+        {!loading && !error && !visibleItems.length ? (
           <SurfaceCard style={styles.stateCard}>
             <Text style={styles.stateText}>Abhi koi notification nahi aayi hai.</Text>
           </SurfaceCard>
         ) : null}
 
         {!loading && !error
-          ? items.map((item) => (
+          ? visibleItems.map((item) => (
               <Pressable key={item.id} onPress={() => void openNotification(item)}>
                 <SurfaceCard style={[styles.itemCard, !item.read && styles.itemCardUnread]}>
                 <View style={styles.badgeRow}>
@@ -230,7 +247,7 @@ function getNotificationRoute(item: NotificationEntry) {
     return "/chat";
   }
   if (channel === "result") {
-    return "/charts";
+    return "/(tabs)";
   }
   if (channel === "security") {
     return "/profile";
@@ -289,6 +306,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     textAlign: "center"
+  },
+  settingsCard: {
+    paddingVertical: 14
+  },
+  settingsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16
+  },
+  settingsTextWrap: {
+    flex: 1,
+    gap: 4
+  },
+  settingsTitle: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  settingsSubtitle: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18
   },
   stateCard: {
     alignItems: "center",

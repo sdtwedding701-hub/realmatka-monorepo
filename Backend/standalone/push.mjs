@@ -1,6 +1,6 @@
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getMessaging } from "firebase-admin/messaging";
 import { createNotification, listEnabledNotificationDevicesByUserIds } from "./db.mjs";
-
-const EXPO_PUSH_ENDPOINT = "https://exp.host/--/api/v2/push/send";
 
 function chunkArray(items, size) {
   const chunks = [];
@@ -10,32 +10,67 @@ function chunkArray(items, size) {
   return chunks;
 }
 
-function isExpoPushToken(token) {
-  return /^ExponentPushToken\[.+\]$/.test(token) || /^ExpoPushToken\[.+\]$/.test(token);
+function getFirebaseAdminConfig() {
+  const rawServiceAccount = String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim();
+  if (rawServiceAccount) {
+    const parsed = JSON.parse(rawServiceAccount);
+    if (parsed.private_key && typeof parsed.private_key === "string") {
+      parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+    }
+    return parsed;
+  }
+
+  const projectId = String(process.env.FIREBASE_PROJECT_ID || "").trim();
+  const clientEmail = String(process.env.FIREBASE_CLIENT_EMAIL || "").trim();
+  const privateKey = String(process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n").trim();
+  if (!projectId || !clientEmail || !privateKey) {
+    return null;
+  }
+
+  return {
+    projectId,
+    clientEmail,
+    privateKey
+  };
 }
 
-async function sendExpoPushBatch(messages) {
+function getFirebaseMessagingClient() {
+  const config = getFirebaseAdminConfig();
+  if (!config) {
+    return null;
+  }
+
+  if (!getApps().length) {
+    initializeApp({
+      credential: cert(config)
+    });
+  }
+
+  return getMessaging();
+}
+
+function normalizeNotificationData(data) {
+  const normalized = {};
+  for (const [key, value] of Object.entries(data && typeof data === "object" ? data : {})) {
+    if (value === undefined || value === null) {
+      continue;
+    }
+    normalized[key] = typeof value === "string" ? value : JSON.stringify(value);
+  }
+  return normalized;
+}
+
+async function sendFcmBatch(messages) {
   if (!messages.length) {
-    return [];
+    return { successCount: 0, failureCount: 0, responses: [] };
   }
 
-  const response = await fetch(EXPO_PUSH_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Accept-Encoding": "gzip, deflate",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(messages)
-  });
-
-  if (!response.ok) {
-    const preview = await response.text();
-    throw new Error(`Expo push request failed (${response.status}): ${preview.slice(0, 200)}`);
+  const messaging = getFirebaseMessagingClient();
+  if (!messaging) {
+    throw new Error("Firebase Admin SDK is not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY.");
   }
 
-  const payload = await response.json();
-  return Array.isArray(payload?.data) ? payload.data : [];
+  return messaging.sendEach(messages);
 }
 
 export async function notifyUsers(entries) {
@@ -76,19 +111,26 @@ export async function notifyUsers(entries) {
   for (const entry of normalizedEntries) {
     const userDevices = devicesByUserId.get(entry.userId) || [];
     for (const device of userDevices) {
-      if (!isExpoPushToken(device.token)) {
+      const token = String(device.token || "").trim();
+      if (!token) {
         continue;
       }
       messages.push({
-        to: device.token,
-        title: entry.title,
-        body: entry.body,
-        sound: "default",
-        priority: "high",
-        channelId: "default",
+        token,
+        notification: {
+          title: entry.title,
+          body: entry.body
+        },
+        android: {
+          priority: "high",
+          notification: {
+            channelId: "default",
+            sound: "default"
+          }
+        },
         data: {
           channel: entry.channel,
-          ...entry.data
+          ...normalizeNotificationData(entry.data)
         }
       });
     }
@@ -99,11 +141,11 @@ export async function notifyUsers(entries) {
 
   for (const chunk of chunkArray(messages, 100)) {
     try {
-      const tickets = await sendExpoPushBatch(chunk);
-      pushed += tickets.filter((ticket) => ticket?.status === "ok").length;
-      tickets
-        .filter((ticket) => ticket?.status && ticket.status !== "ok")
-        .forEach((ticket) => errors.push(ticket?.message || "Push ticket error"));
+      const batchResponse = await sendFcmBatch(chunk);
+      pushed += Number(batchResponse?.successCount || 0);
+      (Array.isArray(batchResponse?.responses) ? batchResponse.responses : [])
+        .filter((response) => !response?.success)
+        .forEach((response) => errors.push(response?.error?.message || "FCM push send failed"));
     } catch (error) {
       errors.push(error instanceof Error ? error.message : "Push send failed");
     }

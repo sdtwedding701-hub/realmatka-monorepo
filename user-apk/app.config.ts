@@ -41,6 +41,7 @@ const config: ExpoConfig = {
   android: {
     package: androidPackage,
     jsEngine: "hermes",
+    googleServicesFile: "./android/app/google-services.json",
     adaptiveIcon: {
       foregroundImage: adaptiveIconPath,
       backgroundColor: "#ffffff"

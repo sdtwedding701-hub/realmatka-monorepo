@@ -1,4 +1,3 @@
-import Constants from "expo-constants";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { api } from "@/lib/api";
@@ -7,7 +6,7 @@ import { debugError, debugLog } from "@/lib/debug";
 let notificationBehaviorInitialized = false;
 
 export function isExpoGoEnvironment() {
-  return Constants.appOwnership === "expo";
+  return false;
 }
 
 async function getNotificationsModule() {
@@ -93,19 +92,16 @@ export async function registerDeviceForPushNotifications(sessionToken: string) {
     return null;
   }
 
-  const projectId =
-    Constants?.expoConfig?.extra?.eas?.projectId ||
-    Constants?.easConfig?.projectId ||
-    process.env.EXPO_PUBLIC_EAS_PROJECT_ID ||
-    "";
+  const devicePushToken = await Notifications.getDevicePushTokenAsync();
+  const token = typeof devicePushToken?.data === "string" ? devicePushToken.data.trim() : "";
+  const tokenType = String(devicePushToken?.type ?? "").toLowerCase();
 
-  if (!projectId) {
-    throw new Error("Expo EAS projectId missing for push registration.");
-  }
-
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   if (!token) {
     return null;
+  }
+
+  if (Platform.OS === "android" && tokenType && tokenType !== "fcm") {
+    debugLog("push", "unexpected android push token type", { tokenType });
   }
 
   await api.registerNotificationDevice(sessionToken, Platform.OS === "ios" ? "ios" : "android", token);

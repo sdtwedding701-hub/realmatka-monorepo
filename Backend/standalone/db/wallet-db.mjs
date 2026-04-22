@@ -68,7 +68,7 @@ function getWalletEntryBalanceDelta(entry) {
   }
   const amount = Number(entry.amount ?? 0);
   const type = String(entry.type || "").toUpperCase();
-  const creditTypes = new Set(["DEPOSIT", "REFERRAL_COMMISSION", "BID_WIN", "SIGNUP_BONUS", "ADMIN_CREDIT"]);
+  const creditTypes = new Set(["DEPOSIT", "REFERRAL_COMMISSION", "BID_WIN", "SIGNUP_BONUS", "FIRST_DEPOSIT_BONUS", "ADMIN_CREDIT"]);
   const debitTypes = new Set(["WITHDRAW", "BID_PLACED", "BID_WIN_REVERSAL", "ADMIN_DEBIT"]);
   if (creditTypes.has(type)) return amount;
   if (debitTypes.has(type)) return -amount;
@@ -507,9 +507,20 @@ export async function resolveWalletApprovalRequest(entryId, action) {
   }
 
   if (request.type === "DEPOSIT") {
+    const approvedRequest = await updateWalletEntryAdmin(entryId, {
+      status: "SUCCESS",
+      beforeBalance,
+      afterBalance: beforeBalance + request.amount
+    });
+    const { applyFirstDepositBonusIfEligible } = await import("../db.mjs");
+    const bonusEntry = await applyFirstDepositBonusIfEligible({
+      userId: request.userId,
+      depositAmount: request.amount,
+      depositEntryId: entryId
+    });
     return {
-      request: await updateWalletEntryAdmin(entryId, { status: "SUCCESS", beforeBalance, afterBalance: beforeBalance + request.amount }),
-      settlementEntry: null
+      request: approvedRequest,
+      settlementEntry: bonusEntry
     };
   }
 
@@ -526,11 +537,22 @@ export async function completeWalletRequest(entryId) {
     throw new Error("User has insufficient live balance for withdraw completion");
   }
 
-  return updateWalletEntryAdmin(entryId, {
+  const completedRequest = await updateWalletEntryAdmin(entryId, {
     status: "SUCCESS",
     beforeBalance,
     afterBalance: request.type === "DEPOSIT" ? beforeBalance + request.amount : beforeBalance - request.amount
   });
+
+  if (request.type === "DEPOSIT") {
+    const { applyFirstDepositBonusIfEligible } = await import("../db.mjs");
+    await applyFirstDepositBonusIfEligible({
+      userId: request.userId,
+      depositAmount: request.amount,
+      depositEntryId: entryId
+    });
+  }
+
+  return completedRequest;
 }
 
 export async function rejectWalletRequest(entryId) {

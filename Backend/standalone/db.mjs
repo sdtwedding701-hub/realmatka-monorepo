@@ -22,6 +22,8 @@ const sessionTtlMs = standaloneConfig.sessionTtlHours * 60 * 60 * 1000;
 const authSessionCache = new Map();
 const AUTH_SESSION_CACHE_TTL_MS = 15_000;
 const signupBonusAmount = 25;
+const firstDepositBonusRate = 5;
+const firstDepositBonusCap = 100;
 const supportChatResolvedRetentionMs = Math.max(1, standaloneConfig.supportChatResolvedRetentionDays) * 24 * 60 * 60 * 1000;
 const dbIndexDefinitions = [
   ["idx_users_role_approval_joined_at", "users (role, approval_status, joined_at DESC)"],
@@ -387,6 +389,7 @@ function mapUserRow(row) {
         deactivatedAt: toIso(row.deactivated_at),
         statusNote: row.status_note ?? "",
         signupBonusGranted: toBool(row.signup_bonus_granted),
+        firstDepositBonusGranted: toBool(row.first_deposit_bonus_granted),
         referredByUserId: row.referred_by_user_id ?? null
       }
     : null;
@@ -754,6 +757,7 @@ async function ensurePostgresBootstrap(pool) {
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status_note TEXT`);
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS mpin_configured BOOLEAN NOT NULL DEFAULT FALSE`);
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_bonus_granted BOOLEAN NOT NULL DEFAULT FALSE`);
+      await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_deposit_bonus_granted BOOLEAN NOT NULL DEFAULT FALSE`);
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by_user_id TEXT`);
       await client.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS game_type TEXT`);
       await client.query(`ALTER TABLE markets ADD COLUMN IF NOT EXISTS result_locked_at TIMESTAMPTZ`);
@@ -947,6 +951,7 @@ function getSqlite() {
       deactivated_at TEXT,
       status_note TEXT,
       signup_bonus_granted INTEGER NOT NULL DEFAULT 0,
+      first_deposit_bonus_granted INTEGER NOT NULL DEFAULT 0,
       referred_by_user_id TEXT
     );
 
@@ -1127,6 +1132,7 @@ function getSqlite() {
   ensureSqliteColumn(sqlite, "users", "status_note", "TEXT");
   ensureSqliteColumn(sqlite, "users", "mpin_configured", "INTEGER NOT NULL DEFAULT 0");
   ensureSqliteColumn(sqlite, "users", "signup_bonus_granted", "INTEGER NOT NULL DEFAULT 0");
+  ensureSqliteColumn(sqlite, "users", "first_deposit_bonus_granted", "INTEGER NOT NULL DEFAULT 0");
   ensureSqliteColumn(sqlite, "users", "referred_by_user_id", "TEXT");
   ensureSqliteColumn(sqlite, "bids", "game_type", "TEXT");
   ensureSqliteColumn(sqlite, "markets", "result_locked_at", "TEXT");
@@ -1307,7 +1313,7 @@ export async function updateUserProfile(userId, updates) {
        SET name = COALESCE(NULLIF($2, ''), name),
            phone = COALESCE(NULLIF($3, ''), phone)
        WHERE id = $1
-       RETURNING id, phone, password_hash, mpin_hash, mpin_configured, name, role, referral_code, joined_at, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id`,
+       RETURNING id, phone, password_hash, mpin_hash, mpin_configured, name, role, referral_code, joined_at, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id`,
       [userId, nextName, nextPhone]
     );
     return mapUserRow(result.rows[0]);
@@ -1323,7 +1329,7 @@ export async function updateUserProfile(userId, updates) {
 
   const row = db
     .prepare(
-      `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, role, referral_code, joined_at, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id
+      `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, role, referral_code, joined_at, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id
        FROM users
        WHERE id = ?
        LIMIT 1`
@@ -1354,15 +1360,15 @@ export async function createUserAccount({ phone, passwordHash, referenceCode, fi
   if (isStandalonePostgresEnabled()) {
       const pool = await getReadyPgPool();
     await pool.query(
-      `INSERT INTO users (id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, signup_bonus_granted, referred_by_user_id)
-       VALUES ($1, $2, $3, $4, FALSE, $5, $6, $7, 'user', 'Approved', $6, FALSE, $8)`,
+      `INSERT INTO users (id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id)
+       VALUES ($1, $2, $3, $4, FALSE, $5, $6, $7, 'user', 'Approved', $6, FALSE, FALSE, $8)`,
       [userId, phone, passwordHash, hashSecret("1234"), name, joinedAt, referralCode, referrer?.id ?? null]
     );
   } else {
     getSqlite()
       .prepare(
-        `INSERT INTO users (id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, signup_bonus_granted, referred_by_user_id)
-         VALUES (?, ?, ?, ?, 0, ?, ?, ?, 'user', 'Approved', ?, 0, ?)`
+        `INSERT INTO users (id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id)
+         VALUES (?, ?, ?, ?, 0, ?, ?, ?, 'user', 'Approved', ?, 0, 0, ?)`
       )
       .run(userId, phone, passwordHash, hashSecret("1234"), name, joinedAt, referralCode, joinedAt, referrer?.id ?? null);
   }
@@ -1390,7 +1396,7 @@ async function findUserByReferralCode(referenceCode) {
   if (isStandalonePostgresEnabled()) {
       const pool = await getReadyPgPool();
     const result = await pool.query(
-      `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, role, referral_code, joined_at, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id
+      `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, role, referral_code, joined_at, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id
        FROM users
        WHERE referral_code = $1
        LIMIT 1`,
@@ -1402,7 +1408,7 @@ async function findUserByReferralCode(referenceCode) {
   return mapUserRow(
     getSqlite()
       .prepare(
-        `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, role, referral_code, joined_at, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id
+        `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, role, referral_code, joined_at, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id
          FROM users
          WHERE referral_code = ?
          LIMIT 1`
@@ -1415,7 +1421,7 @@ export async function findUserById(userId) {
   if (isStandalonePostgresEnabled()) {
       const pool = await getReadyPgPool();
     const result = await pool.query(
-      `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id
+      `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id
        FROM users
        WHERE id = $1
        LIMIT 1`,
@@ -1427,7 +1433,7 @@ export async function findUserById(userId) {
   return mapUserRow(
     getSqlite()
       .prepare(
-        `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id
+        `SELECT id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id
          FROM users
          WHERE id = ?
          LIMIT 1`
@@ -1440,7 +1446,7 @@ export async function getUsersList() {
   if (isStandalonePostgresEnabled()) {
       const pool = await getReadyPgPool();
     const result = await pool.query(
-      `SELECT id, phone, password_hash, mpin_hash, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id
+      `SELECT id, phone, password_hash, mpin_hash, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id
        FROM users
        ORDER BY joined_at DESC, id DESC`
     );
@@ -1449,7 +1455,7 @@ export async function getUsersList() {
 
   return getSqlite()
     .prepare(
-      `SELECT id, phone, password_hash, mpin_hash, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id
+      `SELECT id, phone, password_hash, mpin_hash, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id
        FROM users
        ORDER BY joined_at DESC, id DESC`
     )
@@ -1475,6 +1481,7 @@ export async function getUserAdminSummaries() {
         u.deactivated_at,
         u.status_note,
         u.signup_bonus_granted,
+        u.first_deposit_bonus_granted,
         u.referred_by_user_id,
         COALESCE(balance.after_balance, 0) AS wallet_balance,
         COALESCE(session_stats.login_count, 0) AS login_count,
@@ -1536,6 +1543,7 @@ export async function getUserAdminSummaries() {
       deactivatedAt: toIso(row.deactivated_at),
       statusNote: row.status_note ?? "",
       signupBonusGranted: toBool(row.signup_bonus_granted),
+      firstDepositBonusGranted: toBool(row.first_deposit_bonus_granted),
       referredByUserId: row.referred_by_user_id ?? null,
       walletBalance: Number(row.wallet_balance ?? 0),
       loginCount: Number(row.login_count ?? 0),
@@ -1562,6 +1570,7 @@ export async function getUserAdminSummaries() {
          u.deactivated_at,
          u.status_note,
          u.signup_bonus_granted,
+         u.first_deposit_bonus_granted,
          u.referred_by_user_id,
          COALESCE((
            SELECT after_balance
@@ -1616,6 +1625,7 @@ export async function getUserAdminSummaries() {
       deactivatedAt: toIso(row.deactivated_at),
       statusNote: row.status_note ?? "",
       signupBonusGranted: toBool(row.signup_bonus_granted),
+      firstDepositBonusGranted: toBool(row.first_deposit_bonus_granted),
       referredByUserId: row.referred_by_user_id ?? null,
       walletBalance: Number(row.wallet_balance ?? 0),
       loginCount: Number(row.login_count ?? 0),
@@ -1870,6 +1880,52 @@ export async function applyReferralLossCommission({ userId, lostAmount, bidId, m
     body: `Rs ${commissionAmount.toFixed(2)} referral income added from ${player.name}.`,
     channel: "wallet"
   });
+
+  return entry;
+}
+
+export async function applyFirstDepositBonusIfEligible({ userId, depositAmount, depositEntryId }) {
+  const normalizedUserId = String(userId || "").trim();
+  const normalizedDepositEntryId = String(depositEntryId || "").trim();
+  const normalizedAmount = roundMoney(Number(depositAmount || 0));
+  if (!normalizedUserId || !normalizedDepositEntryId || normalizedAmount <= 0) {
+    return null;
+  }
+
+  const user = await findUserById(normalizedUserId);
+  if (!user || user.firstDepositBonusGranted) {
+    return null;
+  }
+
+  const bonusAmount = Math.min(roundMoney(normalizedAmount * (firstDepositBonusRate / 100)), firstDepositBonusCap);
+  if (bonusAmount <= 0) {
+    return null;
+  }
+
+  const referenceId = `first-deposit-bonus:${normalizedDepositEntryId}`;
+  const existingEntry = await findWalletEntryByReferenceId(normalizedUserId, referenceId);
+  if (existingEntry) {
+    return existingEntry;
+  }
+
+  const beforeBalance = await getUserBalance(normalizedUserId);
+  const entry = await addWalletEntry({
+    userId: normalizedUserId,
+    type: "FIRST_DEPOSIT_BONUS",
+    status: "SUCCESS",
+    amount: bonusAmount,
+    beforeBalance,
+    afterBalance: beforeBalance + bonusAmount,
+    referenceId,
+    note: `First deposit bonus @ ${firstDepositBonusRate}%`
+  });
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await getReadyPgPool();
+    await pool.query(`UPDATE users SET first_deposit_bonus_granted = TRUE WHERE id = $1`, [normalizedUserId]);
+  } else {
+    getSqlite().prepare(`UPDATE users SET first_deposit_bonus_granted = 1 WHERE id = ?`).run(normalizedUserId);
+  }
 
   return entry;
 }
@@ -2199,7 +2255,7 @@ export async function updateUserAccountStatus(userId, action, note = "") {
            deactivated_at = $3,
            status_note = $4
        WHERE id = $1
-       RETURNING id, phone, password_hash, mpin_hash, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, referred_by_user_id`,
+       RETURNING id, phone, password_hash, mpin_hash, name, joined_at, referral_code, role, approval_status, approved_at, rejected_at, blocked_at, deactivated_at, status_note, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id`,
       [userId, blockedAt, deactivatedAt, statusNote]
     );
     return mapUserRow(result.rows[0]);

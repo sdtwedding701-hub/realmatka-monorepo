@@ -15,6 +15,7 @@ CREATE TABLE users (
   deactivated_at TIMESTAMPTZ,
   status_note TEXT,
   signup_bonus_granted BOOLEAN NOT NULL DEFAULT FALSE,
+  first_deposit_bonus_granted BOOLEAN NOT NULL DEFAULT FALSE,
   referred_by_user_id TEXT REFERENCES users(id)
 );
 

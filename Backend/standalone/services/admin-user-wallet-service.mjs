@@ -40,6 +40,16 @@ async function sendWalletActionNotification(entry, action, settlementEntry = nul
       channel: "wallet",
       url: "/wallet/history"
     });
+    const bonusAmount = roundAmount(Number(settlementEntry?.amount ?? 0));
+    if (String(settlementEntry?.type || "").toUpperCase() === "FIRST_DEPOSIT_BONUS" && bonusAmount > 0) {
+      await sendUserNotification({
+        userId,
+        title: "First deposit bonus added",
+        body: `Rs ${bonusAmount.toFixed(2)} first deposit bonus added to your wallet.`,
+        channel: "wallet",
+        url: "/wallet/history"
+      });
+    }
     return;
   }
 

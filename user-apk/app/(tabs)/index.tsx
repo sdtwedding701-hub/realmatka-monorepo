@@ -157,10 +157,10 @@ export default function HomeScreen() {
     }
 
     const travelDistance = measuredNoticeTextWidth + noticeContainerWidth + 24;
-    noticeScrollX.setValue(-measuredNoticeTextWidth - 24);
+    noticeScrollX.setValue(noticeContainerWidth);
     const animation = Animated.loop(
       Animated.timing(noticeScrollX, {
-        toValue: noticeContainerWidth,
+        toValue: -measuredNoticeTextWidth - 24,
         duration: Math.max(9000, travelDistance * 42),
         easing: Easing.linear,
         useNativeDriver: true

@@ -61,7 +61,12 @@ export async function register(request) {
     return fail("Password and confirm password must match", 400, request);
   }
 
-  const validOtp = await verifyOtp(phone, "register", otp);
+  let validOtp = false;
+  try {
+    validOtp = await verifyOtp(phone, "register", otp);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Unable to verify OTP", 500, request);
+  }
   if (!validOtp) {
     return fail("Invalid or expired OTP", 400, request);
   }

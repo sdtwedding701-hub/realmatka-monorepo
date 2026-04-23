@@ -33,7 +33,7 @@ export default function RegisterScreen() {
   const hasValidLastName = normalizedLastName.length >= 2;
   const hasValidPhone = normalizedPhone.length === 10;
   const hasValidOtp = normalizedOtp.length === 6;
-  const hasValidPassword = password.trim().length >= 4;
+  const hasValidPassword = password.trim().length >= 8;
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
 
   useEffect(() => {
@@ -240,7 +240,7 @@ export default function RegisterScreen() {
                   return;
                 }
                 if (!hasValidPassword) {
-                  setError("Password kam se kam 4 characters ka hona chahiye.");
+                  setError("Password kam se kam 8 characters ka hona chahiye.");
                   return;
                 }
                 if (!passwordsMatch) {

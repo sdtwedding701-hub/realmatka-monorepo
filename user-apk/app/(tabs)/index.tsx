@@ -23,6 +23,7 @@ type MarketItem = {
   slug: string;
   name: string;
   result: string;
+  phase?: "open-running" | "close-running" | "closed" | "upcoming";
   status: string;
   action: string;
   open: string;
@@ -49,16 +50,23 @@ function isMarketForcedClosed(market: Pick<MarketItem, "status" | "action">) {
   return status.includes("weekly off") || status.includes("closed for today") || action === "closed";
 }
 
-function getMarketDisplayMeta(market: Pick<MarketItem, "status" | "action">) {
+function getMarketDisplayMeta(market: Pick<MarketItem, "status" | "action" | "phase">) {
   const isClosed = isMarketForcedClosed(market);
   const normalizedStatus = String(market.status ?? "").trim();
   const normalizedAction = String(market.action ?? "").trim();
+  const normalizedPhase = String(market.phase ?? "").trim().toLowerCase();
+  const resolvedPhase =
+    normalizedPhase === "open-running" || normalizedPhase === "close-running" || normalizedPhase === "upcoming" || normalizedPhase === "closed"
+      ? normalizedPhase
+      : isClosed
+        ? "closed"
+        : "open-running";
 
   return {
     label: normalizedStatus || (isClosed ? "Betting is Closed for Today" : "Betting Running Now"),
     isClosed,
     canPlaceBet: !isClosed && normalizedAction.toLowerCase() !== "closed",
-    phase: isClosed ? "closed" : "close-running"
+    phase: resolvedPhase
   } as const;
 }
 

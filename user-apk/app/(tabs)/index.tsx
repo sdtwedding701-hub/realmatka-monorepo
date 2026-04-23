@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Animated, Easing, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { marketCatalog } from "../../data/mock";
 import { api, formatApiError } from "@/lib/api";
@@ -35,6 +35,8 @@ type MarketItem = {
 };
 
 const HOME_SOFT_REFRESH_INTERVAL_MS = 120_000;
+const DEFAULT_NOTICE_TEXT =
+  "Abhi market aur betting running hai. Aap app me bet place kar sakte ho. First deposit bonus: Rs 1000 par 50 points aur Rs 2000 par 100 points milenge. Bonus sirf first deposit par milega.";
 const FALLBACK_MARKETS: MarketItem[] = marketCatalog.map((fallback) => ({
   id: fallback.slug,
   slug: fallback.slug,
@@ -93,7 +95,10 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [noticeText, setNoticeText] = useState("Notice: Market open-close time change ho sakta hai, bet place karne se pehle check karein.");
+  const [noticeText, setNoticeText] = useState(DEFAULT_NOTICE_TEXT);
+  const noticeScrollX = useRef(new Animated.Value(0)).current;
+  const [noticeContainerWidth, setNoticeContainerWidth] = useState(0);
+  const [noticeTextWidth, setNoticeTextWidth] = useState(0);
   const [selectedChartMarket, setSelectedChartMarket] = useState<Pick<MarketItem, "slug" | "name"> | null>(null);
   useEffect(() => {
     const cachedMarkets = getCachedMarkets();
@@ -138,6 +143,35 @@ export default function HomeScreen() {
     }, [])
   );
 
+  useEffect(() => {
+    noticeScrollX.stopAnimation();
+    if (!noticeContainerWidth || !noticeTextWidth) {
+      noticeScrollX.setValue(0);
+      return;
+    }
+
+    if (noticeTextWidth <= noticeContainerWidth) {
+      noticeScrollX.setValue(0);
+      return;
+    }
+
+    const travelDistance = noticeTextWidth + noticeContainerWidth + 24;
+    noticeScrollX.setValue(noticeContainerWidth);
+    const animation = Animated.loop(
+      Animated.timing(noticeScrollX, {
+        toValue: -noticeTextWidth - 24,
+        duration: Math.max(9000, travelDistance * 42),
+        easing: Easing.linear,
+        useNativeDriver: true
+      })
+    );
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [noticeContainerWidth, noticeScrollX, noticeText, noticeTextWidth]);
+
   const listedMarkets = markets;
   const isCompactScreen = height < 760;
   const showHardError = listedMarkets.length === 0 && Boolean(error);
@@ -157,7 +191,18 @@ export default function HomeScreen() {
       />
       <View style={styles.noticeStrip}>
         <Ionicons color={colors.warning} name="alert-circle-outline" size={16} />
-        <Text style={styles.noticeText}>{noticeText}</Text>
+        <View
+          onLayout={(event) => setNoticeContainerWidth(event.nativeEvent.layout.width)}
+          style={styles.noticeMarqueeWindow}
+        >
+          <Animated.Text
+            numberOfLines={1}
+            onLayout={(event) => setNoticeTextWidth(event.nativeEvent.layout.width)}
+            style={[styles.noticeText, { transform: [{ translateX: noticeScrollX }] }]}
+          >
+            {noticeText}
+          </Animated.Text>
+        </View>
       </View>
 
       <AppScreen
@@ -483,12 +528,18 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 8
   },
-  noticeText: {
+  noticeMarqueeWindow: {
     flex: 1,
+    minHeight: 18,
+    overflow: "hidden"
+  },
+  noticeText: {
+    alignSelf: "flex-start",
     color: colors.warning,
     fontSize: 12,
     fontWeight: "800",
-    lineHeight: 17
+    lineHeight: 17,
+    minWidth: "100%"
   },
   errorTitle: {
     color: colors.textPrimary,

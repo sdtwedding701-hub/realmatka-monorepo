@@ -24,6 +24,8 @@ const AUTH_SESSION_CACHE_TTL_MS = 15_000;
 const signupBonusAmount = 25;
 const firstDepositBonusRate = 5;
 const firstDepositBonusCap = 100;
+const defaultNoticeText =
+  "Abhi market aur betting running hai. Aap app me bet place kar sakte ho. First deposit bonus: Rs 1000 par 50 points aur Rs 2000 par 100 points milenge. Bonus sirf first deposit par milega.";
 const supportChatResolvedRetentionMs = Math.max(1, standaloneConfig.supportChatResolvedRetentionDays) * 24 * 60 * 60 * 1000;
 const dbIndexDefinitions = [
   ["idx_users_role_approval_joined_at", "users (role, approval_status, joined_at DESC)"],
@@ -893,7 +895,7 @@ async function ensurePostgresBootstrap(pool) {
       const settingsCount = Number((await client.query("SELECT COUNT(*)::int AS count FROM app_settings")).rows[0]?.count ?? 0);
       if (settingsCount === 0) {
         const settings = [
-          ["notice_text", "Withdraw approvals aur result updates yahan se control hote hain."],
+          ["notice_text", defaultNoticeText],
           ["support_phone", defaultUser?.phone || ""],
           ["support_hours", "10:00 AM - 10:00 PM"],
           ["bonus_enabled", "true"],
@@ -1178,7 +1180,7 @@ function getSqlite() {
   if (settingsCount === 0) {
     const insertSetting = sqlite.prepare(`INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)`);
     const createdAt = nowIso();
-    insertSetting.run("notice_text", "Withdraw approvals aur result updates yahan se control hote hain.", createdAt);
+    insertSetting.run("notice_text", defaultNoticeText, createdAt);
     insertSetting.run("support_phone", defaultUser?.phone || "", createdAt);
     insertSetting.run("support_hours", "10:00 AM - 10:00 PM", createdAt);
     insertSetting.run("bonus_enabled", "true", createdAt);

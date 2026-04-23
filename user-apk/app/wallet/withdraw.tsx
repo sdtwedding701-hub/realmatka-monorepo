@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppState } from "@/lib/app-state";
@@ -26,45 +26,12 @@ export default function WithdrawScreen() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const withdrawAmount = Number(amount || 0);
   const hasEnoughWalletBalanceForWithdraw = walletBalance >= MIN_WITHDRAW_AMOUNT;
-  const hasValidAmount = Number.isFinite(withdrawAmount) && withdrawAmount >= MIN_WITHDRAW_AMOUNT && withdrawAmount <= walletBalance;
   const hasValidOtp = otp.trim().length === 6;
   const isMultipleOfHundred = Number.isFinite(withdrawAmount) && withdrawAmount % WITHDRAW_MULTIPLE === 0;
-  const withdrawValidationMessage = useMemo(() => {
-    if (!latestBank) {
-      return "Withdraw request se pehle bank account add karo.";
-    }
-    if (!amount.trim()) {
-      return "";
-    }
-    if (!hasEnoughWalletBalanceForWithdraw) {
-      return `Insufficient balance. Minimum withdraw ke liye wallet me kam se kam Rs ${MIN_WITHDRAW_AMOUNT} hona chahiye.`;
-    }
-    if (!Number.isFinite(withdrawAmount) || withdrawAmount <= 0) {
-      return "Valid withdraw amount enter karo.";
-    }
-    if (withdrawAmount < MIN_WITHDRAW_AMOUNT) {
-      return `Minimum withdraw amount Rs ${MIN_WITHDRAW_AMOUNT} hai.`;
-    }
-    if (!isMultipleOfHundred) {
-      return `Withdraw amount ${WITHDRAW_MULTIPLE} ke multiple me hona chahiye.`;
-    }
-    if (withdrawAmount > walletBalance) {
-      return "Insufficient balance for this withdraw amount.";
-    }
-    return "";
-  }, [amount, hasEnoughWalletBalanceForWithdraw, isMultipleOfHundred, latestBank, walletBalance, withdrawAmount]);
-  const canRequestWithdrawOtp =
-    Boolean(latestBank) &&
-    !submitting &&
-    Boolean(amount.trim()) &&
-    hasEnoughWalletBalanceForWithdraw &&
-    Number.isFinite(withdrawAmount) &&
-    withdrawAmount >= MIN_WITHDRAW_AMOUNT &&
-    isMultipleOfHundred &&
-    withdrawAmount <= walletBalance;
 
   useEffect(() => {
     void Promise.all([loadBankAccounts(), loadWalletHistory()]);
@@ -86,6 +53,15 @@ export default function WithdrawScreen() {
       hideSubscription.remove();
     };
   }, []);
+
+  useEffect(
+    () => () => {
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+    },
+    []
+  );
 
   return (
     <View style={styles.overlay}>
@@ -136,13 +112,11 @@ export default function WithdrawScreen() {
 
             <Text style={styles.fieldLabel}>Amount</Text>
             <View style={styles.inputRow}>
-              <TextInput
-                keyboardType="numeric"
-                onChangeText={(value) => {
-                  setAmount(value.replace(/[^0-9]/g, ""));
-                  setError("");
-                  setSuccessMessage("");
-                }}
+                <TextInput
+                  keyboardType="numeric"
+                  onChangeText={(value) => {
+                    setAmount(value.replace(/[^0-9]/g, ""));
+                  }}
                 placeholder="Enter amount min 500"
                 placeholderTextColor="rgba(100, 116, 139, 0.5)"
                 style={styles.input}
@@ -157,13 +131,12 @@ export default function WithdrawScreen() {
               <>
                 <Text style={styles.fieldLabel}>Withdraw OTP</Text>
                 <View style={styles.inputRow}>
-                  <TextInput
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    onChangeText={(value) => {
-                      setOtp(value.replace(/[^0-9]/g, ""));
-                      setError("");
-                    }}
+                <TextInput
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  onChangeText={(value) => {
+                    setOtp(value.replace(/[^0-9]/g, ""));
+                  }}
                     placeholder="Enter 6 digit OTP"
                     placeholderTextColor="rgba(100, 116, 139, 0.5)"
                     style={styles.input}
@@ -173,23 +146,24 @@ export default function WithdrawScreen() {
                 </View>
                 {otpMessage ? <Text style={styles.simpleInfoText}>{otpMessage}</Text> : null}
                 <Pressable
-                  disabled={!hasValidAmount || !hasValidOtp || submitting}
+                  disabled={submitting}
                   onPress={() => void submitWithdraw()}
-                  style={[styles.primaryButton, (!hasValidAmount || !hasValidOtp || submitting) && styles.disabledButton]}
+                  style={[styles.primaryButton, submitting && styles.disabledButton]}
                 >
                   {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>Confirm Withdraw</Text>}
                 </Pressable>
               </>
             ) : (
               <Pressable
-                disabled={!canRequestWithdrawOtp}
+                disabled={submitting}
                 onPress={() => void sendWithdrawOtp()}
-                style={[styles.primaryButton, !canRequestWithdrawOtp && styles.disabledButton]}
+                style={[styles.primaryButton, submitting && styles.disabledButton]}
               >
                 {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>Withdraw</Text>}
               </Pressable>
             )}
-            {withdrawValidationMessage ? <Text style={styles.errorText}>{withdrawValidationMessage}</Text> : null}
+            {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <Text style={styles.simpleInfoText}>Withdrawal limit is 500 to 99999.</Text>
             <Text style={styles.simpleInfoText}>Withdraw request timing is 11:00 AM to 11:00 PM.</Text>
@@ -200,27 +174,36 @@ export default function WithdrawScreen() {
   );
   async function sendWithdrawOtp() {
     if (pendingWithdraw) {
-      setError("Already one withdraw request is pending.");
-      setTimeout(() => setError(""), 5000);
+      showTransientMessage("error", "Already one withdraw request is pending.");
       return;
     }
 
     if (!latestBank) {
-      setError("Bank account add karo, tabhi withdraw request jayegi.");
+      showTransientMessage("error", "Bank account add karo, tabhi withdraw request jayegi.");
       return;
     }
 
-    if (!Number.isFinite(withdrawAmount) || withdrawAmount < MIN_WITHDRAW_AMOUNT) {
-      setError(`Minimum withdraw Rs ${MIN_WITHDRAW_AMOUNT} hai.`);
+    if (!hasEnoughWalletBalanceForWithdraw) {
+      showTransientMessage("error", `Insufficient balance. Minimum withdraw ke liye wallet me kam se kam Rs ${MIN_WITHDRAW_AMOUNT} hona chahiye.`);
+      return;
+    }
+
+    if (!Number.isFinite(withdrawAmount) || withdrawAmount <= 0) {
+      showTransientMessage("error", "Valid withdraw amount enter karo.");
+      return;
+    }
+
+    if (withdrawAmount < MIN_WITHDRAW_AMOUNT) {
+      showTransientMessage("error", `Minimum withdraw Rs ${MIN_WITHDRAW_AMOUNT} hai.`);
       return;
     }
     if (!isMultipleOfHundred) {
-      setError(`Withdraw amount ${WITHDRAW_MULTIPLE} ke multiple me enter karo.`);
+      showTransientMessage("error", `Withdraw amount ${WITHDRAW_MULTIPLE} ke multiple me enter karo.`);
       return;
     }
 
     if (withdrawAmount > walletBalance) {
-      setError("Withdraw amount wallet balance se zyada nahi ho sakta.");
+      showTransientMessage("error", "Insufficient balance for this withdraw amount.");
       return;
     }
 
@@ -232,8 +215,9 @@ export default function WithdrawScreen() {
       setOtpSent(true);
       setOtp("");
       setOtpMessage(response.provider === "twilio" ? "Withdraw OTP SMS successfully sent." : "Withdraw OTP generated.");
+      showTransientMessage("success", "Withdraw OTP sent successfully.");
     } catch (submitError) {
-      setError(formatApiError(submitError, "Withdraw OTP send nahi hui."));
+      showTransientMessage("error", formatApiError(submitError, "Withdraw OTP send nahi hui."));
     } finally {
       setSubmitting(false);
     }
@@ -241,32 +225,31 @@ export default function WithdrawScreen() {
 
   async function submitWithdraw() {
     if (pendingWithdraw) {
-      setError("Already one withdraw request is pending.");
-      setTimeout(() => setError(""), 5000);
+      showTransientMessage("error", "Already one withdraw request is pending.");
       return;
     }
 
     if (!latestBank) {
-      setError("Bank account add karo, tabhi withdraw request jayegi.");
+      showTransientMessage("error", "Bank account add karo, tabhi withdraw request jayegi.");
       return;
     }
 
     if (!Number.isFinite(withdrawAmount) || withdrawAmount < MIN_WITHDRAW_AMOUNT) {
-      setError(`Minimum withdraw Rs ${MIN_WITHDRAW_AMOUNT} hai.`);
+      showTransientMessage("error", `Minimum withdraw Rs ${MIN_WITHDRAW_AMOUNT} hai.`);
       return;
     }
     if (!isMultipleOfHundred) {
-      setError(`Withdraw amount ${WITHDRAW_MULTIPLE} ke multiple me enter karo.`);
+      showTransientMessage("error", `Withdraw amount ${WITHDRAW_MULTIPLE} ke multiple me enter karo.`);
       return;
     }
 
     if (withdrawAmount > walletBalance) {
-      setError("Withdraw amount wallet balance se zyada nahi ho sakta.");
+      showTransientMessage("error", "Insufficient balance for this withdraw amount.");
       return;
     }
 
     if (!hasValidOtp) {
-      setError("Valid 6 digit OTP dalo.");
+      showTransientMessage("error", "Valid 6 digit OTP dalo.");
       return;
     }
 
@@ -279,10 +262,33 @@ export default function WithdrawScreen() {
         router.replace("/wallet/history");
       }, 700);
     } catch (submitError) {
-      setError(formatApiError(submitError, "Withdraw request submit nahi hui."));
+      showTransientMessage("error", formatApiError(submitError, "Withdraw request submit nahi hui."));
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function showTransientMessage(kind: "error" | "success", text: string) {
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current);
+    }
+
+    if (kind === "error") {
+      setSuccessMessage("");
+      setError(text);
+    } else {
+      setError("");
+      setSuccessMessage(text);
+    }
+
+    feedbackTimerRef.current = setTimeout(() => {
+      if (kind === "error") {
+        setError("");
+      } else {
+        setSuccessMessage("");
+      }
+      feedbackTimerRef.current = null;
+    }, 3500);
   }
 }
 

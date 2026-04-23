@@ -39,7 +39,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="relative border-t border-white/10 px-4 py-4 text-center text-xs text-slate-400">
-        © 2026 RealMatka.in • All rights reserved
+        Copyright 2026 RealMatka.in - All rights reserved
       </div>
     </footer>
   );

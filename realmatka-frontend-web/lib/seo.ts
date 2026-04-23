@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import { SEO } from "@/seo.config";
 
+const defaultImage = {
+  url: "/app-icon.jpg",
+  width: 1024,
+  height: 1024,
+  alt: "Real Matka"
+};
+
 export const defaultMetadata: Metadata = {
   metadataBase: new URL(SEO.siteUrl),
   title: {
@@ -12,23 +19,35 @@ export const defaultMetadata: Metadata = {
   alternates: {
     canonical: SEO.siteUrl,
   },
+  icons: {
+    icon: "/app-icon.jpg",
+    shortcut: "/app-icon.jpg",
+    apple: "/app-icon.jpg",
+  },
   openGraph: {
     type: "website",
     url: SEO.siteUrl,
     siteName: SEO.siteName,
     title: SEO.defaultTitle,
     description: SEO.defaultDescription,
-    images: ["/og-image.png"],
+    images: [defaultImage],
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: SEO.defaultTitle,
     description: SEO.defaultDescription,
-    images: ["/og-image.png"],
+    images: ["/app-icon.jpg"],
   },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
 };
 
@@ -57,13 +76,13 @@ export function buildMetadata({
       url,
       title,
       description,
-      images: ["/og-image.png"],
+      images: [defaultImage],
     },
     twitter: {
-      card: "summary_large_image",
+      card: "summary",
       title,
       description,
-      images: ["/og-image.png"],
+      images: ["/app-icon.jpg"],
     },
   };
 }

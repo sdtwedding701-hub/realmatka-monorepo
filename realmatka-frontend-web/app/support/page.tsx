@@ -1,6 +1,12 @@
-"use client";
-
 import Link from "next/link";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Support And Contact",
+  description: "Contact Real Matka support for login help, wallet request help, chart issues, and account review queries.",
+  path: "/support",
+  keywords: ["real matka support", "real matka contact"]
+});
 
 const supportItems = [
   { label: "Support Phone", value: "+91 93097 82081" },

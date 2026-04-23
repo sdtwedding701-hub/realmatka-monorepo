@@ -1,4 +1,13 @@
 import { MarketsSection, type MarketCard } from "./markets-section";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Real Matka - Game Rates, Market Results, Jodi & Panna Charts",
+  description:
+    "Check Real Matka game rates, live market results, market timings, available games, jodi charts, panna charts, and direct access to the Real Matka web app.",
+  path: "/",
+  keywords: ["real matka live", "real matka market", "game rate", "live result"]
+});
 
 const webAppBaseUrl = "https://play.realmatka.in";
 const loginUrl = `${webAppBaseUrl}/auth/login`;
@@ -69,19 +78,39 @@ const games = [
   "Choice Pana"
 ] as const;
 
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Real Matka",
+  url: "https://realmatka.in",
+  description:
+    "Real Matka provides game rates, live market results, jodi charts, panna charts, market timings, and secure access to the Real Matka web app.",
+  publisher: {
+    "@type": "Organization",
+    name: "Real Matka",
+    url: "https://realmatka.in",
+    logo: "https://realmatka.in/app-icon.jpg"
+  },
+  inLanguage: "en-IN"
+};
+
 export default function HomePage() {
   return (
     <div className="min-h-screen text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <main className="mx-auto flex w-full max-w-[1620px] flex-col gap-6 px-3 py-6 sm:px-5 sm:py-8 xl:px-6">
         <section className="section-shell relative overflow-hidden px-5 py-8 sm:px-8 sm:py-10 xl:px-10 xl:py-12">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.2),transparent_25%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_28%)]" />
           <div className="relative max-w-4xl">
-            <div className="metric-pill">Full Game Rate • All Markets • Charts</div>
+            <div className="metric-pill">Full Game Rate - All Markets - Charts</div>
             <h1 className="mt-4 max-w-4xl text-3xl font-extrabold leading-tight sm:text-5xl">
-              Real Matka me full rate, complete market list aur charts sab ek jagah.
+              Real Matka game rates, market results, jodi charts aur panna charts ek jagah.
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-lg sm:leading-8">
-              Daily khelne wale players ke liye seedha aur clear flow. Rate dekho, markets check karo, aur login karke direct live web experience me chalo.
+              Real Matka par daily market timing, live result, full game rate, available games, jodi chart aur panna chart clear format me dekho. Login karke direct live web app access karo.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a href="#rates" className="action-primary">Check Game Rate</a>

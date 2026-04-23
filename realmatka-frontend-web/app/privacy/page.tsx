@@ -1,6 +1,12 @@
-"use client";
-
 import Link from "next/link";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Privacy Policy",
+  description: "Read the Real Matka privacy policy for account data, wallet records, support requests, cookies, and platform security information.",
+  path: "/privacy",
+  keywords: ["real matka privacy", "privacy policy"]
+});
 
 const sections = [
   {

@@ -1,6 +1,12 @@
-"use client";
-
 import Link from "next/link";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Terms Of Use",
+  description: "Read the Real Matka terms of use for eligibility, account responsibility, wallet requests, market information, and platform rules.",
+  path: "/terms",
+  keywords: ["real matka terms", "terms of use"]
+});
 
 const sections = [
   {

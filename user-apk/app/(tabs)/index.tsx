@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { marketCatalog } from "../../data/mock";
 import { api, formatApiError } from "@/lib/api";
@@ -156,8 +156,8 @@ export default function HomeScreen() {
         rightLabel={`Rs ${walletBalance}`}
       />
       <View style={styles.noticeStrip}>
-        <Ionicons color={colors.warning} name="alert-circle-outline" size={14} />
-        <NoticeTicker text={noticeText} />
+        <Ionicons color={colors.warning} name="alert-circle-outline" size={16} />
+        <Text style={styles.noticeText}>{noticeText}</Text>
       </View>
 
       <AppScreen
@@ -424,47 +424,6 @@ export default function HomeScreen() {
 
 }
 
-function NoticeTicker({ text }: { text: string }) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const [containerWidth, setContainerWidth] = useState(1);
-  const [textWidth, setTextWidth] = useState(1);
-
-  useEffect(() => {
-    if (!containerWidth || !textWidth) {
-      return;
-    }
-
-    translateX.stopAnimation();
-    translateX.setValue(containerWidth);
-
-    const distance = containerWidth + textWidth;
-    const duration = Math.max(9000, distance * 18);
-    const loop = Animated.loop(
-      Animated.timing(translateX, {
-        toValue: -textWidth,
-        duration,
-        easing: Easing.linear,
-        useNativeDriver: true
-      })
-    );
-
-    loop.start();
-    return () => loop.stop();
-  }, [containerWidth, textWidth, text, translateX]);
-
-  return (
-    <View onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)} style={styles.noticeTickerViewport}>
-      <Animated.Text
-        onLayout={(event) => setTextWidth(event.nativeEvent.layout.width)}
-        style={[styles.noticeText, { transform: [{ translateX }] }]}
-        numberOfLines={1}
-      >
-        {text}
-      </Animated.Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   page: {
     flex: 1,
@@ -519,23 +478,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: colors.borderStrong,
     paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingVertical: 9,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6
-  },
-  noticeTickerViewport: {
-    flex: 1,
-    overflow: "hidden",
-    minHeight: 15,
-    justifyContent: "center"
+    alignItems: "flex-start",
+    gap: 8
   },
   noticeText: {
+    flex: 1,
     color: colors.warning,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 15,
-    position: "absolute"
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17
   },
   errorTitle: {
     color: colors.textPrimary,

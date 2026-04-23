@@ -353,6 +353,7 @@ function decorateMarketWithLookup(market, chartLookup) {
     ...market,
     result: nextResult,
     phase: runtimeMeta.phase,
+    label: runtimeMeta.label,
     status: runtimeMeta.status,
     action: runtimeMeta.action
   };

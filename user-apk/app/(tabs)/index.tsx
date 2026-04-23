@@ -24,6 +24,7 @@ type MarketItem = {
   name: string;
   result: string;
   phase?: "open-running" | "close-running" | "closed" | "upcoming";
+  label?: string;
   status: string;
   action: string;
   open: string;
@@ -50,9 +51,19 @@ function isMarketForcedClosed(market: Pick<MarketItem, "status" | "action">) {
   return status.includes("weekly off") || status.includes("closed for today") || action === "closed";
 }
 
-function getMarketDisplayMeta(market: Pick<MarketItem, "status" | "action" | "phase">) {
+function getPhaseDisplayLabel(phase: MarketItem["phase"], isClosed: boolean) {
+  if (phase === "close-running") {
+    return "Betting is Running for Close";
+  }
+  if (phase === "closed" || isClosed) {
+    return "Betting is Closed for Today";
+  }
+  return "Betting Running Now";
+}
+
+function getMarketDisplayMeta(market: Pick<MarketItem, "status" | "action" | "phase" | "label">) {
   const isClosed = isMarketForcedClosed(market);
-  const normalizedStatus = String(market.status ?? "").trim();
+  const normalizedLabel = String(market.label ?? "").trim();
   const normalizedAction = String(market.action ?? "").trim();
   const normalizedPhase = String(market.phase ?? "").trim().toLowerCase();
   const resolvedPhase =
@@ -63,7 +74,7 @@ function getMarketDisplayMeta(market: Pick<MarketItem, "status" | "action" | "ph
         : "open-running";
 
   return {
-    label: normalizedStatus || (isClosed ? "Betting is Closed for Today" : "Betting Running Now"),
+    label: normalizedLabel || getPhaseDisplayLabel(resolvedPhase as MarketItem["phase"], isClosed),
     isClosed,
     canPlaceBet: !isClosed && normalizedAction.toLowerCase() !== "closed",
     phase: resolvedPhase

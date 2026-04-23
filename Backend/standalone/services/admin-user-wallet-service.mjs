@@ -93,7 +93,10 @@ function buildUserLedgerSummary(walletEntries, bids, walletBalance) {
     bidPlaced: 0,
     bidWins: 0,
     adminCredits: 0,
-    adminDebits: 0
+    adminDebits: 0,
+    signupBonus: 0,
+    firstDepositBonus: 0,
+    referralIncome: 0
   };
 
   for (const entry of walletEntries) {
@@ -105,6 +108,9 @@ function buildUserLedgerSummary(walletEntries, bids, walletBalance) {
     if (type === "BID_WIN" && entry.status === "SUCCESS") totals.bidWins += amount;
     if (type === "ADMIN_CREDIT" && entry.status === "SUCCESS") totals.adminCredits += amount;
     if (type === "ADMIN_DEBIT" && entry.status === "SUCCESS") totals.adminDebits += amount;
+    if (type === "SIGNUP_BONUS" && entry.status === "SUCCESS") totals.signupBonus += amount;
+    if (type === "FIRST_DEPOSIT_BONUS" && entry.status === "SUCCESS") totals.firstDepositBonus += amount;
+    if (type === "REFERRAL_COMMISSION" && entry.status === "SUCCESS") totals.referralIncome += amount;
   }
 
   return {
@@ -115,6 +121,9 @@ function buildUserLedgerSummary(walletEntries, bids, walletBalance) {
     bidWins: roundAmount(totals.bidWins),
     adminCredits: roundAmount(totals.adminCredits),
     adminDebits: roundAmount(totals.adminDebits),
+    signupBonus: roundAmount(totals.signupBonus),
+    firstDepositBonus: roundAmount(totals.firstDepositBonus),
+    referralIncome: roundAmount(totals.referralIncome),
     totalBids: bids.length,
     wonBids: bids.filter((bid) => bid.status === "Won").length,
     lostBids: bids.filter((bid) => bid.status === "Lost").length,
@@ -270,7 +279,7 @@ export async function updateAdminUserStatus(userId, action, note) {
   return updateUserAccountStatus(userId, action, note);
 }
 
-export async function createWalletAdjustment({ userId, mode, amount }) {
+export async function createWalletAdjustment({ userId, mode, amount, note = "" }) {
   const user = await findUserById(userId);
   if (!user) {
     return { ok: false, status: 404, error: "User not found" };
@@ -287,7 +296,8 @@ export async function createWalletAdjustment({ userId, mode, amount }) {
     status: "SUCCESS",
     amount,
     beforeBalance,
-    afterBalance: mode === "credit" ? beforeBalance + amount : beforeBalance - amount
+    afterBalance: mode === "credit" ? beforeBalance + amount : beforeBalance - amount,
+    note: String(note || "").trim() || null
   });
 
   await sendUserNotification({

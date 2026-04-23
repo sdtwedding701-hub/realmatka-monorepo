@@ -138,7 +138,7 @@ export async function adminWalletAdjustmentController(request) {
     return fail("userId, mode, and positive amount are required", 400, request);
   }
 
-  const result = await createWalletAdjustment({ userId, mode, amount });
+  const result = await createWalletAdjustment({ userId, mode, amount, note });
   if (!result.ok) return fail(result.error, result.status, request);
 
   await addAuditLog({

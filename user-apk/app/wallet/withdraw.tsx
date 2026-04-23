@@ -8,6 +8,7 @@ import { formatApiError } from "@/lib/api";
 import { colors } from "@/theme/colors";
 
 const MIN_WITHDRAW_AMOUNT = 500;
+const WITHDRAW_MULTIPLE = 100;
 
 export default function WithdrawScreen() {
   const insets = useSafeAreaInsets();
@@ -27,9 +28,43 @@ export default function WithdrawScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const withdrawAmount = Number(amount || 0);
+  const hasEnoughWalletBalanceForWithdraw = walletBalance >= MIN_WITHDRAW_AMOUNT;
   const hasValidAmount = Number.isFinite(withdrawAmount) && withdrawAmount >= MIN_WITHDRAW_AMOUNT && withdrawAmount <= walletBalance;
   const hasValidOtp = otp.trim().length === 6;
-  const isMultipleOfHundred = Number.isFinite(withdrawAmount) && withdrawAmount % 100 === 0;
+  const isMultipleOfHundred = Number.isFinite(withdrawAmount) && withdrawAmount % WITHDRAW_MULTIPLE === 0;
+  const withdrawValidationMessage = useMemo(() => {
+    if (!latestBank) {
+      return "Withdraw request se pehle bank account add karo.";
+    }
+    if (!amount.trim()) {
+      return "";
+    }
+    if (!hasEnoughWalletBalanceForWithdraw) {
+      return `Insufficient balance. Minimum withdraw ke liye wallet me kam se kam Rs ${MIN_WITHDRAW_AMOUNT} hona chahiye.`;
+    }
+    if (!Number.isFinite(withdrawAmount) || withdrawAmount <= 0) {
+      return "Valid withdraw amount enter karo.";
+    }
+    if (withdrawAmount < MIN_WITHDRAW_AMOUNT) {
+      return `Minimum withdraw amount Rs ${MIN_WITHDRAW_AMOUNT} hai.`;
+    }
+    if (!isMultipleOfHundred) {
+      return `Withdraw amount ${WITHDRAW_MULTIPLE} ke multiple me hona chahiye.`;
+    }
+    if (withdrawAmount > walletBalance) {
+      return "Insufficient balance for this withdraw amount.";
+    }
+    return "";
+  }, [amount, hasEnoughWalletBalanceForWithdraw, isMultipleOfHundred, latestBank, walletBalance, withdrawAmount]);
+  const canRequestWithdrawOtp =
+    Boolean(latestBank) &&
+    !submitting &&
+    Boolean(amount.trim()) &&
+    hasEnoughWalletBalanceForWithdraw &&
+    Number.isFinite(withdrawAmount) &&
+    withdrawAmount >= MIN_WITHDRAW_AMOUNT &&
+    isMultipleOfHundred &&
+    withdrawAmount <= walletBalance;
 
   useEffect(() => {
     void Promise.all([loadBankAccounts(), loadWalletHistory()]);
@@ -147,13 +182,14 @@ export default function WithdrawScreen() {
               </>
             ) : (
               <Pressable
-                disabled={!hasValidAmount || submitting}
+                disabled={!canRequestWithdrawOtp}
                 onPress={() => void sendWithdrawOtp()}
-                style={[styles.primaryButton, (!hasValidAmount || submitting) && styles.disabledButton]}
+                style={[styles.primaryButton, !canRequestWithdrawOtp && styles.disabledButton]}
               >
-                {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>Send Withdraw OTP</Text>}
+                {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>Withdraw</Text>}
               </Pressable>
             )}
+            {withdrawValidationMessage ? <Text style={styles.errorText}>{withdrawValidationMessage}</Text> : null}
 
             <Text style={styles.simpleInfoText}>Withdrawal limit is 500 to 99999.</Text>
             <Text style={styles.simpleInfoText}>Withdraw request timing is 11:00 AM to 11:00 PM.</Text>
@@ -179,7 +215,7 @@ export default function WithdrawScreen() {
       return;
     }
     if (!isMultipleOfHundred) {
-      setError("Please enter amount multiple of 100.");
+      setError(`Withdraw amount ${WITHDRAW_MULTIPLE} ke multiple me enter karo.`);
       return;
     }
 
@@ -220,7 +256,7 @@ export default function WithdrawScreen() {
       return;
     }
     if (!isMultipleOfHundred) {
-      setError("Please enter amount multiple of 100.");
+      setError(`Withdraw amount ${WITHDRAW_MULTIPLE} ke multiple me enter karo.`);
       return;
     }
 

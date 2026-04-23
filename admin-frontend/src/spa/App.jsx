@@ -554,6 +554,7 @@ function UsersPage({ apiBase, token, me }) {
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState("");
   const [ledgerState, setLedgerState] = useState({ open: false, loading: false, error: "", detail: null });
+  const [adjustmentDraft, setAdjustmentDraft] = useState({ userId: "", mode: "credit", amount: "", note: "" });
 
   useEffect(() => {
     void loadUsers();
@@ -581,7 +582,9 @@ function UsersPage({ apiBase, token, me }) {
             miniStat("Visible Users", filtered.length),
             miniStat("Approved", filtered.filter((user) => user.approvalStatus === "Approved").length),
             miniStat("Pending", filtered.filter((user) => user.approvalStatus === "Pending").length),
-            miniStat("Wallet Total", formatCurrency(filtered.reduce((sum, user) => sum + Number(user.walletBalance || 0), 0)))
+            miniStat("Wallet Total", formatCurrency(filtered.reduce((sum, user) => sum + Number(user.walletBalance || 0), 0))),
+            miniStat("Signup Bonus Users", filtered.filter((user) => user.signupBonusGranted).length),
+            miniStat("First Deposit Bonus Users", filtered.filter((user) => user.firstDepositBonusGranted).length)
           ]}
         </div>
       </section>
@@ -614,10 +617,28 @@ function UsersPage({ apiBase, token, me }) {
               <div className="row-main">
                 <strong>{formatCurrency(user.walletBalance)}</strong>
                 <span>Bids {user.bidCount}</span>
+                <span>
+                  {user.signupBonusGranted ? "Signup bonus done" : "Signup bonus pending"} |{" "}
+                  {user.firstDepositBonusGranted ? "First deposit bonus done" : "First deposit bonus pending"}
+                </span>
                 <span>{user.statusNote || "No status note"}</span>
               </div>
               <div className="row-actions">
                 <button className="secondary" disabled={busyId === user.id} onClick={() => void openLedger(user.id)}>Open Ledger</button>
+                <button
+                  className="secondary"
+                  disabled={busyId === user.id}
+                  onClick={() =>
+                    setAdjustmentDraft((current) => ({
+                      userId: current.userId === user.id ? "" : user.id,
+                      mode: "credit",
+                      amount: "",
+                      note: current.userId === user.id ? "" : `Manual wallet credit for ${user.name}`
+                    }))
+                  }
+                >
+                  {adjustmentDraft.userId === user.id ? "Close Wallet Tool" : "Wallet Tool"}
+                </button>
                 {user.approvalStatus === "Pending" ? (
                   <>
                     <button className="primary" disabled={busyId === user.id} onClick={() => void submitApproval(user.id, "approve")}>Approve</button>
@@ -635,6 +656,59 @@ function UsersPage({ apiBase, token, me }) {
                   <button className="secondary" disabled={busyId === user.id} onClick={() => void submitLifecycle(user.id, "deactivate")}>Deactivate</button>
                 )}
               </div>
+              {adjustmentDraft.userId === user.id ? (
+                <div className="panel" style={{ gridColumn: "1 / -1", marginTop: 12, background: "#fffaf5" }}>
+                  <div className="panel-head">
+                    <h3>Wallet Credit / Debit</h3>
+                    <p>{user.name} ({user.phone}) ka wallet yahin se adjust karo.</p>
+                  </div>
+                  <div className="form-grid">
+                    <label>
+                      <span>Mode</span>
+                      <select
+                        value={adjustmentDraft.mode}
+                        onChange={(event) => setAdjustmentDraft((current) => ({ ...current, mode: event.target.value }))}
+                      >
+                        <option value="credit">Credit</option>
+                        <option value="debit">Debit</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Amount</span>
+                      <input
+                        value={adjustmentDraft.amount}
+                        onChange={(event) => setAdjustmentDraft((current) => ({ ...current, amount: event.target.value }))}
+                        placeholder="1000"
+                        inputMode="decimal"
+                      />
+                    </label>
+                    <label className="wide">
+                      <span>Operator Note</span>
+                      <input
+                        value={adjustmentDraft.note}
+                        onChange={(event) => setAdjustmentDraft((current) => ({ ...current, note: event.target.value }))}
+                        placeholder="Why are you adjusting this wallet?"
+                      />
+                    </label>
+                    <div className="actions wide">
+                      <button
+                        className="primary"
+                        disabled={busyId === user.id || !Number(adjustmentDraft.amount || 0)}
+                        onClick={() => void submitWalletAdjustment(user)}
+                      >
+                        {adjustmentDraft.mode === "credit" ? "Credit Wallet" : "Debit Wallet"}
+                      </button>
+                      <button
+                        className="secondary"
+                        disabled={busyId === user.id}
+                        onClick={() => setAdjustmentDraft({ userId: "", mode: "credit", amount: "", note: "" })}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )) : <div className="empty-card">No users match current filters.</div>}
         </div>
@@ -695,6 +769,37 @@ function UsersPage({ apiBase, token, me }) {
 
   function closeLedger() {
     setLedgerState({ open: false, loading: false, error: "", detail: null });
+  }
+
+  async function submitWalletAdjustment(user) {
+    setBusyId(user.id);
+    setMessage("");
+    try {
+      await fetchApi(apiBase, "/api/admin/wallet-adjustment", token, {
+        method: "POST",
+        body: {
+          userId: user.id,
+          mode: adjustmentDraft.mode,
+          amount: Number(adjustmentDraft.amount || 0),
+          note: adjustmentDraft.note
+        }
+      });
+      await loadUsers();
+      if (ledgerState.open && ledgerState.detail?.user?.id === user.id) {
+        const detail = await fetchApi(apiBase, `/api/admin/user-detail?userId=${encodeURIComponent(user.id)}`, token);
+        setLedgerState({ open: true, loading: false, error: "", detail });
+      }
+      setAdjustmentDraft({ userId: "", mode: "credit", amount: "", note: "" });
+      setMessage(
+        adjustmentDraft.mode === "credit"
+          ? `Rs ${adjustmentDraft.amount} credited to ${user.name}.`
+          : `Rs ${adjustmentDraft.amount} debited from ${user.name}.`
+      );
+    } catch (error) {
+      setMessage(formatApiError(error, "Wallet adjustment failed."));
+    } finally {
+      setBusyId("");
+    }
   }
 }
 
@@ -1599,7 +1704,10 @@ function UserLedgerModal({ state, onClose }) {
                 miniStat("Withdraws", formatCurrency(state.detail.summary?.withdraws ?? 0)),
                 miniStat("Bid Placed", formatCurrency(state.detail.summary?.bidPlaced ?? 0)),
                 miniStat("Bid Wins", formatCurrency(state.detail.summary?.bidWins ?? 0)),
-                miniStat("Pending Bids", state.detail.summary?.pendingBids ?? 0)
+                miniStat("Pending Bids", state.detail.summary?.pendingBids ?? 0),
+                miniStat("Signup Bonus", formatCurrency(state.detail.summary?.signupBonus ?? 0)),
+                miniStat("First Deposit Bonus", formatCurrency(state.detail.summary?.firstDepositBonus ?? 0)),
+                miniStat("Referral Income", formatCurrency(state.detail.summary?.referralIncome ?? 0))
               ]}
             </div>
             <div className="dashboard-grid">
@@ -1610,6 +1718,18 @@ function UserLedgerModal({ state, onClose }) {
                   <div className="compact-row"><strong>Approval</strong><span>{state.detail.user.approvalStatus || "-"}</span></div>
                   <div className="compact-row"><strong>Joined</strong><span>{formatDate(state.detail.user.joinedAt)}</span></div>
                   <div className="compact-row"><strong>Status</strong><span>{state.detail.user.blockedAt ? "Blocked" : state.detail.user.deactivatedAt ? "Deactivated" : "Live"}</span></div>
+                  <div className="compact-row"><strong>Signup Bonus Flag</strong><span>{state.detail.user.signupBonusGranted ? "Granted" : "Pending"}</span></div>
+                  <div className="compact-row"><strong>First Deposit Bonus Flag</strong><span>{state.detail.user.firstDepositBonusGranted ? "Granted" : "Pending"}</span></div>
+                </div>
+              </div>
+              <div className="subpanel">
+                <h3>Bonus Visibility</h3>
+                <div className="compact-list">
+                  <div className="compact-row"><strong>Signup Bonus Total</strong><span>{formatCurrency(state.detail.summary?.signupBonus ?? 0)}</span></div>
+                  <div className="compact-row"><strong>First Deposit Bonus Total</strong><span>{formatCurrency(state.detail.summary?.firstDepositBonus ?? 0)}</span></div>
+                  <div className="compact-row"><strong>Referral Income</strong><span>{formatCurrency(state.detail.summary?.referralIncome ?? 0)}</span></div>
+                  <div className="compact-row"><strong>Manual Credits</strong><span>{formatCurrency(state.detail.summary?.adminCredits ?? 0)}</span></div>
+                  <div className="compact-row"><strong>Manual Debits</strong><span>{formatCurrency(state.detail.summary?.adminDebits ?? 0)}</span></div>
                 </div>
               </div>
               <div className="subpanel">

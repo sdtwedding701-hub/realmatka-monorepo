@@ -52,6 +52,19 @@ export function SettingsPage({ apiBase, token, fetchApi, PageHeader, PageState }
     <>
       <PageHeader title="Settings" subtitle="Shared settings for admin, mobile, and web surfaces." />
       <section className="panel">
+        <div className="panel-head">
+          <h2>Bonus Visibility</h2>
+          <p>Current bonus rules ko operator side se clearly dekhne ke liye quick summary.</p>
+        </div>
+        <div className="mini-stats">
+          {[
+            <div className="mini-stat" key="signup-bonus"><span>Signup Bonus</span><strong>{form.bonus_enabled === "false" ? "Disabled" : "On Approval"}</strong></div>,
+            <div className="mini-stat" key="first-deposit"><span>First Deposit Bonus</span><strong>5% up to Rs 100</strong></div>,
+            <div className="mini-stat" key="repeat-rule"><span>Repeat Rule</span><strong>Only First Successful Deposit</strong></div>
+          ]}
+        </div>
+      </section>
+      <section className="panel">
         <div className="form-grid">
           <label className="wide"><span>Notice Text</span><textarea rows={4} value={form.notice_text} onChange={(e) => setForm({ ...form, notice_text: e.target.value })} /></label>
           <label><span>Support Phone</span><input value={form.support_phone} onChange={(e) => setForm({ ...form, support_phone: e.target.value })} /></label>

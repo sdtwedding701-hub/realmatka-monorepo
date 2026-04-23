@@ -575,17 +575,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       throw new Error("No bid selected");
     }
 
+    const totalPoints = draftBid.items.reduce((sum, item) => sum + Number(item.points || 0), 0);
+    let createdBids: BidEntry[];
     try {
-      await api.placeBids(sessionToken, draftBid);
+      createdBids = await api.placeBids(sessionToken, draftBid);
     } catch (error) {
       if (isAuthFailure(error)) {
         await clearSession();
       }
       throw error;
     }
+
+    const nextWalletBalance = Math.max(walletBalance - totalPoints, 0);
+    setWalletBalance(nextWalletBalance);
+    setCurrentUser((existing) => (existing ? { ...existing, walletBalance: nextWalletBalance } : existing));
+    setBids((existing) => [...createdBids, ...existing]);
+    setCachedBidHistory(sessionToken, [...createdBids, ...bids]);
+    lastBidReloadAtRef.current = Date.now();
+
     setDraftBid(null);
-    await Promise.all([reloadSessionData({ force: true }), loadBidHistory({ force: true })]);
-  }, [clearSession, draftBid, loadBidHistory, reloadSessionData, sessionToken]);
+    void reloadSessionData({ force: true });
+    void loadBidHistory({ force: true });
+  }, [bids, clearSession, draftBid, loadBidHistory, reloadSessionData, sessionToken, walletBalance]);
 
   const value = useMemo<AppStateValue>(() => ({
     currentUser,

@@ -354,18 +354,37 @@ function RootNavigator() {
           <UniversalBottomTabs />
           <Modal animationType="fade" transparent visible={Boolean(appUpdatePrompt)}>
             <View style={{ flex: 1, backgroundColor: colors.overlay, alignItems: "center", justifyContent: "center", padding: 24 }}>
-              <View style={{ width: "100%", maxWidth: 380, borderRadius: 28, backgroundColor: colors.surface, padding: 22, gap: 14 }}>
+              <View style={{ width: "100%", maxWidth: 392, borderRadius: 28, backgroundColor: colors.surface, padding: 22, gap: 14 }}>
                 <View style={{ gap: 6 }}>
                   <Text style={{ color: colors.textPrimary, fontSize: 24, fontWeight: "900", textAlign: "center" }}>
                     {appUpdatePrompt?.title || "New update available"}
                   </Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>
-                    Latest version: {appUpdatePrompt?.latestVersion || "-"}
-                  </Text>
+                </View>
+                <View style={{ flexDirection: "row", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                  <View style={{ borderRadius: 999, backgroundColor: colors.surfaceMuted, paddingHorizontal: 14, paddingVertical: 8 }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: "800" }}>
+                      Installed: {getInstalledAppVersion()}
+                    </Text>
+                  </View>
+                  <View style={{ borderRadius: 999, backgroundColor: colors.primarySoft, paddingHorizontal: 14, paddingVertical: 8 }}>
+                    <Text style={{ color: colors.primaryDark, fontSize: 12, fontWeight: "900" }}>
+                      Latest: {appUpdatePrompt?.latestVersion || "-"}
+                    </Text>
+                  </View>
                 </View>
                 <Text style={{ color: colors.textSecondary, textAlign: "center", lineHeight: 21 }}>
                   {appUpdatePrompt?.message || "Please download the latest APK to continue with the newest fixes and features."}
                 </Text>
+                <View style={{ borderRadius: 20, backgroundColor: appUpdatePrompt?.required ? colors.warningSoft : colors.infoSoft, padding: 14, gap: 4 }}>
+                  <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "900" }}>
+                    {appUpdatePrompt?.required ? "Update required" : "Recommended update"}
+                  </Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 19 }}>
+                    {appUpdatePrompt?.required
+                      ? "App continue karne se pehle latest APK install karna zaroori hai."
+                      : "Abhi download karoge to latest fixes aur smoother app experience milega."}
+                  </Text>
+                </View>
                 <Pressable
                   onPress={() => {
                     if (appUpdatePrompt?.apkUrl) {
@@ -374,14 +393,16 @@ function RootNavigator() {
                   }}
                   style={{ minHeight: 48, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", paddingHorizontal: 20 }}
                 >
-                  <Text style={{ color: colors.surface, fontSize: 15, fontWeight: "900" }}>Download Now</Text>
+                  <Text style={{ color: colors.surface, fontSize: 15, fontWeight: "900" }}>
+                    {appUpdatePrompt?.required ? "Update Now" : "Download Now"}
+                  </Text>
                 </Pressable>
                 {!appUpdatePrompt?.required ? (
                   <Pressable
                     onPress={() => setAppUpdatePrompt(null)}
                     style={{ minHeight: 44, borderRadius: 999, borderWidth: 1, borderColor: colors.borderStrong, alignItems: "center", justifyContent: "center", paddingHorizontal: 18 }}
                   >
-                    <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: "800" }}>Later</Text>
+                    <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: "800" }}>Remind Me Later</Text>
                   </Pressable>
                 ) : null}
               </View>

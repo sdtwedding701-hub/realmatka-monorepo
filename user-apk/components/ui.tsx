@@ -70,7 +70,7 @@ export function AppScreen({
   return (
     <SafeAreaView edges={["left", "right", "bottom"]} style={styles.safe}>
       {content}
-      {footer ? <View style={styles.fixedFooter}>{footer}</View> : null}
+      {footer ? <View style={[styles.fixedFooter, { paddingBottom: Math.max(insets.bottom + spacing.sm, spacing.lg) }]}>{footer}</View> : null}
       {showPromo ? <PromoStrip /> : null}
     </SafeAreaView>
   );

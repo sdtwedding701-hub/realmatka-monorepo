@@ -12,6 +12,7 @@ export const metadata = buildMetadata({
 const webAppBaseUrl = "https://play.realmatka.in";
 const loginUrl = `${webAppBaseUrl}/auth/login`;
 const registerUrl = `${webAppBaseUrl}/auth/register`;
+const apkDownloadUrl = "https://pub-6623a0d99133406b850cfa8224871d15.r2.dev/app-release.apk";
 
 const rates = [
   { name: "Single Digit", rate: "10" },
@@ -114,8 +115,7 @@ export default function HomePage() {
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a href="#rates" className="action-primary">Check Game Rate</a>
-              <a href={loginUrl} target="_blank" rel="noreferrer" className="action-secondary">Login</a>
-              <a href={registerUrl} className="action-secondary">Register Now</a>
+              <a download="realmatka.apk" href={apkDownloadUrl} className="action-secondary">Download APK</a>
             </div>
           </div>
         </section>

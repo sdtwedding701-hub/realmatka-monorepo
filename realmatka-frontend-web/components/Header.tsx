@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 const webAppBaseUrl = "https://play.realmatka.in";
-const registerUrl = `${webAppBaseUrl}/auth/register`;
+const apkDownloadUrl = "https://pub-6623a0d99133406b850cfa8224871d15.r2.dev/app-release.apk";
 
 const links = [
   { href: "#rates", label: "Rates" },
@@ -47,10 +47,11 @@ export default function Header() {
             Login
           </a>
           <a
-            href={registerUrl}
+            download="realmatka.apk"
+            href={apkDownloadUrl}
             className="rounded-full bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(249,115,22,0.9)] transition hover:opacity-90"
           >
-            Register Now
+            Download APK
           </a>
         </div>
 
@@ -83,8 +84,8 @@ export default function Header() {
             >
               Login
             </a>
-            <a href={registerUrl} className="rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-3 text-sm font-semibold text-white">
-              Register Now
+            <a download="realmatka.apk" href={apkDownloadUrl} className="rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-3 text-sm font-semibold text-white">
+              Download APK
             </a>
           </div>
         </div>

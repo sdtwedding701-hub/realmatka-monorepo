@@ -1,9 +1,12 @@
 import { Stack, usePathname, useRouter } from "expo-router";
 import { Component, ReactNode, useEffect, useRef, useState } from "react";
 import { StatusBar } from "expo-status-bar";
-import { Platform, Pressable, Text, View } from "react-native";
+import Constants from "expo-constants";
+import * as Linking from "expo-linking";
+import { Modal, Platform, Pressable, Text, View } from "react-native";
 import { AppChromeProvider } from "@/components/ui";
 import { UniversalBottomTabs } from "@/components/universal-bottom-tabs";
+import { api } from "@/lib/api";
 import { AppStateProvider, useAppState } from "@/lib/app-state";
 import {
   getNotificationTargetUrl,
@@ -34,9 +37,17 @@ function RootNavigator() {
   const router = useRouter();
   const pathname = usePathname();
   const { currentUser, loading, sessionToken } = useAppState();
+  const [appUpdatePrompt, setAppUpdatePrompt] = useState<{
+    latestVersion: string;
+    apkUrl: string;
+    required: boolean;
+    title: string;
+    message: string;
+  } | null>(null);
   const [windowGuardBlocked, setWindowGuardBlocked] = useState(false);
   const [windowGuardCloseHint, setWindowGuardCloseHint] = useState(false);
   const registeredPushSessionTokenRef = useRef("");
+  const updateCheckCompletedRef = useRef(false);
   const webWindowIdRef = useRef(`web_${Math.random().toString(36).slice(2, 10)}`);
 
   useEffect(() => {
@@ -120,6 +131,54 @@ function RootNavigator() {
       active = false;
     };
   }, [currentUser, sessionToken]);
+
+  useEffect(() => {
+    if (Platform.OS === "web" || loading || updateCheckCompletedRef.current) {
+      return;
+    }
+
+    let active = true;
+    updateCheckCompletedRef.current = true;
+
+    void api
+      .getSettings()
+      .then((settings) => {
+        if (!active) {
+          return;
+        }
+
+        const settingsMap = new Map((Array.isArray(settings) ? settings : []).map((item) => [String(item.key || "").trim(), String(item.value || "").trim()]));
+        const latestVersion = settingsMap.get("latest_app_version") || "";
+        const apkUrl = settingsMap.get("latest_app_apk_url") || "";
+        const required = ["true", "1", "yes"].includes((settingsMap.get("latest_app_update_required") || "").toLowerCase());
+        const title = settingsMap.get("latest_app_update_title") || "New update available";
+        const message = settingsMap.get("latest_app_update_message") || "Please download the latest APK to continue with the newest fixes and features.";
+
+        if (!latestVersion || !apkUrl) {
+          return;
+        }
+
+        const currentVersion = getInstalledAppVersion();
+        if (compareAppVersions(latestVersion, currentVersion) <= 0) {
+          return;
+        }
+
+        setAppUpdatePrompt({
+          latestVersion,
+          apkUrl,
+          required,
+          title,
+          message
+        });
+      })
+      .catch(() => {
+        // Ignore update-check failures and continue app flow.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [loading]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") {
@@ -293,10 +352,77 @@ function RootNavigator() {
           <StatusBar style="light" />
           <Stack screenOptions={{ headerShown: false }} />
           <UniversalBottomTabs />
+          <Modal animationType="fade" transparent visible={Boolean(appUpdatePrompt)}>
+            <View style={{ flex: 1, backgroundColor: colors.overlay, alignItems: "center", justifyContent: "center", padding: 24 }}>
+              <View style={{ width: "100%", maxWidth: 380, borderRadius: 28, backgroundColor: colors.surface, padding: 22, gap: 14 }}>
+                <View style={{ gap: 6 }}>
+                  <Text style={{ color: colors.textPrimary, fontSize: 24, fontWeight: "900", textAlign: "center" }}>
+                    {appUpdatePrompt?.title || "New update available"}
+                  </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>
+                    Latest version: {appUpdatePrompt?.latestVersion || "-"}
+                  </Text>
+                </View>
+                <Text style={{ color: colors.textSecondary, textAlign: "center", lineHeight: 21 }}>
+                  {appUpdatePrompt?.message || "Please download the latest APK to continue with the newest fixes and features."}
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    if (appUpdatePrompt?.apkUrl) {
+                      void Linking.openURL(appUpdatePrompt.apkUrl);
+                    }
+                  }}
+                  style={{ minHeight: 48, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", paddingHorizontal: 20 }}
+                >
+                  <Text style={{ color: colors.surface, fontSize: 15, fontWeight: "900" }}>Download Now</Text>
+                </Pressable>
+                {!appUpdatePrompt?.required ? (
+                  <Pressable
+                    onPress={() => setAppUpdatePrompt(null)}
+                    style={{ minHeight: 44, borderRadius: 999, borderWidth: 1, borderColor: colors.borderStrong, alignItems: "center", justifyContent: "center", paddingHorizontal: 18 }}
+                  >
+                    <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: "800" }}>Later</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          </Modal>
         </>
       )}
     </View>
   );
+}
+
+function getInstalledAppVersion() {
+  return String(
+    Constants.expoConfig?.version ||
+      Constants.manifest2?.extra?.expoClient?.version ||
+      Constants.manifest?.version ||
+      "0.0.0"
+  ).trim();
+}
+
+function compareAppVersions(left: string, right: string) {
+  const leftParts = String(left || "")
+    .split(".")
+    .map((part) => Number.parseInt(part, 10) || 0);
+  const rightParts = String(right || "")
+    .split(".")
+    .map((part) => Number.parseInt(part, 10) || 0);
+  const size = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < size; index += 1) {
+    const leftValue = leftParts[index] ?? 0;
+    const rightValue = rightParts[index] ?? 0;
+    if (leftValue > rightValue) {
+      return 1;
+    }
+    if (leftValue < rightValue) {
+      return -1;
+    }
+  }
+
+  return 0;
 }
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {

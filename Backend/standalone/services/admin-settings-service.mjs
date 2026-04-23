@@ -1,6 +1,17 @@
 import { getAppSettings, upsertAppSetting } from "../stores/admin-store.mjs";
 
-const allowedPublicSettingKeys = new Set(["notice_text", "support_phone", "support_hours", "bonus_enabled", "bonus_text"]);
+const allowedPublicSettingKeys = new Set([
+  "notice_text",
+  "support_phone",
+  "support_hours",
+  "bonus_enabled",
+  "bonus_text",
+  "latest_app_version",
+  "latest_app_apk_url",
+  "latest_app_update_required",
+  "latest_app_update_title",
+  "latest_app_update_message"
+]);
 
 export async function getAdminSettings() {
   return getAppSettings();

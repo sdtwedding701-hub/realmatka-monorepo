@@ -48,7 +48,6 @@ export const marketCatalog = [
   { slug: "madhur-day", name: "Madhur Day", category: "games", open: "01:20 PM", close: "02:20 PM" },
   { slug: "sita-day", name: "Sita Day", category: "games", open: "01:40 PM", close: "02:40 PM" },
   { slug: "star-tara-day", name: "Star Tara Day", category: "games", open: "02:15 PM", close: "03:15 PM" },
-  { slug: "ntr-bazar", name: "NTR Bazar", category: "games", open: "02:45 PM", close: "03:50 PM" },
   { slug: "milan-day", name: "Milan Day", category: "games", open: "02:45 PM", close: "04:45 PM" },
   { slug: "rajdhani-day", name: "Rajdhani Day", category: "games", open: "03:00 PM", close: "05:00 PM" },
   { slug: "andhra-day", name: "Andhra Day", category: "games", open: "03:30 PM", close: "05:30 PM" },

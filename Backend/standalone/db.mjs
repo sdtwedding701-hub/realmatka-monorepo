@@ -136,7 +136,6 @@ const seededMarkets = [
   ["seed_madhur_day", "madhur-day", "Madhur Day", "***-**-***", "Betting open now", "Place Bet", "01:20 PM", "02:20 PM", "main"],
   ["seed_sita_day", "sita-day", "Sita Day", "***-**-***", "Betting open now", "Place Bet", "01:40 PM", "02:40 PM", "main"],
   ["seed_star_tara_day", "star-tara-day", "Star Tara Day", "***-**-***", "Betting open now", "Place Bet", "02:15 PM", "03:15 PM", "main"],
-  ["seed_ntr_bazar", "ntr-bazar", "NTR Bazar", "***-**-***", "Betting open now", "Place Bet", "02:45 PM", "03:50 PM", "main"],
   ["seed_milan_day", "milan-day", "Milan Day", "***-**-***", "Betting open now", "Place Bet", "02:45 PM", "04:45 PM", "main"],
   ["seed_rajdhani_day", "rajdhani-day", "Rajdhani Day", "***-**-***", "Betting open now", "Place Bet", "03:00 PM", "05:00 PM", "main"],
   ["seed_andhra_day", "andhra-day", "Andhra Day", "***-**-***", "Betting open now", "Place Bet", "03:30 PM", "05:30 PM", "main"],

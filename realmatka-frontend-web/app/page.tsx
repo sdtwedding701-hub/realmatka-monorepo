@@ -39,7 +39,6 @@ const marketCatalog: MarketCard[] = [
   { slug: "madhur-day", name: "Madhur Day", open: "01:20 PM", close: "02:20 PM", tag: "Games" },
   { slug: "sita-day", name: "Sita Day", open: "01:40 PM", close: "02:40 PM", tag: "Games" },
   { slug: "star-tara-day", name: "Star Tara Day", open: "02:15 PM", close: "03:15 PM", tag: "Games" },
-  { slug: "ntr-bazar", name: "NTR Bazar", open: "02:45 PM", close: "03:50 PM", tag: "Games" },
   { slug: "milan-day", name: "Milan Day", open: "02:45 PM", close: "04:45 PM", tag: "Games" },
   { slug: "rajdhani-day", name: "Rajdhani Day", open: "03:00 PM", close: "05:00 PM", tag: "Games" },
   { slug: "andhra-day", name: "Andhra Day", open: "03:30 PM", close: "05:30 PM", tag: "Games" },

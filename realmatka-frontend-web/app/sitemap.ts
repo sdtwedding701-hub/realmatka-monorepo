@@ -15,7 +15,6 @@ const marketChartSlugs = [
   "madhur-day",
   "sita-day",
   "star-tara-day",
-  "ntr-bazar",
   "milan-day",
   "rajdhani-day",
   "andhra-day",

@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const backendRoot = path.resolve(__dirname, "..");
 const workspaceRoot = path.resolve(backendRoot, "..");
-const dataDir = path.join(workspaceRoot, "data");
+const defaultDataDir = path.join(backendRoot, "chart-data");
 
 async function loadEnvFile(filePath, { override = false } = {}) {
   try {
@@ -34,6 +34,7 @@ async function main() {
   await loadEnvFile(path.join(workspaceRoot, ".env.backend.local"), { override: true });
 
   const { upsertChartRecord } = await import("../standalone/db.mjs");
+  const dataDir = process.argv[2] ? path.resolve(process.argv[2]) : defaultDataDir;
   const files = (await readdir(dataDir))
     .filter((name) => name.endsWith(".chart.json"))
     .sort((left, right) => left.localeCompare(right));

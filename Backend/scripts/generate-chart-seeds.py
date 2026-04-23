@@ -10,34 +10,46 @@ from xml.etree import ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = ROOT / "data"
+DEFAULT_INPUT_DIR = ROOT / "data"
+DEFAULT_OUTPUT_DIR = ROOT / "Backend" / "chart-data"
 MOCK_PATH = ROOT / "user-apk" / "data" / "mock.ts"
 FILE_SLUG_OVERRIDES = {
+    "ANDHRA DAY MATKA PANEL RECORD.xlsx": "andhra-day",
     "ANDHRA DAY MATKA PANEL RECORD 2021 - 2026.xlsx": "andhra-day",
     "ANDHRA MORNING MATKA PANEL RECORD.xlsx": "andhra-morning",
     "ANDHRA NIGHT MATKA PANEL RECORD.xlsx": "andhra-night",
     "KALYAN MATKA PANEL RECORD 2012 - 2026.xlsx": "kalyan",
     "KALYAN NIGHT MATKA JODI RECORD.xlsx": "kalyan-night",
+    "KARNATAKA DAY PANEL CHART.xlsx": "karnataka-day",
     "karnataka day chart pannel.xlsx": "karnataka-day",
+    "MADHUR DAY MATKA PANEL RECORD.xlsx": "madhur-day",
     "MADHUR DAY MATKA PANEL RECORD 2018 - 2026.xlsx": "madhur-day",
     "Madhur Night Matka Panel Chart.xlsx": "madhur-night",
     "MAHADEVI MORNING Panel Chart.xlsx": "mahadevi-morning",
     "MAHADEVI NIGHT Panel Chart.xlsx": "mahadevi-night",
     "MAHADEVI PANEL CHART.xlsx": "mahadevi",
+    "MAIN BAZAR MATKA PANEL RECORD.xlsx": "main-bazar",
     "MAIN BAZAR MATKA PANEL RECORD 2015 - 2026.xlsx": "main-bazar",
     "MANGAL BAZAR PANEL CHART.xlsx": "mangal-bazar",
     "Maya Bazar Panel Chart.xlsx": "maya-bazar",
+    "MILAN DAY MATKA PANEL RECORD.xlsx": "milan-day",
     "MILAN DAY MATKA PANEL RECORD 2018 - 2026.xlsx": "milan-day",
+    "MILAN MORNING MATKA PANEL.xlsx": "milan-morning",
     "MILAN MORNING MATKA PANEL RECORD 2019 - 2026.xlsx": "milan-morning",
     "MILAN NIGHT MATKA PANEL RECORD.xlsx": "milan-night",
     "NTR DAY PANEL CHART.xlsx": "ntr-day",
+    "NTR MORNING PANEL CHART.xlsx": "ntr-morning",
     "Ntr morning.xlsx": "ntr-morning",
     "NTR NIGHT PANEL CHART.xlsx": "ntr-night",
+    "RAJDHANI DAY MATKA PANEL RECORD.xlsx": "rajdhani-day",
     "RAJDHANI DAY MATKA PANEL RECORD 2013 - 2026.xlsx": "rajdhani-day",
     "RAJDHANI NIGHT MATKA PANEL RECORD.xlsx": "rajdhani-night",
+    "SITA DAY PANEL.xlsx": "sita-day",
     "SITA DAY PANEL CHART.xlsx": "sita-day",
+    "SITA MORNING Panel Chart.xlsx": "sita-morning",
     "sita morning chart pannel.xlsx": "sita-morning",
     "SITA NIGHT PANEL CHART.xlsx": "sita-night",
+    "SRIDEVI MATKA PANEL RECORD.xlsx": "sridevi",
     "SRIDEVI MATKA PANEL RECORD 2018 - 2026.xlsx": "sridevi",
     "SRIDEVI NIGHT MATKA PANEL RECORD.xlsx": "sridevi-night",
     "STAR TARA DAY PANEL CHART.xlsx": "star-tara-day",
@@ -243,11 +255,15 @@ def parse_chart_rows(cells: dict[int, dict[int, str]]) -> tuple[list[list[str]],
 
 
 def main() -> int:
+    input_dir = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else DEFAULT_INPUT_DIR
+    output_dir = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else DEFAULT_OUTPUT_DIR
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     markets = load_markets()
     generated = []
     skipped = []
 
-    for xlsx_path in sorted(DATA_DIR.glob("*.xlsx")):
+    for xlsx_path in sorted(input_dir.glob("*.xlsx")):
         market = resolve_slug(xlsx_path.name, markets)
         if not market:
             skipped.append({"file": xlsx_path.name, "reason": "No market slug match"})
@@ -266,7 +282,7 @@ def main() -> int:
                 "jodi": jodi_rows,
                 "panna": panna_rows,
             }
-            output_path = DATA_DIR / f"{market['slug']}.chart.json"
+            output_path = output_dir / f"{market['slug']}.chart.json"
             output_path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
             generated.append({
                 "slug": market["slug"],

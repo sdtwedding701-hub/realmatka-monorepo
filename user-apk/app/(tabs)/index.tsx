@@ -25,6 +25,8 @@ type MarketItem = {
   result: string;
   phase?: "open-running" | "close-running" | "closed" | "upcoming";
   label?: string;
+  canPlaceBet?: boolean;
+  blockedBoardLabels?: string[];
   status: string;
   action: string;
   open: string;
@@ -66,6 +68,7 @@ function getMarketDisplayMeta(market: Pick<MarketItem, "status" | "action" | "ph
   const normalizedLabel = String(market.label ?? "").trim();
   const normalizedAction = String(market.action ?? "").trim();
   const normalizedPhase = String(market.phase ?? "").trim().toLowerCase();
+  const canPlaceBetFromBackend = typeof (market as MarketItem).canPlaceBet === "boolean" ? (market as MarketItem).canPlaceBet : null;
   const resolvedPhase =
     normalizedPhase === "open-running" || normalizedPhase === "close-running" || normalizedPhase === "upcoming" || normalizedPhase === "closed"
       ? normalizedPhase
@@ -76,7 +79,7 @@ function getMarketDisplayMeta(market: Pick<MarketItem, "status" | "action" | "ph
   return {
     label: normalizedLabel || getPhaseDisplayLabel(resolvedPhase as MarketItem["phase"], isClosed),
     isClosed,
-    canPlaceBet: !isClosed && normalizedAction.toLowerCase() !== "closed",
+    canPlaceBet: canPlaceBetFromBackend ?? (!isClosed && normalizedAction.toLowerCase() !== "closed"),
     phase: resolvedPhase
   } as const;
 }
@@ -231,7 +234,12 @@ export default function HomeScreen() {
                           asChild
                           href={{
                             pathname: "/place-bid/[market]",
-                            params: { market: market.slug, label: market.name, marketPhase: phaseMeta.phase }
+                            params: {
+                              market: market.slug,
+                              label: market.name,
+                              marketPhase: phaseMeta.phase,
+                              blockedBoards: (market.blockedBoardLabels ?? []).join("||")
+                            }
                           }}
                         >
                           <Pressable style={styles.openButton}>
@@ -333,6 +341,8 @@ export default function HomeScreen() {
           result: live.result ?? "",
           phase: live.phase,
           label: live.label ?? "",
+          canPlaceBet: live.canPlaceBet,
+          blockedBoardLabels: Array.isArray(live.blockedBoardLabels) ? live.blockedBoardLabels : [],
           status: live.status ?? "Active",
           action: live.action ?? "Open",
           open: live.open ?? fallback?.open ?? "--:--",
@@ -350,6 +360,8 @@ export default function HomeScreen() {
           result: "",
           phase: "open-running",
           label: "",
+          canPlaceBet: true,
+          blockedBoardLabels: [],
           status: "Active",
           action: "Open",
           open: fallback.open,

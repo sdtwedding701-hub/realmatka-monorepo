@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.realmatka.in").replace(/\/$/, "");
 const REFRESH_INTERVAL_MS = 60_000;
-const MARKET_DAY_ROLLOVER_MINUTES = 30;
 
 type LiveMarket = {
   slug: string;
@@ -31,73 +30,6 @@ type MarketsSectionProps = {
 
 function slugifyMarket(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
-
-function parseClockTimeToMinutes(value: string) {
-  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
-  if (!match) {
-    return Number.MAX_SAFE_INTEGER;
-  }
-
-  let hours = Number(match[1]) % 12;
-  const minutes = Number(match[2]);
-  const meridiem = match[3].toUpperCase();
-  if (meridiem === "PM") {
-    hours += 12;
-  }
-
-  return hours * 60 + minutes;
-}
-
-function getIndiaCurrentMinutes() {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  }).formatToParts(now);
-  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
-  return hour * 60 + minute;
-}
-
-function sortMarketsByCurrentPhase(markets: MarketCard[]) {
-  const currentMinutes = getIndiaCurrentMinutes();
-
-  return [...markets].sort((left, right) => {
-    const leftOpen = parseClockTimeToMinutes(left.open);
-    const leftClose = parseClockTimeToMinutes(left.close);
-    const rightOpen = parseClockTimeToMinutes(right.open);
-    const rightClose = parseClockTimeToMinutes(right.close);
-
-    const leftBucket =
-      currentMinutes < MARKET_DAY_ROLLOVER_MINUTES ? 0 : currentMinutes < leftOpen ? 1 : currentMinutes < leftClose ? 0 : 2;
-    const rightBucket =
-      currentMinutes < MARKET_DAY_ROLLOVER_MINUTES ? 0 : currentMinutes < rightOpen ? 1 : currentMinutes < rightClose ? 0 : 2;
-
-    if (leftBucket !== rightBucket) {
-      return leftBucket - rightBucket;
-    }
-
-    if (leftBucket === 0 || leftBucket === 1) {
-      const leftAnchor = leftBucket === 0 ? leftClose : leftOpen;
-      const rightAnchor = rightBucket === 0 ? rightClose : rightOpen;
-      const diff = leftAnchor - rightAnchor;
-      if (diff !== 0) {
-        return diff;
-      }
-    }
-
-    if (leftBucket === 2) {
-      const diff = leftClose - rightClose;
-      if (diff !== 0) {
-        return diff;
-      }
-    }
-
-    return left.name.localeCompare(right.name);
-  });
 }
 
 function mergeMarkets(initialMarkets: MarketCard[], liveMarkets: LiveMarket[]) {
@@ -127,12 +59,10 @@ function mergeMarkets(initialMarkets: MarketCard[], liveMarkets: LiveMarket[]) {
 
 export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: MarketsSectionProps) {
   const [markets, setMarkets] = useState<MarketCard[]>(() =>
-    sortMarketsByCurrentPhase(
-      initialMarkets.map((market) => ({
-        ...market,
-        result: market.result || "***-**-***"
-      }))
-    )
+    initialMarkets.map((market) => ({
+      ...market,
+      result: market.result || "***-**-***"
+    }))
   );
 
   useEffect(() => {
@@ -153,10 +83,10 @@ export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: Market
           return;
         }
 
-        setMarkets(sortMarketsByCurrentPhase(mergeMarkets(initialMarkets, liveMarkets)));
+        setMarkets(mergeMarkets(initialMarkets, liveMarkets));
       } catch {
         if (!cancelled) {
-          setMarkets((current) => sortMarketsByCurrentPhase(current));
+          setMarkets((current) => current);
         }
       }
     }
@@ -172,7 +102,7 @@ export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: Market
     };
   }, [initialMarkets]);
 
-  const orderedMarkets = useMemo(() => sortMarketsByCurrentPhase(markets), [markets]);
+  const orderedMarkets = useMemo(() => markets, [markets]);
 
   return (
     <>

@@ -114,12 +114,13 @@ function useBoardHelper(
 }
 
 export default function BettingBoardScreen() {
-  const params = useLocalSearchParams<{ label?: string; boardLabel?: string; market?: string; marketPhase?: string }>();
+  const params = useLocalSearchParams<{ label?: string; boardLabel?: string; market?: string; marketPhase?: string; blockedBoards?: string | string[] }>();
   const marketLabel = params.label ?? "MANGAL BAZAR";
   const boardLabel = params.boardLabel ?? "Single Digit";
   const marketPhase = normalizeMarketPhase(params.marketPhase);
+  const blockedBoards = parseBlockedBoards(params.blockedBoards);
 
-  if (isBoardBlockedForPhase(boardLabel, marketPhase)) {
+  if (marketPhase === "closed" || blockedBoards.has(boardLabel) || isBoardBlockedForPhase(boardLabel, marketPhase)) {
     return <BlockedBoardState boardLabel={boardLabel} marketLabel={marketLabel} marketPhase={marketPhase} />;
   }
 
@@ -183,6 +184,16 @@ function normalizeMarketPhase(value?: string): MarketPhase {
     return value;
   }
   return "open-running";
+}
+
+function parseBlockedBoards(value?: string | string[]) {
+  const source = Array.isArray(value) ? value.join("||") : String(value ?? "");
+  return new Set(
+    source
+      .split("||")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  );
 }
 
 function isOpenCutoffOnlyBoard(boardLabel: string) {

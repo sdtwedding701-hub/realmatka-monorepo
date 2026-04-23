@@ -5,6 +5,14 @@ const MARKET_SNAPSHOT_TTL_MS = 60_000;
 const MARKET_RESULT_RESET_AFTER_MINUTES = 30;
 const MARKET_RESULT_RESET_SETTING_KEY = "market_results_reset_day_india";
 const MARKET_DAY_ROLLOVER_MINUTES = 30;
+const OPEN_CUTOFF_ONLY_BOARDS = [
+  "Jodi Digit",
+  "Jodi Digit Bulk",
+  "Red Bracket",
+  "Digit Based Jodi",
+  "Half Sangam",
+  "Full Sangam"
+];
 const WEEKDAY_OFF_BY_SLUG = new Map([
   ["kalyan-night", new Set([0, 6])],
   ["main-bazar", new Set([0, 6])],
@@ -87,6 +95,16 @@ function getIndiaWeekday(date = getIndiaNow()) {
 function isMarketWeeklyOff(market, date = getIndiaNow()) {
   const offDays = WEEKDAY_OFF_BY_SLUG.get(String(market?.slug ?? "").trim());
   return Boolean(offDays && offDays.has(getIndiaWeekday(date)));
+}
+
+function getBlockedBoardLabelsForPhase(phase) {
+  if (phase === "closed") {
+    return [...OPEN_CUTOFF_ONLY_BOARDS];
+  }
+  if (phase === "close-running") {
+    return [...OPEN_CUTOFF_ONLY_BOARDS];
+  }
+  return [];
 }
 
 export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
@@ -354,6 +372,8 @@ function decorateMarketWithLookup(market, chartLookup) {
     result: nextResult,
     phase: runtimeMeta.phase,
     label: runtimeMeta.label,
+    canPlaceBet: runtimeMeta.canPlaceBet,
+    blockedBoardLabels: getBlockedBoardLabelsForPhase(runtimeMeta.phase),
     status: runtimeMeta.status,
     action: runtimeMeta.action
   };
@@ -446,9 +466,16 @@ export async function getDecoratedMarketBySlug(slug) {
     getChartRecord(sourceMarket.slug, "jodi"),
     getChartRecord(sourceMarket.slug, "panna")
   ]);
+  const runtimeMeta = getMarketRuntimeMeta(sourceMarket);
 
   return {
     ...sourceMarket,
-    result: deriveTodayResultFromCharts(sourceMarket, jodiChart, pannaChart)
+    result: deriveTodayResultFromCharts(sourceMarket, jodiChart, pannaChart),
+    phase: runtimeMeta.phase,
+    label: runtimeMeta.label,
+    canPlaceBet: runtimeMeta.canPlaceBet,
+    blockedBoardLabels: getBlockedBoardLabelsForPhase(runtimeMeta.phase),
+    status: runtimeMeta.status,
+    action: runtimeMeta.action
   };
 }

@@ -24,15 +24,6 @@ const allBetBoards = [
   { title: "Digit Based Jodi", color: "#7e22ce" }
 ] as const;
 
-const openCutoffOnlyBoards = new Set([
-  "Jodi Digit",
-  "Jodi Digit Bulk",
-  "Red Bracket",
-  "Digit Based Jodi",
-  "Half Sangam",
-  "Full Sangam"
-]);
-
 function normalizeMarketPhase(value?: string) {
   if (value === "close-running" || value === "closed" || value === "upcoming") {
     return value;
@@ -40,18 +31,29 @@ function normalizeMarketPhase(value?: string) {
   return "open-running";
 }
 
-function isBoardAvailableForPhase(boardLabel: string, marketPhase: string) {
-  if (!openCutoffOnlyBoards.has(boardLabel)) {
-    return marketPhase !== "closed";
+function parseBlockedBoards(value?: string | string[]) {
+  const source = Array.isArray(value) ? value.join("||") : String(value ?? "");
+  return new Set(
+    source
+      .split("||")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  );
+}
+
+function isBoardAvailable(boardLabel: string, marketPhase: string, blockedBoards: Set<string>) {
+  if (marketPhase === "closed") {
+    return false;
   }
-  return marketPhase === "open-running" || marketPhase === "upcoming";
+  return !blockedBoards.has(boardLabel);
 }
 
 export default function PlaceBidDashboardScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ market?: string; label?: string; marketPhase?: string }>();
+  const params = useLocalSearchParams<{ market?: string; label?: string; marketPhase?: string; blockedBoards?: string | string[] }>();
   const marketLabel = params.label ?? formatLabel(params.market ?? "market");
   const marketPhase = normalizeMarketPhase(params.marketPhase);
+  const blockedBoards = parseBlockedBoards(params.blockedBoards);
 
   return (
     <View style={styles.page}>
@@ -62,9 +64,9 @@ export default function PlaceBidDashboardScreen() {
           {allBetBoards.map((board) => (
             <Pressable
               key={board.title}
-              disabled={!isBoardAvailableForPhase(board.title, marketPhase)}
+              disabled={!isBoardAvailable(board.title, marketPhase, blockedBoards)}
               onPress={() => {
-                if (!isBoardAvailableForPhase(board.title, marketPhase)) {
+                if (!isBoardAvailable(board.title, marketPhase, blockedBoards)) {
                   return;
                 }
                 router.push({
@@ -74,18 +76,19 @@ export default function PlaceBidDashboardScreen() {
                     board: slugify(board.title),
                     label: marketLabel,
                     boardLabel: board.title,
-                    marketPhase: params.marketPhase ?? ""
+                    marketPhase: params.marketPhase ?? "",
+                    blockedBoards: Array.from(blockedBoards).join("||")
                   }
                 });
               }}
-              style={[styles.card, !isBoardAvailableForPhase(board.title, marketPhase) && styles.cardDisabled]}
+              style={[styles.card, !isBoardAvailable(board.title, marketPhase, blockedBoards) && styles.cardDisabled]}
             >
               <View style={[styles.iconCircle, { backgroundColor: board.color }]}>
                 <Ionicons color={colors.surface} name="grid-outline" size={18} />
               </View>
               <View style={[styles.cardUnderline, { backgroundColor: board.color }]} />
               <Text style={styles.cardTitle}>{board.title}</Text>
-              {!isBoardAvailableForPhase(board.title, marketPhase) ? <Text style={styles.cardMeta}>Open Time Tak</Text> : null}
+              {!isBoardAvailable(board.title, marketPhase, blockedBoards) ? <Text style={styles.cardMeta}>Open Time Tak</Text> : null}
             </Pressable>
           ))}
         </View>

@@ -10,6 +10,8 @@ type MarketItem = {
   result: string;
   phase?: "open-running" | "close-running" | "closed" | "upcoming";
   label?: string;
+  canPlaceBet?: boolean;
+  blockedBoardLabels?: string[];
   status: string;
   action: string;
   open: string;

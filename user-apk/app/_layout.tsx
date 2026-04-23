@@ -3,7 +3,7 @@ import { Component, ReactNode, useEffect, useRef, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import Constants from "expo-constants";
 import * as Linking from "expo-linking";
-import { Modal, NativeModules, Platform, Pressable, Text, View } from "react-native";
+import { Modal, Platform, Pressable, Text, View } from "react-native";
 import { AppChromeProvider } from "@/components/ui";
 import { UniversalBottomTabs } from "@/components/universal-bottom-tabs";
 import { api } from "@/lib/api";
@@ -20,7 +20,7 @@ import { colors } from "@/theme/colors";
 const WEB_ACTIVE_WINDOW_KEY = "realmatka.active-web-window";
 const WEB_WINDOW_HEARTBEAT_MS = 3000;
 const WEB_WINDOW_STALE_MS = 9000;
-const UPDATE_APK_FILE_NAME = "realmatka.apk";
+const UPDATE_DOWNLOAD_PAGE_URL = "https://realmatka.in/download";
 
 export default function RootLayout() {
   return (
@@ -448,13 +448,9 @@ function compareAppVersions(left: string, right: string) {
 }
 
 async function downloadUpdateApk(apkUrl: string) {
-  if (Platform.OS === "android" && NativeModules.AppUpdateDownload?.downloadApk) {
-    try {
-      await NativeModules.AppUpdateDownload.downloadApk(apkUrl, UPDATE_APK_FILE_NAME);
-      return;
-    } catch {
-      // Fall back to the browser if Android DownloadManager is unavailable.
-    }
+  if (Platform.OS === "android") {
+    await Linking.openURL(UPDATE_DOWNLOAD_PAGE_URL);
+    return;
   }
 
   await Linking.openURL(apkUrl);

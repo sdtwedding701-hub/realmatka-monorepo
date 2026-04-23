@@ -144,22 +144,23 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
+    const measuredNoticeTextWidth = Math.max(noticeTextWidth, noticeText.length * 7);
     noticeScrollX.stopAnimation();
-    if (!noticeContainerWidth || !noticeTextWidth) {
+    if (!noticeContainerWidth || !measuredNoticeTextWidth) {
       noticeScrollX.setValue(0);
       return;
     }
 
-    if (noticeTextWidth <= noticeContainerWidth) {
+    if (measuredNoticeTextWidth <= noticeContainerWidth) {
       noticeScrollX.setValue(0);
       return;
     }
 
-    const travelDistance = noticeTextWidth + noticeContainerWidth + 24;
-    noticeScrollX.setValue(noticeContainerWidth);
+    const travelDistance = measuredNoticeTextWidth + noticeContainerWidth + 24;
+    noticeScrollX.setValue(-measuredNoticeTextWidth - 24);
     const animation = Animated.loop(
       Animated.timing(noticeScrollX, {
-        toValue: -noticeTextWidth - 24,
+        toValue: noticeContainerWidth,
         duration: Math.max(9000, travelDistance * 42),
         easing: Easing.linear,
         useNativeDriver: true
@@ -198,6 +199,12 @@ export default function HomeScreen() {
           <Animated.Text
             numberOfLines={1}
             onLayout={(event) => setNoticeTextWidth(event.nativeEvent.layout.width)}
+            onTextLayout={(event) => {
+              const firstLineWidth = event.nativeEvent.lines?.[0]?.width;
+              if (typeof firstLineWidth === "number" && firstLineWidth > 0) {
+                setNoticeTextWidth(Math.ceil(firstLineWidth));
+              }
+            }}
             style={[styles.noticeText, { transform: [{ translateX: noticeScrollX }] }]}
           >
             {noticeText}

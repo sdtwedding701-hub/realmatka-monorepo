@@ -8,6 +8,8 @@ type MarketItem = {
   slug: string;
   name: string;
   result: string;
+  phase?: "open-running" | "close-running" | "closed" | "upcoming";
+  label?: string;
   status: string;
   action: string;
   open: string;

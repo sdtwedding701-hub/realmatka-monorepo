@@ -124,8 +124,6 @@ export default function WithdrawScreen() {
               />
               <Ionicons color={colors.primary} name="cash-outline" size={18} />
             </View>
-            {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             {otpSent ? (
               <>
@@ -162,8 +160,16 @@ export default function WithdrawScreen() {
                 {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>Withdraw</Text>}
               </Pressable>
             )}
-            {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {successMessage ? (
+              <View style={styles.feedbackCardSuccess}>
+                <Text style={styles.feedbackTextSuccess}>{successMessage}</Text>
+              </View>
+            ) : null}
+            {error ? (
+              <View style={styles.feedbackCardError}>
+                <Text style={styles.feedbackTextError}>{error}</Text>
+              </View>
+            ) : null}
 
             <Text style={styles.simpleInfoText}>Withdrawal limit is 500 to 99999.</Text>
             <Text style={styles.simpleInfoText}>Withdraw request timing is 11:00 AM to 11:00 PM.</Text>
@@ -463,5 +469,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 18
+  },
+  feedbackCardSuccess: {
+    borderRadius: 14,
+    backgroundColor: colors.successSoft,
+    borderWidth: 1,
+    borderColor: "#b9ebc8",
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  feedbackCardError: {
+    borderRadius: 14,
+    backgroundColor: colors.dangerSoft,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  feedbackTextSuccess: {
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17
+  },
+  feedbackTextError: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17
   }
 });

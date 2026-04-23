@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
+import { getAddFundUnsupportedMessage, isSupportedAddFundPlatform } from "@/lib/payment-platform";
 import { colors } from "@/theme/colors";
 
 const walletActions = [
@@ -14,27 +15,45 @@ const walletActions = [
 
 export default function WalletScreen() {
   const { walletBalance } = useAppState();
+  const addFundSupported = isSupportedAddFundPlatform();
 
   return (
     <View style={styles.page}>
       <AppHeader title="Wallet" subtitle={undefined} rightLabel={`Rs ${walletBalance}`} />
       <AppScreen showPromo={false}>
         <View style={styles.list}>
-          {walletActions.map((item) => (
-            <Pressable key={item.title} onPress={() => router.push(item.href as never)}>
+          {walletActions.map((item) => {
+            const isAddFund = item.href === "/wallet/add-fund";
+            const disabled = isAddFund && !addFundSupported;
+
+            return (
+            <Pressable
+              key={item.title}
+              disabled={disabled}
+              onPress={() => {
+                if (disabled) {
+                  return;
+                }
+                router.push(item.href as never);
+              }}
+            >
               <SurfaceCard style={styles.actionCard}>
-                <View style={styles.actionRow}>
+                <View style={[styles.actionRow, disabled && styles.actionRowDisabled]}>
                   <View style={[styles.actionIconWrap, { borderColor: item.tone }]}>
                     <View style={[styles.actionIcon, { backgroundColor: item.tone }]}>
                       <Ionicons color={colors.surface} name={item.icon} size={20} />
                     </View>
                   </View>
-                  <Text style={styles.actionText}>{item.title}</Text>
+                  <View style={styles.actionCopy}>
+                    <Text style={styles.actionText}>{item.title}</Text>
+                    {disabled ? <Text style={styles.actionHint}>{getAddFundUnsupportedMessage()}</Text> : null}
+                  </View>
                   <Ionicons color="#98a2b3" name="chevron-forward" size={18} />
                 </View>
               </SurfaceCard>
             </Pressable>
-          ))}
+          );
+          })}
         </View>
       </AppScreen>
     </View>
@@ -57,6 +76,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 14
   },
+  actionRowDisabled: {
+    opacity: 0.55
+  },
+  actionCopy: {
+    flex: 1
+  },
   actionIconWrap: {
     width: 52,
     height: 52,
@@ -74,9 +99,15 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   actionText: {
-    flex: 1,
     color: "#111827",
     fontSize: 17,
     fontWeight: "800"
+  },
+  actionHint: {
+    marginTop: 4,
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 15
   }
 });

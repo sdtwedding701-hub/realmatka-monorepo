@@ -5,6 +5,7 @@ import { ActivityIndicator, AppState, AppStateStatus, Linking, Platform, Pressab
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
 import { api, formatApiError, type PaymentOrder } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
+import { getAddFundUnsupportedMessage, isSupportedAddFundPlatform } from "@/lib/payment-platform";
 import { colors } from "@/theme/colors";
 
 const QUICK_AMOUNTS = [100, 200, 500, 1000];
@@ -24,6 +25,7 @@ function statusTone(status: string) {
 
 export default function AddFundScreen() {
   const { sessionToken, walletBalance, reloadSessionData } = useAppState();
+  const addFundSupported = isSupportedAddFundPlatform();
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
@@ -120,6 +122,17 @@ export default function AddFundScreen() {
     <View style={styles.page}>
       <BackHeader title="Add Fund" subtitle="Razorpay test payment link se wallet top-up karo." />
       <AppScreen showPromo={false}>
+        {!addFundSupported ? (
+          <SurfaceCard style={styles.unsupportedCard}>
+            <Ionicons color={colors.warning} name="alert-circle-outline" size={22} />
+            <Text style={styles.unsupportedTitle}>Add Fund unavailable</Text>
+            <Text style={styles.unsupportedText}>{getAddFundUnsupportedMessage()}</Text>
+            <Pressable onPress={() => router.replace("/(tabs)/wallet" as never)} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>Back to Wallet</Text>
+            </Pressable>
+          </SurfaceCard>
+        ) : (
+          <>
         <SurfaceCard style={styles.heroCard}>
           <View style={styles.heroIcon}>
             <Ionicons color={colors.surface} name="wallet-outline" size={22} />
@@ -234,6 +247,8 @@ export default function AddFundScreen() {
             <Text style={styles.historyButtonText}>View Wallet History</Text>
           </Pressable>
         </View>
+          </>
+        )}
       </AppScreen>
     </View>
   );
@@ -278,6 +293,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12
+  },
+  unsupportedCard: {
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 28
+  },
+  unsupportedTitle: {
+    color: colors.textPrimary,
+    fontSize: 20,
+    fontWeight: "900"
+  },
+  unsupportedText: {
+    color: colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 21
   },
   heroIcon: {
     width: 48,

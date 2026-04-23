@@ -26,13 +26,7 @@ export default function ProfileScreen() {
   const referredCount = referralStats?.referredCount ?? 0;
   const referralIncomeTotal = referralStats?.referralIncomeTotal ?? 0;
   const referredUsers = referralStats?.referredUsers ?? [];
-  const appBaseUrl = String(process.env.EXPO_PUBLIC_APP_URL || "https://play.realmatka.in")
-    .trim()
-    .replace(/\/+$/, "");
-  const referralWebBaseUrl = String(process.env.EXPO_PUBLIC_REFERRAL_WEB_URL || appBaseUrl || "https://play.realmatka.in")
-    .trim()
-    .replace(/\/+$/, "");
-  const referralWebLink = referralWebBaseUrl ? `${referralWebBaseUrl}/auth/register?ref=${encodeURIComponent(referralCode)}` : "";
+  const referralWebLink = `https://play.realmatka.in/auth/register?ref=${encodeURIComponent(referralCode)}`;
   const shareMessage = `Real Matka join karo.\n\nRegister here: ${referralWebLink}\nReferral code auto-fill ho jayega.\n\nReferral code: ${referralCode}`;
 
   useFocusEffect(

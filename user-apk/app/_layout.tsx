@@ -3,7 +3,7 @@ import { Component, ReactNode, useEffect, useRef, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import Constants from "expo-constants";
 import * as Linking from "expo-linking";
-import { Modal, Platform, Pressable, Text, View } from "react-native";
+import { Modal, NativeModules, Platform, Pressable, Text, View } from "react-native";
 import { AppChromeProvider } from "@/components/ui";
 import { UniversalBottomTabs } from "@/components/universal-bottom-tabs";
 import { api } from "@/lib/api";
@@ -20,6 +20,7 @@ import { colors } from "@/theme/colors";
 const WEB_ACTIVE_WINDOW_KEY = "realmatka.active-web-window";
 const WEB_WINDOW_HEARTBEAT_MS = 3000;
 const WEB_WINDOW_STALE_MS = 9000;
+const UPDATE_APK_FILE_NAME = "realmatka.apk";
 
 export default function RootLayout() {
   return (
@@ -388,7 +389,7 @@ function RootNavigator() {
                 <Pressable
                   onPress={() => {
                     if (appUpdatePrompt?.apkUrl) {
-                      void Linking.openURL(appUpdatePrompt.apkUrl);
+                      void downloadUpdateApk(appUpdatePrompt.apkUrl);
                     }
                   }}
                   style={{ minHeight: 48, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", paddingHorizontal: 20 }}
@@ -444,6 +445,19 @@ function compareAppVersions(left: string, right: string) {
   }
 
   return 0;
+}
+
+async function downloadUpdateApk(apkUrl: string) {
+  if (Platform.OS === "android" && NativeModules.AppUpdateDownload?.downloadApk) {
+    try {
+      await NativeModules.AppUpdateDownload.downloadApk(apkUrl, UPDATE_APK_FILE_NAME);
+      return;
+    } catch {
+      // Fall back to the browser if Android DownloadManager is unavailable.
+    }
+  }
+
+  await Linking.openURL(apkUrl);
 }
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {

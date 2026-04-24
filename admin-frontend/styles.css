@@ -604,6 +604,10 @@ a.secondary {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.bid-summary-strip {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
 .mini-stat,
 .compact-row {
   display: flex;
@@ -917,6 +921,82 @@ a.secondary {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.bid-row {
+  align-items: stretch;
+}
+
+.bid-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.bid-row-head,
+.bid-row-market,
+.bid-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+}
+
+.bid-row-head strong,
+.bid-row-market strong {
+  color: var(--ink);
+}
+
+.bid-row-market strong {
+  font-size: 18px;
+}
+
+.bid-row-meta span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bid-row-meta.muted span {
+  font-size: 11px;
+}
+
+.bid-row-side {
+  min-width: 248px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: start;
+  justify-items: stretch;
+}
+
+.bid-metric-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+  padding: 12px 14px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bid-metric-card span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bid-metric-card strong {
+  color: var(--primary-dark);
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.bid-row-side .risk-chip {
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .payout-row {
@@ -1628,6 +1708,45 @@ button.secondary.danger {
   margin: 0;
 }
 
+.ledger-feed {
+  display: grid;
+  gap: 12px;
+  max-height: 58vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.ledger-row {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
+  padding: 14px 16px;
+}
+
+.ledger-row-main {
+  display: grid;
+  gap: 10px;
+}
+
+.ledger-row-head,
+.ledger-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.ledger-row-meta span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ledger-row-meta.muted span {
+  font-size: 11px;
+}
+
 .inline-note {
   border: 1px dashed var(--border);
   border-radius: 16px;
@@ -1767,6 +1886,7 @@ button.secondary.danger {
   .hero-grid,
   .hero-grid-requests,
   .compact-metric-strip,
+  .bid-summary-strip,
   .queue-overview-grid,
   .action-card-grid,
   .toolbar-grid-requests,
@@ -1781,6 +1901,11 @@ button.secondary.danger {
 
   .toolbar-actions {
     justify-content: flex-start;
+  }
+
+  .bid-row-side {
+    width: 100%;
+    min-width: 0;
   }
 
   .support-list-items,

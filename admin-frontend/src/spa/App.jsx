@@ -1652,9 +1652,15 @@ function BidsPage({ apiBase, token }) {
     return matchesQuery && matchesStatus;
   });
 
+  const visibleBetAmount = filtered.reduce((sum, bid) => sum + Number(bid.points || 0), 0);
+  const visibleWinAmount = filtered.reduce((sum, bid) => sum + Number(bid.payout || 0), 0);
+  const pendingCount = filtered.filter((bid) => bid.status === "Pending").length;
+  const wonCount = filtered.filter((bid) => bid.status === "Won").length;
+  const lostCount = filtered.filter((bid) => bid.status === "Lost").length;
+
   return (
     <>
-      <PageHeader title="All Bids" subtitle="Every placed bid with user, market, board, and settlement status." />
+      <PageHeader title="All Bids" subtitle="Every placed bid with user, board, amount, payout, result, and settlement status in one cleaner view." />
       <section className="panel">
         <div className="form-grid">
           <label className="wide"><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="User, phone, market" /></label>
@@ -1665,17 +1671,51 @@ function BidsPage({ apiBase, token }) {
         </div>
       </section>
       <section className="panel">
+        <div className="mini-stats bid-summary-strip">
+          {[
+            miniStat("Visible Bids", filtered.length),
+            miniStat("Bet Amount", formatCurrency(visibleBetAmount)),
+            miniStat("Win Amount", formatCurrency(visibleWinAmount)),
+            miniStat("Pending", pendingCount),
+            miniStat("Won", wonCount),
+            miniStat("Lost", lostCount)
+          ]}
+        </div>
+      </section>
+      <section className="panel">
         <div className="table-list">
+          {!filtered.length ? <div className="empty-card">Is filter ke andar koi bid nahi mili.</div> : null}
           {filtered.map((bid) => (
-            <div className="data-row" key={bid.id}>
-              <div className="row-main">
-                <strong>{bid.user?.name || "Unknown"} ({bid.user?.phone || "n/a"})</strong>
-                <span>{bid.market} - {bid.boardLabel}</span>
-                <span>{bid.sessionType} - {bid.digit}</span>
+            <div className="data-row bid-row" key={bid.id}>
+              <div className="row-main bid-row-main">
+                <div className="bid-row-head">
+                  <strong>{bid.user?.name || "Unknown"} ({bid.user?.phone || "n/a"})</strong>
+                  <span>{formatDate(bid.createdAt)}</span>
+                </div>
+                <div className="bid-row-market">
+                  <strong>{bid.market}</strong>
+                  <span>{bid.boardLabel}</span>
+                </div>
+                <div className="bid-row-meta">
+                  <span>Game: {bid.gameType || bid.boardLabel || "-"}</span>
+                  <span>Session: {bid.sessionType || "-"}</span>
+                  <span>Digit: {bid.digit || "-"}</span>
+                </div>
+                <div className="bid-row-meta muted">
+                  <span>Bid ID: {bid.id}</span>
+                  <span>Result: {bid.settledResult || "-"}</span>
+                </div>
               </div>
-              <div className="row-main">
-                <strong>{formatCurrency(bid.points)}</strong>
-                <span>{bid.status}</span>
+              <div className="bid-row-side">
+                <div className="bid-metric-card">
+                  <span>Bet Amount</span>
+                  <strong>{formatCurrency(bid.points)}</strong>
+                </div>
+                <div className="bid-metric-card">
+                  <span>Win Amount</span>
+                  <strong>{formatCurrency(bid.payout)}</strong>
+                </div>
+                <span className={`risk-chip ${getBidStatusTone(bid.status)}`}>{bid.status}</span>
               </div>
             </div>
           ))}
@@ -1686,6 +1726,18 @@ function BidsPage({ apiBase, token }) {
 }
 
 function UserLedgerModal({ state, onClose }) {
+  const detail = state.detail;
+  const walletEntries = detail?.walletEntries || [];
+  const bids = detail?.bids || [];
+  const walletTimeline = walletEntries
+    .slice()
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const bidTimeline = bids
+    .slice()
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const lossDays = buildBidLossDays(bidTimeline);
+  const winningDays = buildBidWinningDays(bidTimeline);
+
   return (
     <div className="modal-shell" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="modal-card">
@@ -1695,47 +1747,48 @@ function UserLedgerModal({ state, onClose }) {
         </div>
         {state.loading ? <div className="empty-card">Loading user ledger...</div> : null}
         {state.error ? <p className="message error">{state.error}</p> : null}
-        {state.detail ? (
+        {detail ? (
           <div className="compact-list">
             <div className="mini-stats">
               {[
-                miniStat("Wallet", formatCurrency(state.detail.summary?.walletBalance ?? 0)),
-                miniStat("Deposits", formatCurrency(state.detail.summary?.deposits ?? 0)),
-                miniStat("Withdraws", formatCurrency(state.detail.summary?.withdraws ?? 0)),
-                miniStat("Bid Placed", formatCurrency(state.detail.summary?.bidPlaced ?? 0)),
-                miniStat("Bid Wins", formatCurrency(state.detail.summary?.bidWins ?? 0)),
-                miniStat("Pending Bids", state.detail.summary?.pendingBids ?? 0),
-                miniStat("Signup Bonus", formatCurrency(state.detail.summary?.signupBonus ?? 0)),
-                miniStat("First Deposit Bonus", formatCurrency(state.detail.summary?.firstDepositBonus ?? 0)),
-                miniStat("Referral Income", formatCurrency(state.detail.summary?.referralIncome ?? 0))
+                miniStat("Wallet", formatCurrency(detail.summary?.walletBalance ?? 0)),
+                miniStat("Deposits", formatCurrency(detail.summary?.deposits ?? 0)),
+                miniStat("Withdraws", formatCurrency(detail.summary?.withdraws ?? 0)),
+                miniStat("Bid Placed", formatCurrency(detail.summary?.bidPlaced ?? 0)),
+                miniStat("Bid Wins", formatCurrency(detail.summary?.bidWins ?? 0)),
+                miniStat("Pending Bids", detail.summary?.pendingBids ?? 0),
+                miniStat("Won Bids", detail.summary?.wonBids ?? 0),
+                miniStat("Lost Bids", detail.summary?.lostBids ?? 0),
+                miniStat("Referral Income", formatCurrency(detail.summary?.referralIncome ?? 0))
               ]}
             </div>
             <div className="dashboard-grid">
               <div className="subpanel">
-                <h3>{state.detail.user.name} ({state.detail.user.phone})</h3>
+                <h3>{detail.user.name} ({detail.user.phone})</h3>
                 <div className="compact-list">
-                  <div className="compact-row"><strong>Referral</strong><span>{state.detail.user.referralCode || "-"}</span></div>
-                  <div className="compact-row"><strong>Approval</strong><span>{state.detail.user.approvalStatus || "-"}</span></div>
-                  <div className="compact-row"><strong>Joined</strong><span>{formatDate(state.detail.user.joinedAt)}</span></div>
-                  <div className="compact-row"><strong>Status</strong><span>{state.detail.user.blockedAt ? "Blocked" : state.detail.user.deactivatedAt ? "Deactivated" : "Live"}</span></div>
-                  <div className="compact-row"><strong>Signup Bonus Flag</strong><span>{state.detail.user.signupBonusGranted ? "Granted" : "Pending"}</span></div>
-                  <div className="compact-row"><strong>First Deposit Bonus Flag</strong><span>{state.detail.user.firstDepositBonusGranted ? "Granted" : "Pending"}</span></div>
+                  <div className="compact-row"><strong>Referral</strong><span>{detail.user.referralCode || "-"}</span></div>
+                  <div className="compact-row"><strong>Approval</strong><span>{detail.user.approvalStatus || "-"}</span></div>
+                  <div className="compact-row"><strong>Joined</strong><span>{formatDate(detail.user.joinedAt)}</span></div>
+                  <div className="compact-row"><strong>Status</strong><span>{detail.user.blockedAt ? "Blocked" : detail.user.deactivatedAt ? "Deactivated" : "Live"}</span></div>
+                  <div className="compact-row"><strong>Signup Bonus Flag</strong><span>{detail.user.signupBonusGranted ? "Granted" : "Pending"}</span></div>
+                  <div className="compact-row"><strong>First Deposit Bonus Flag</strong><span>{detail.user.firstDepositBonusGranted ? "Granted" : "Pending"}</span></div>
+                  <div className="compact-row"><strong>Status Note</strong><span>{detail.user.statusNote || "-"}</span></div>
                 </div>
               </div>
               <div className="subpanel">
                 <h3>Bonus Visibility</h3>
                 <div className="compact-list">
-                  <div className="compact-row"><strong>Signup Bonus Total</strong><span>{formatCurrency(state.detail.summary?.signupBonus ?? 0)}</span></div>
-                  <div className="compact-row"><strong>First Deposit Bonus Total</strong><span>{formatCurrency(state.detail.summary?.firstDepositBonus ?? 0)}</span></div>
-                  <div className="compact-row"><strong>Referral Income</strong><span>{formatCurrency(state.detail.summary?.referralIncome ?? 0)}</span></div>
-                  <div className="compact-row"><strong>Manual Credits</strong><span>{formatCurrency(state.detail.summary?.adminCredits ?? 0)}</span></div>
-                  <div className="compact-row"><strong>Manual Debits</strong><span>{formatCurrency(state.detail.summary?.adminDebits ?? 0)}</span></div>
+                  <div className="compact-row"><strong>Signup Bonus Total</strong><span>{formatCurrency(detail.summary?.signupBonus ?? 0)}</span></div>
+                  <div className="compact-row"><strong>First Deposit Bonus Total</strong><span>{formatCurrency(detail.summary?.firstDepositBonus ?? 0)}</span></div>
+                  <div className="compact-row"><strong>Referral Income</strong><span>{formatCurrency(detail.summary?.referralIncome ?? 0)}</span></div>
+                  <div className="compact-row"><strong>Manual Credits</strong><span>{formatCurrency(detail.summary?.adminCredits ?? 0)}</span></div>
+                  <div className="compact-row"><strong>Manual Debits</strong><span>{formatCurrency(detail.summary?.adminDebits ?? 0)}</span></div>
                 </div>
               </div>
               <div className="subpanel">
                 <h3>Bank Accounts</h3>
                 <div className="compact-list">
-                  {state.detail.bankAccounts?.length ? state.detail.bankAccounts.map((account) => (
+                  {detail.bankAccounts?.length ? detail.bankAccounts.map((account) => (
                     <div className="compact-row" key={account.id}>
                       <strong>{account.holderName}</strong>
                       <span>{account.accountNumber} / {account.ifsc}</span>
@@ -1746,23 +1799,77 @@ function UserLedgerModal({ state, onClose }) {
             </div>
             <div className="dashboard-grid">
               <div className="subpanel">
-                <h3>Recent Wallet Entries</h3>
+                <h3>Day Wise Loss Summary</h3>
                 <div className="compact-list">
-                  {state.detail.walletEntries?.length ? state.detail.walletEntries.map((entry) => (
-                    <div className="compact-row" key={entry.id}>
-                      <strong>{entry.type} / {entry.status}</strong>
-                      <span>{formatCurrency(entry.amount)} | {formatDate(entry.createdAt)}</span>
+                  {lossDays.length ? lossDays.map((day) => (
+                    <div className="compact-row" key={day.label}>
+                      <strong>{day.label}</strong>
+                      <span>{day.lossCount} loss bids / {formatCurrency(day.lossAmount)}</span>
+                    </div>
+                  )) : <div className="empty-card">Is user ki loss history abhi available nahi hai.</div>}
+                </div>
+              </div>
+              <div className="subpanel">
+                <h3>Day Wise Winning Summary</h3>
+                <div className="compact-list">
+                  {winningDays.length ? winningDays.map((day) => (
+                    <div className="compact-row" key={day.label}>
+                      <strong>{day.label}</strong>
+                      <span>{day.winCount} win bids / {formatCurrency(day.winAmount)}</span>
+                    </div>
+                  )) : <div className="empty-card">Is user ki winning history abhi available nahi hai.</div>}
+                </div>
+              </div>
+            </div>
+            <div className="dashboard-grid">
+              <div className="subpanel">
+                <h3>Wallet Timeline</h3>
+                <div className="ledger-feed">
+                  {walletTimeline.length ? walletTimeline.map((entry) => (
+                    <div className="ledger-row" key={entry.id}>
+                      <div className="ledger-row-main">
+                        <div className="ledger-row-head">
+                          <strong>{entry.type}</strong>
+                          <span className={`risk-chip ${getWalletEntryTone(entry)}`}>{entry.status}</span>
+                        </div>
+                        <div className="ledger-row-meta">
+                          <span>{formatDate(entry.createdAt)}</span>
+                          <span>Amount: {formatCurrency(entry.amount)}</span>
+                          <span>Before: {formatCurrency(entry.beforeBalance)}</span>
+                          <span>After: {formatCurrency(entry.afterBalance)}</span>
+                        </div>
+                        <div className="ledger-row-meta muted">
+                          <span>Reference: {entry.referenceId || "-"}</span>
+                          <span>Proof: {entry.proofUrl || "-"}</span>
+                          <span>Note: {entry.note || "-"}</span>
+                        </div>
+                      </div>
                     </div>
                   )) : <div className="empty-card">No wallet entries available.</div>}
                 </div>
               </div>
               <div className="subpanel">
-                <h3>Recent Bids</h3>
-                <div className="compact-list">
-                  {state.detail.bids?.length ? state.detail.bids.map((bid) => (
-                    <div className="compact-row" key={bid.id}>
-                      <strong>{bid.market} / {bid.boardLabel}</strong>
-                      <span>{bid.digit} | {formatCurrency(bid.points)} | {bid.status}</span>
+                <h3>Bid Timeline</h3>
+                <div className="ledger-feed">
+                  {bidTimeline.length ? bidTimeline.map((bid) => (
+                    <div className="ledger-row" key={bid.id}>
+                      <div className="ledger-row-main">
+                        <div className="ledger-row-head">
+                          <strong>{bid.market} / {bid.boardLabel}</strong>
+                          <span className={`risk-chip ${getBidStatusTone(bid.status)}`}>{bid.status}</span>
+                        </div>
+                        <div className="ledger-row-meta">
+                          <span>{formatDate(bid.createdAt)}</span>
+                          <span>Game: {bid.gameType || bid.boardLabel || "-"}</span>
+                          <span>Session: {bid.sessionType || "-"}</span>
+                          <span>Digit: {bid.digit || "-"}</span>
+                        </div>
+                        <div className="ledger-row-meta">
+                          <span>Bet: {formatCurrency(bid.points)}</span>
+                          <span>Win: {formatCurrency(bid.payout)}</span>
+                          <span>Result: {bid.settledResult || "-"}</span>
+                        </div>
+                      </div>
                     </div>
                   )) : <div className="empty-card">No bids available.</div>}
                 </div>
@@ -1773,6 +1880,57 @@ function UserLedgerModal({ state, onClose }) {
       </div>
     </div>
   );
+}
+
+function buildBidLossDays(bids) {
+  const grouped = new Map();
+  for (const bid of bids) {
+    if (bid.status !== "Lost") continue;
+    const key = getDateGroupLabel(bid.createdAt);
+    const current = grouped.get(key) || { label: key, lossCount: 0, lossAmount: 0, stamp: new Date(bid.createdAt).getTime() };
+    current.lossCount += 1;
+    current.lossAmount += Number(bid.points || 0);
+    current.stamp = Math.max(current.stamp, new Date(bid.createdAt).getTime());
+    grouped.set(key, current);
+  }
+  return [...grouped.values()].sort((left, right) => right.stamp - left.stamp);
+}
+
+function buildBidWinningDays(bids) {
+  const grouped = new Map();
+  for (const bid of bids) {
+    if (bid.status !== "Won") continue;
+    const key = getDateGroupLabel(bid.createdAt);
+    const current = grouped.get(key) || { label: key, winCount: 0, winAmount: 0, stamp: new Date(bid.createdAt).getTime() };
+    current.winCount += 1;
+    current.winAmount += Number(bid.payout || 0);
+    current.stamp = Math.max(current.stamp, new Date(bid.createdAt).getTime());
+    grouped.set(key, current);
+  }
+  return [...grouped.values()].sort((left, right) => right.stamp - left.stamp);
+}
+
+function getDateGroupLabel(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("en-IN", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    weekday: "short"
+  });
+}
+
+function getWalletEntryTone(entry) {
+  const type = String(entry?.type || "").toUpperCase();
+  const status = String(entry?.status || "").toUpperCase();
+  if (status === "REJECTED" || status === "FAILED") return "high";
+  if (type === "DEPOSIT" || type === "BID_WIN" || type === "ADMIN_CREDIT" || type === "SIGNUP_BONUS" || type === "FIRST_DEPOSIT_BONUS" || type === "REFERRAL_COMMISSION") {
+    return "low";
+  }
+  if (type === "WITHDRAW" || type === "BID_PLACED" || type === "ADMIN_DEBIT") {
+    return "medium";
+  }
+  return "low";
 }
 
 function ProofModal({ item, onClose }) {
@@ -1825,6 +1983,12 @@ function statCard(label, value) {
 
 function miniStat(label, value) {
   return <div className="mini-stat" key={label}><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function getBidStatusTone(status) {
+  if (status === "Won") return "high";
+  if (status === "Lost") return "medium";
+  return "low";
 }
 
 function getPayoutActionTitle(action) {

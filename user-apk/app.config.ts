@@ -33,7 +33,7 @@ const config: ExpoConfig = {
   slug,
   owner: expoOwner,
   scheme,
-  version: "1.0.7",
+  version: "1.0.8",
   icon: appIconPath,
   splash: {
     backgroundColor: "#ffffff"

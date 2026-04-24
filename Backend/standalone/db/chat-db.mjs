@@ -417,16 +417,18 @@ export async function listSupportConversations(options = {}) {
     const now = new Date();
     const waitingCutoff = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
     const recentCutoff = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-    const params = [waitingCutoff, recentCutoff];
+    const params = [];
     const whereParts = [];
 
     if (filter === "unread") {
       whereParts.push("COALESCE(uc.unread_for_admin, 0) > 0");
     } else if (filter === "waiting") {
-      whereParts.push("COALESCE(c.last_message_at, c.updated_at, c.created_at) <= $1");
+      params.push(waitingCutoff);
+      whereParts.push(`COALESCE(c.last_message_at, c.updated_at, c.created_at) <= $${params.length}`);
       whereParts.push("c.status <> 'RESOLVED'");
     } else if (filter === "recent") {
-      whereParts.push("COALESCE(c.last_message_at, c.updated_at, c.created_at) >= $2");
+      params.push(recentCutoff);
+      whereParts.push(`COALESCE(c.last_message_at, c.updated_at, c.created_at) >= $${params.length}`);
       whereParts.push("c.status <> 'RESOLVED'");
     } else if (filter === "resolved") {
       whereParts.push("c.status = 'RESOLVED'");

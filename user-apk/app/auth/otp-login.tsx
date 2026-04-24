@@ -30,7 +30,7 @@ export default function OtpLoginScreen() {
     <View style={styles.page}>
       <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.hero}>
         <Image source={require("../../assets/images/adaptive-icon.png")} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.tagline}>OTP se fast login karo. Production me yahi code SMS provider se jayega.</Text>
+        <Text style={styles.tagline}>OTP se fast login karo. Phone number verify hone ke baad direct access mil jayega.</Text>
       </LinearGradient>
 
       <AppScreen padded={false} showPromo={false}>

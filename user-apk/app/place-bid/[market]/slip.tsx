@@ -1,8 +1,9 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
+import { formatApiError } from "@/lib/api";
 import { colors } from "@/theme/colors";
 
 const MIN_BID_POINTS = 5;
@@ -12,6 +13,7 @@ export default function BidSlipScreen() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const submitLockRef = useRef(false);
   const { draftBid, submitDraftBid, walletBalance } = useAppState();
   const total = draftBid?.items.reduce((sum, item) => sum + item.points, 0) ?? 0;
   const hasInvalidBidAmount = draftBid?.items.some((item) => item.points < MIN_BID_POINTS || item.points > MAX_BID_POINTS) ?? false;
@@ -32,21 +34,27 @@ export default function BidSlipScreen() {
             <Pressable
               disabled={submitDisabled}
               onPress={async () => {
-                if (submitDisabled) {
+                if (submitDisabled || submitLockRef.current) {
                   return;
                 }
+                submitLockRef.current = true;
+                let didSubmitSuccessfully = false;
                 setError("");
                 try {
                   setSubmitting(true);
                   await submitDraftBid();
+                  didSubmitSuccessfully = true;
                   setSubmitted(true);
                   setTimeout(() => {
                     router.replace("/(tabs)/bids");
                   }, 900);
                 } catch (submitError) {
-                  setError(submitError instanceof Error ? submitError.message : "Unable to submit bid");
+                  setError(formatApiError(submitError, "Bet place nahi ho paayi. Dobara try karo."));
                 } finally {
                   setSubmitting(false);
+                  if (!didSubmitSuccessfully) {
+                    submitLockRef.current = false;
+                  }
                 }
               }}
               style={[styles.submitButton, submitDisabled && styles.submitDisabled]}

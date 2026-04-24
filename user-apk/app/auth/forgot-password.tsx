@@ -19,14 +19,14 @@ export default function ForgotPasswordScreen() {
   const normalizedOtp = otp.replace(/[^0-9]/g, "");
   const hasValidPhone = normalizedPhone.length === 10;
   const hasValidOtp = normalizedOtp.length === 6;
-  const hasValidPassword = password.trim().length >= 4;
+  const hasValidPassword = password.trim().length >= 8;
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
 
   return (
     <View style={styles.page}>
       <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.hero}>
         <Image source={require("../../assets/images/adaptive-icon.png")} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.tagline}>Forgot password flow with OTP verification.</Text>
+        <Text style={styles.tagline}>Password reset ke liye OTP verify karke naya password set karo.</Text>
       </LinearGradient>
 
       <AppScreen padded={false} showPromo={false}>
@@ -107,7 +107,7 @@ export default function ForgotPasswordScreen() {
                   return;
                 }
                 if (!hasValidPassword) {
-                  setError("Password kam se kam 4 characters ka hona chahiye.");
+                  setError("Password kam se kam 8 characters ka hona chahiye.");
                   return;
                 }
                 if (!passwordsMatch) {

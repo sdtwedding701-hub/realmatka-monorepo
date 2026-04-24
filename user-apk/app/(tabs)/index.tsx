@@ -144,14 +144,15 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    const measuredNoticeTextWidth = Math.max(noticeTextWidth, noticeText.length * 7);
+    const measuredNoticeTextWidth = Math.max(noticeTextWidth, noticeText.length * 8);
     noticeScrollX.stopAnimation();
     if (!noticeContainerWidth || !measuredNoticeTextWidth) {
       noticeScrollX.setValue(0);
       return;
     }
 
-    if (measuredNoticeTextWidth <= noticeContainerWidth) {
+    const shouldScroll = measuredNoticeTextWidth > noticeContainerWidth - 8 || noticeText.length > 42;
+    if (!shouldScroll) {
       noticeScrollX.setValue(0);
       return;
     }
@@ -530,14 +531,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: colors.borderStrong,
     paddingHorizontal: 16,
-    paddingVertical: 9,
+    paddingVertical: 10,
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 8
   },
   noticeMarqueeWindow: {
     flex: 1,
-    minHeight: 18,
+    minHeight: 20,
     overflow: "hidden"
   },
   noticeText: {
@@ -546,7 +547,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 17,
-    minWidth: "100%"
+    paddingRight: 24
   },
   errorTitle: {
     color: colors.textPrimary,

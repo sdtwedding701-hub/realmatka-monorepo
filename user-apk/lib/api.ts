@@ -181,10 +181,10 @@ function mapUserFacingErrorMessage(message: string, fallback: string) {
     return "Password aur confirm password same nahi hai.";
   }
   if (lower.includes("api server connect nahi ho raha")) {
-    return "Server connect nahi ho raha. Thodi der baad retry karo.";
+    return "Server se connect nahi ho pa raha. Dobara try karo.";
   }
   if (lower.includes("api server response time")) {
-    return "Server slow hai. Thodi der baad retry karo.";
+    return "Server abhi busy hai. Thodi der baad dobara try karo.";
   }
   if (lower.includes("otp")) {
     return "OTP sahi se check karo.";

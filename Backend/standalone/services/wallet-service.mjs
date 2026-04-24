@@ -2,9 +2,22 @@ import { issueOtp, verifyOtp } from "../routes/auth-otp.mjs";
 import { addWalletEntry, getBankAccountsForUser, getUserBalance, getWalletEntriesForUser } from "../stores/wallet-store.mjs";
 
 export const MIN_WITHDRAW_AMOUNT = 500;
+const WITHDRAW_WEEKEND_CLOSED_MESSAGE = "Saturday aur Sunday ko withdraw service band rahegi.";
 
 function normalizeAmount(value) {
   return Number(value ?? 0);
+}
+
+function getIndiaWeekday(date = new Date()) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    weekday: "long"
+  }).format(date);
+}
+
+function isWithdrawWeekendClosed(date = new Date()) {
+  const weekday = getIndiaWeekday(date);
+  return weekday === "Saturday" || weekday === "Sunday";
 }
 
 function validateWithdrawAmount(amount) {
@@ -18,6 +31,10 @@ function validateWithdrawAmount(amount) {
 }
 
 async function ensureWithdrawAllowed(userId, amount) {
+  if (isWithdrawWeekendClosed()) {
+    return { ok: false, status: 400, error: WITHDRAW_WEEKEND_CLOSED_MESSAGE };
+  }
+
   const validationError = validateWithdrawAmount(amount);
   if (validationError) {
     return { ok: false, status: 400, error: validationError };

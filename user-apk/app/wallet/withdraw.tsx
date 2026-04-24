@@ -9,6 +9,14 @@ import { colors } from "@/theme/colors";
 
 const MIN_WITHDRAW_AMOUNT = 500;
 const WITHDRAW_MULTIPLE = 100;
+const WEEKEND_WITHDRAW_CLOSED_MESSAGE = "Saturday aur Sunday ko withdraw service band rahegi.";
+
+function getIndiaWeekday(date = new Date()) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    weekday: "long"
+  }).format(date);
+}
 
 export default function WithdrawScreen() {
   const insets = useSafeAreaInsets();
@@ -27,6 +35,10 @@ export default function WithdrawScreen() {
   const [successMessage, setSuccessMessage] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isWeekendWithdrawClosed = useMemo(() => {
+    const weekday = getIndiaWeekday();
+    return weekday === "Saturday" || weekday === "Sunday";
+  }, []);
 
   const withdrawAmount = Number(amount || 0);
   const hasEnoughWalletBalanceForWithdraw = walletBalance >= MIN_WITHDRAW_AMOUNT;
@@ -144,22 +156,27 @@ export default function WithdrawScreen() {
                 </View>
                 {otpMessage ? <Text style={styles.simpleInfoText}>{otpMessage}</Text> : null}
                 <Pressable
-                  disabled={submitting}
+                  disabled={submitting || isWeekendWithdrawClosed}
                   onPress={() => void submitWithdraw()}
-                  style={[styles.primaryButton, submitting && styles.disabledButton]}
+                  style={[styles.primaryButton, (submitting || isWeekendWithdrawClosed) && styles.disabledButton]}
                 >
                   {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>Confirm Withdraw</Text>}
                 </Pressable>
               </>
             ) : (
               <Pressable
-                disabled={submitting}
+                disabled={submitting || isWeekendWithdrawClosed}
                 onPress={() => void sendWithdrawOtp()}
-                style={[styles.primaryButton, submitting && styles.disabledButton]}
+                style={[styles.primaryButton, (submitting || isWeekendWithdrawClosed) && styles.disabledButton]}
               >
                 {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>Withdraw</Text>}
               </Pressable>
             )}
+            {isWeekendWithdrawClosed ? (
+              <View style={styles.feedbackCardError}>
+                <Text style={styles.feedbackTextError}>{WEEKEND_WITHDRAW_CLOSED_MESSAGE}</Text>
+              </View>
+            ) : null}
             {successMessage ? (
               <View style={styles.feedbackCardSuccess}>
                 <Text style={styles.feedbackTextSuccess}>{successMessage}</Text>
@@ -179,6 +196,11 @@ export default function WithdrawScreen() {
     </View>
   );
   async function sendWithdrawOtp() {
+    if (isWeekendWithdrawClosed) {
+      showTransientMessage("error", WEEKEND_WITHDRAW_CLOSED_MESSAGE);
+      return;
+    }
+
     if (pendingWithdraw) {
       showTransientMessage("error", "Already one withdraw request is pending.");
       return;
@@ -230,6 +252,11 @@ export default function WithdrawScreen() {
   }
 
   async function submitWithdraw() {
+    if (isWeekendWithdrawClosed) {
+      showTransientMessage("error", WEEKEND_WITHDRAW_CLOSED_MESSAGE);
+      return;
+    }
+
     if (pendingWithdraw) {
       showTransientMessage("error", "Already one withdraw request is pending.");
       return;

@@ -186,6 +186,9 @@ function mapUserFacingErrorMessage(message: string, fallback: string) {
   if (lower.includes("api server response time")) {
     return "Server abhi busy hai. Thodi der baad dobara try karo.";
   }
+  if (lower.includes("saturday aur sunday ko withdraw service band rahegi")) {
+    return "Saturday aur Sunday ko withdraw service band rahegi.";
+  }
   if (lower.includes("otp")) {
     return "OTP sahi se check karo.";
   }

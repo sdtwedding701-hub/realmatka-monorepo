@@ -320,6 +320,15 @@ export function SupportChatPage({
     <>
       <PageHeader title="Support Chat" subtitle="User app se aane wale real support messages yahan live dikhte hain aur yahin se reply bheja ja sakta hai." />
       <section className="panel">
+        <div className="compact-row"><strong>API Base</strong><span>{apiBase || "-"}</span></div>
+        {error ? <p className="message error">Support inbox load error: {error}</p> : null}
+        {!error && !conversations.length ? (
+          <p className="message">
+            Agar dashboard me support count aa raha hai aur yahan inbox 0 hai, to latest admin deploy, hard refresh, aur fresh login verify karo.
+          </p>
+        ) : null}
+      </section>
+      <section className="panel">
         <div className="queue-overview-grid">
           <div className="queue-overview-card">
             <span className="queue-overview-kicker">Unread Threads</span>

@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PrimaryButton } from "@/components/ui";
 import { colors } from "@/theme/colors";
 
@@ -70,6 +71,7 @@ export function DateRangeSheet({
   onClear,
   canApply
 }: Props) {
+  const insets = useSafeAreaInsets();
   const [activeField, setActiveField] = useState<"from" | "to">("from");
   const today = new Date();
   const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -102,7 +104,7 @@ export function DateRangeSheet({
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={open}>
       <View style={styles.overlay}>
         <Pressable onPress={onClose} style={styles.backdrop} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(18, insets.bottom + 12) }]}>
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
             <Pressable onPress={onClose} style={styles.closeButton}>
@@ -111,116 +113,122 @@ export function DateRangeSheet({
           </View>
           <Text style={styles.subtitle}>{subtitle}</Text>
 
-          <View style={styles.fieldRow}>
-            <Pressable onPress={() => setActiveField("from")} style={[styles.fieldCard, activeField === "from" && styles.fieldCardActive]}>
-              <Text style={styles.fieldLabel}>From</Text>
-              <Text style={styles.fieldValue}>{fromDate || "Select start date"}</Text>
-            </Pressable>
-            <Pressable onPress={() => setActiveField("to")} style={[styles.fieldCard, activeField === "to" && styles.fieldCardActive]}>
-              <Text style={styles.fieldLabel}>To</Text>
-              <Text style={styles.fieldValue}>{toDate || "Select end date"}</Text>
-            </Pressable>
-          </View>
+          <ScrollView
+            bounces={false}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.fieldRow}>
+              <Pressable onPress={() => setActiveField("from")} style={[styles.fieldCard, activeField === "from" && styles.fieldCardActive]}>
+                <Text style={styles.fieldLabel}>From</Text>
+                <Text style={styles.fieldValue}>{fromDate || "Select start date"}</Text>
+              </Pressable>
+              <Pressable onPress={() => setActiveField("to")} style={[styles.fieldCard, activeField === "to" && styles.fieldCardActive]}>
+                <Text style={styles.fieldLabel}>To</Text>
+                <Text style={styles.fieldValue}>{toDate || "Select end date"}</Text>
+              </Pressable>
+            </View>
 
-          <View style={styles.controlsRow}>
-            <Pressable onPress={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))} style={styles.arrowButton}>
-              <Ionicons color={colors.primaryDark} name="chevron-back" size={18} />
-            </Pressable>
-            <Pressable onPress={() => setPickerMode((current) => (current === "month" ? null : "month"))} style={styles.selectorButton}>
-              <Text style={styles.selectorText}>{MONTHS[visibleMonth.getMonth()]}</Text>
-              <Ionicons color={colors.primaryDark} name="chevron-down" size={14} />
-            </Pressable>
-            <Pressable onPress={() => setPickerMode((current) => (current === "year" ? null : "year"))} style={styles.selectorButton}>
-              <Text style={styles.selectorText}>{visibleMonth.getFullYear()}</Text>
-              <Ionicons color={colors.primaryDark} name="chevron-down" size={14} />
-            </Pressable>
-            <Pressable disabled={!canGoNextMonth} onPress={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))} style={[styles.arrowButton, !canGoNextMonth && styles.arrowButtonDisabled]}>
-              <Ionicons color={canGoNextMonth ? colors.primaryDark : "#98a2b3"} name="chevron-forward" size={18} />
-            </Pressable>
-          </View>
+            <View style={styles.controlsRow}>
+              <Pressable onPress={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))} style={styles.arrowButton}>
+                <Ionicons color={colors.primaryDark} name="chevron-back" size={18} />
+              </Pressable>
+              <Pressable onPress={() => setPickerMode((current) => (current === "month" ? null : "month"))} style={styles.selectorButton}>
+                <Text style={styles.selectorText}>{MONTHS[visibleMonth.getMonth()]}</Text>
+                <Ionicons color={colors.primaryDark} name="chevron-down" size={14} />
+              </Pressable>
+              <Pressable onPress={() => setPickerMode((current) => (current === "year" ? null : "year"))} style={styles.selectorButton}>
+                <Text style={styles.selectorText}>{visibleMonth.getFullYear()}</Text>
+                <Ionicons color={colors.primaryDark} name="chevron-down" size={14} />
+              </Pressable>
+              <Pressable disabled={!canGoNextMonth} onPress={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))} style={[styles.arrowButton, !canGoNextMonth && styles.arrowButtonDisabled]}>
+                <Ionicons color={canGoNextMonth ? colors.primaryDark : "#98a2b3"} name="chevron-forward" size={18} />
+              </Pressable>
+            </View>
 
-          {pickerMode === "month" ? (
-            <View style={styles.selectorGrid}>
-              {MONTHS.map((month, index) => (
-                (() => {
-                  const monthDate = new Date(visibleMonth.getFullYear(), index, 1);
-                  const disabled = monthDate > currentMonth;
-                  return (
-                <Pressable
-                  key={month}
-                  disabled={disabled}
-                  onPress={() => {
-                    setVisibleMonth(new Date(visibleMonth.getFullYear(), index, 1));
-                    setPickerMode(null);
-                  }}
-                  style={[styles.selectorChip, visibleMonth.getMonth() === index && styles.selectorChipActive, disabled && styles.selectorChipDisabled]}
-                >
-                  <Text style={[styles.selectorChipText, visibleMonth.getMonth() === index && styles.selectorChipTextActive, disabled && styles.selectorChipTextDisabled]}>{month}</Text>
-                </Pressable>
-                  );
-                })()
+            {pickerMode === "month" ? (
+              <View style={styles.selectorGrid}>
+                {MONTHS.map((month, index) => (
+                  (() => {
+                    const monthDate = new Date(visibleMonth.getFullYear(), index, 1);
+                    const disabled = monthDate > currentMonth;
+                    return (
+                  <Pressable
+                    key={month}
+                    disabled={disabled}
+                    onPress={() => {
+                      setVisibleMonth(new Date(visibleMonth.getFullYear(), index, 1));
+                      setPickerMode(null);
+                    }}
+                    style={[styles.selectorChip, visibleMonth.getMonth() === index && styles.selectorChipActive, disabled && styles.selectorChipDisabled]}
+                  >
+                    <Text style={[styles.selectorChipText, visibleMonth.getMonth() === index && styles.selectorChipTextActive, disabled && styles.selectorChipTextDisabled]}>{month}</Text>
+                  </Pressable>
+                    );
+                  })()
+                ))}
+              </View>
+            ) : null}
+
+            {pickerMode === "year" ? (
+              <View style={styles.selectorGrid}>
+                {visibleYears.map((year) => (
+                  <Pressable
+                    key={year}
+                    disabled={year > today.getFullYear()}
+                    onPress={() => {
+                      setVisibleMonth(new Date(year, visibleMonth.getMonth(), 1));
+                      setPickerMode(null);
+                    }}
+                    style={[styles.selectorChip, visibleMonth.getFullYear() === year && styles.selectorChipActive, year > today.getFullYear() && styles.selectorChipDisabled]}
+                  >
+                    <Text style={[styles.selectorChipText, visibleMonth.getFullYear() === year && styles.selectorChipTextActive, year > today.getFullYear() && styles.selectorChipTextDisabled]}>{year}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+
+            <View style={styles.weekdays}>
+              {WEEKDAYS.map((day) => (
+                <Text key={day} style={styles.weekday}>
+                  {day}
+                </Text>
               ))}
             </View>
-          ) : null}
 
-          {pickerMode === "year" ? (
-            <View style={styles.selectorGrid}>
-              {visibleYears.map((year) => (
-                <Pressable
-                  key={year}
-                  disabled={year > today.getFullYear()}
-                  onPress={() => {
-                    setVisibleMonth(new Date(year, visibleMonth.getMonth(), 1));
-                    setPickerMode(null);
-                  }}
-                  style={[styles.selectorChip, visibleMonth.getFullYear() === year && styles.selectorChipActive, year > today.getFullYear() && styles.selectorChipDisabled]}
-                >
-                  <Text style={[styles.selectorChipText, visibleMonth.getFullYear() === year && styles.selectorChipTextActive, year > today.getFullYear() && styles.selectorChipTextDisabled]}>{year}</Text>
-                </Pressable>
-              ))}
+            <View style={styles.grid}>
+              {days.map((day, index) => {
+                if (!day) {
+                  return <View key={`empty-${index}`} style={styles.dayCell} />;
+                }
+
+                const dateValue = formatDate(day);
+                const isSelected = dateValue === fromDate || dateValue === toDate;
+                const isInRange = selectedFrom && selectedTo && day >= selectedFrom && day <= selectedTo;
+                const isToday = dateValue === formatDate(new Date());
+                const isFuture = day > today;
+
+                return (
+                  <Pressable
+                    key={dateValue}
+                    disabled={isFuture}
+                    onPress={() => {
+                      if (activeField === "from") {
+                        onChangeFrom(dateValue);
+                      } else {
+                        onChangeTo(dateValue);
+                      }
+                    }}
+                    style={[styles.dayCell, isInRange && styles.dayCellRange, isSelected && styles.dayCellSelected, isToday && !isSelected && styles.todayCell, isFuture && styles.dayCellDisabled]}
+                  >
+                    <Text style={[styles.dayText, isSelected && styles.dayTextSelected, isFuture && styles.dayTextDisabled]}>{day.getDate()}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
-          ) : null}
 
-          <View style={styles.weekdays}>
-            {WEEKDAYS.map((day) => (
-              <Text key={day} style={styles.weekday}>
-                {day}
-              </Text>
-            ))}
-          </View>
-
-          <View style={styles.grid}>
-            {days.map((day, index) => {
-              if (!day) {
-                return <View key={`empty-${index}`} style={styles.dayCell} />;
-              }
-
-              const dateValue = formatDate(day);
-              const isSelected = dateValue === fromDate || dateValue === toDate;
-              const isInRange = selectedFrom && selectedTo && day >= selectedFrom && day <= selectedTo;
-              const isToday = dateValue === formatDate(new Date());
-              const isFuture = day > today;
-
-              return (
-                <Pressable
-                  key={dateValue}
-                  disabled={isFuture}
-                  onPress={() => {
-                    if (activeField === "from") {
-                      onChangeFrom(dateValue);
-                    } else {
-                      onChangeTo(dateValue);
-                    }
-                  }}
-                  style={[styles.dayCell, isInRange && styles.dayCellRange, isSelected && styles.dayCellSelected, isToday && !isSelected && styles.todayCell, isFuture && styles.dayCellDisabled]}
-                >
-                  <Text style={[styles.dayText, isSelected && styles.dayTextSelected, isFuture && styles.dayTextDisabled]}>{day.getDate()}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Text style={styles.hint}>{canApply ? "Search dabane ke baad selected range ka data dikhega." : "Start aur end date calendar se select karo."}</Text>
+            <Text style={styles.hint}>{canApply ? "Search dabane ke baad selected range ka data dikhega." : "Start aur end date calendar se select karo."}</Text>
+          </ScrollView>
 
           <View style={styles.actions}>
             <Pressable onPress={onClear} style={styles.secondaryButton}>
@@ -250,6 +258,7 @@ const styles = StyleSheet.create({
   title: { color: "#111827", fontSize: 18, fontWeight: "800" },
   subtitle: { color: "#667085", fontSize: 13, lineHeight: 20 },
   closeButton: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "#f2f4f7" },
+  scrollContent: { gap: 14, paddingBottom: 8 },
   fieldRow: { flexDirection: "row", gap: 10 },
   fieldCard: { flex: 1, borderRadius: 14, borderWidth: 1, borderColor: "#dbe1ea", backgroundColor: "#f8fafc", padding: 12, gap: 4 },
   fieldCardActive: { borderColor: colors.primary, backgroundColor: "#eef4ff" },

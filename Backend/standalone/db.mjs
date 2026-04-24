@@ -168,6 +168,7 @@ function roundMoney(value) {
 }
 
 const referralLossCommissionRate = Number(process.env.REFERRAL_LOSS_COMMISSION_RATE || "0.2");
+const referralCommissionThreshold = Math.max(0.01, Number(process.env.REFERRAL_COMMISSION_THRESHOLD || "10"));
 
 function toIso(value) {
   if (!value) {
@@ -391,7 +392,8 @@ function mapUserRow(row) {
         statusNote: row.status_note ?? "",
         signupBonusGranted: toBool(row.signup_bonus_granted),
         firstDepositBonusGranted: toBool(row.first_deposit_bonus_granted),
-        referredByUserId: row.referred_by_user_id ?? null
+        referredByUserId: row.referred_by_user_id ?? null,
+        referralCommissionCarry: roundMoney(row.referral_commission_carry ?? 0)
       }
     : null;
 }
@@ -760,6 +762,7 @@ async function ensurePostgresBootstrap(pool) {
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_bonus_granted BOOLEAN NOT NULL DEFAULT FALSE`);
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_deposit_bonus_granted BOOLEAN NOT NULL DEFAULT FALSE`);
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by_user_id TEXT`);
+      await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_commission_carry NUMERIC(12,2) NOT NULL DEFAULT 0`);
       await client.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS game_type TEXT`);
       await client.query(`ALTER TABLE markets ADD COLUMN IF NOT EXISTS result_locked_at TIMESTAMPTZ`);
       await client.query(`ALTER TABLE markets ADD COLUMN IF NOT EXISTS result_locked_by_user_id TEXT REFERENCES users(id)`);
@@ -771,6 +774,14 @@ async function ensurePostgresBootstrap(pool) {
       await client.query(`ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS gateway_payment_id TEXT`);
       await client.query(`ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS gateway_signature TEXT`);
       await client.query(`ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS referral_commission_refs (
+          reference_id TEXT PRIMARY KEY,
+          referrer_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          amount NUMERIC(12,2) NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL
+        )
+      `);
       await client.query(`
         CREATE TABLE IF NOT EXISTS admins (
           id TEXT PRIMARY KEY,
@@ -953,7 +964,8 @@ function getSqlite() {
       status_note TEXT,
       signup_bonus_granted INTEGER NOT NULL DEFAULT 0,
       first_deposit_bonus_granted INTEGER NOT NULL DEFAULT 0,
-      referred_by_user_id TEXT
+      referred_by_user_id TEXT,
+      referral_commission_carry REAL NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
@@ -1065,6 +1077,13 @@ function getSqlite() {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS referral_commission_refs (
+      reference_id TEXT PRIMARY KEY,
+      referrer_user_id TEXT NOT NULL,
+      amount REAL NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS admin_accounts (
       user_id TEXT PRIMARY KEY,
       phone TEXT NOT NULL UNIQUE,
@@ -1135,6 +1154,7 @@ function getSqlite() {
   ensureSqliteColumn(sqlite, "users", "signup_bonus_granted", "INTEGER NOT NULL DEFAULT 0");
   ensureSqliteColumn(sqlite, "users", "first_deposit_bonus_granted", "INTEGER NOT NULL DEFAULT 0");
   ensureSqliteColumn(sqlite, "users", "referred_by_user_id", "TEXT");
+  ensureSqliteColumn(sqlite, "users", "referral_commission_carry", "REAL NOT NULL DEFAULT 0");
   ensureSqliteColumn(sqlite, "bids", "game_type", "TEXT");
   ensureSqliteColumn(sqlite, "markets", "result_locked_at", "TEXT");
   ensureSqliteColumn(sqlite, "markets", "result_locked_by_user_id", "TEXT");
@@ -1812,6 +1832,78 @@ export async function addWalletEntry({ userId, type, status, amount, beforeBalan
   return addWalletEntryFromWalletDb({ userId, type, status, amount, beforeBalance, afterBalance, referenceId, proofUrl, note });
 }
 
+async function getReferralCommissionCarry(userId) {
+  if (isStandalonePostgresEnabled()) {
+    const pool = await getReadyPgPool();
+    const result = await pool.query(
+      `SELECT referral_commission_carry
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [userId]
+    );
+    return roundMoney(result.rows[0]?.referral_commission_carry ?? 0);
+  }
+
+  const row = getSqlite()
+    .prepare(
+      `SELECT referral_commission_carry
+       FROM users
+       WHERE id = ?
+       LIMIT 1`
+    )
+    .get(userId);
+  return roundMoney(row?.referral_commission_carry ?? 0);
+}
+
+async function setReferralCommissionCarry(userId, amount) {
+  const nextCarry = roundMoney(amount);
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await getReadyPgPool();
+    await pool.query(
+      `UPDATE users
+       SET referral_commission_carry = $2
+       WHERE id = $1`,
+      [userId, nextCarry]
+    );
+    return nextCarry;
+  }
+
+  getSqlite()
+    .prepare(
+      `UPDATE users
+       SET referral_commission_carry = ?
+       WHERE id = ?`
+    )
+    .run(nextCarry, userId);
+  return nextCarry;
+}
+
+async function recordReferralCommissionReference(referrerUserId, referenceId, amount) {
+  const createdAt = nowIso();
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await getReadyPgPool();
+    const result = await pool.query(
+      `INSERT INTO referral_commission_refs (reference_id, referrer_user_id, amount, created_at)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (reference_id) DO NOTHING`,
+      [referenceId, referrerUserId, roundMoney(amount), createdAt]
+    );
+    return Number(result.rowCount || 0) > 0;
+  }
+
+  const insertResult = getSqlite()
+    .prepare(
+      `INSERT OR IGNORE INTO referral_commission_refs (reference_id, referrer_user_id, amount, created_at)
+       VALUES (?, ?, ?, ?)`
+    )
+    .run(referenceId, referrerUserId, roundMoney(amount), createdAt);
+
+  return Number(insertResult.changes || 0) > 0;
+}
+
 export async function applyReferralLossCommission({ userId, lostAmount, bidId, market = "", boardLabel = "" }) {
   const player = await findUserById(userId);
   if (!player?.referredByUserId) {
@@ -1829,56 +1921,40 @@ export async function applyReferralLossCommission({ userId, lostAmount, bidId, m
   }
 
   const referralReferenceId = `referral-loss:${bidId}`;
+  const wasRecorded = await recordReferralCommissionReference(referrer.id, referralReferenceId, commissionAmount);
+  if (!wasRecorded) {
+    return null;
+  }
 
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    const existingResult = await pool.query(
-      `SELECT id
-       FROM wallet_entries
-       WHERE user_id = $1
-         AND type = 'REFERRAL_COMMISSION'
-         AND reference_id = $2
-       LIMIT 1`,
-      [referrer.id, referralReferenceId]
-    );
+  const carryBefore = await getReferralCommissionCarry(referrer.id);
+  const totalAccrued = roundMoney(carryBefore + commissionAmount);
+  const payoutSteps = Math.floor((totalAccrued + 0.0001) / referralCommissionThreshold);
+  const payoutAmount = roundMoney(payoutSteps * referralCommissionThreshold);
+  const carryAfter = roundMoney(totalAccrued - payoutAmount);
 
-    if (existingResult.rows[0]) {
-      return null;
-    }
-  } else {
-    const existing = getSqlite()
-      .prepare(
-        `SELECT id
-         FROM wallet_entries
-         WHERE user_id = ?
-           AND type = 'REFERRAL_COMMISSION'
-           AND reference_id = ?
-         LIMIT 1`
-      )
-      .get(referrer.id, referralReferenceId);
+  await setReferralCommissionCarry(referrer.id, carryAfter);
 
-    if (existing?.id) {
-      return null;
-    }
+  if (payoutAmount <= 0) {
+    return null;
   }
 
   const beforeBalance = await getUserBalance(referrer.id);
-  const note = `${player.name} loss referral income${market ? ` | ${market}` : ""}${boardLabel ? ` | ${boardLabel}` : ""}`;
+  const note = `Referral threshold payout${market ? ` | ${market}` : ""}${boardLabel ? ` | ${boardLabel}` : ""}`;
   const entry = await addWalletEntry({
     userId: referrer.id,
     type: "REFERRAL_COMMISSION",
     status: "SUCCESS",
-    amount: commissionAmount,
+    amount: payoutAmount,
     beforeBalance,
-    afterBalance: beforeBalance + commissionAmount,
-    referenceId: referralReferenceId,
+    afterBalance: beforeBalance + payoutAmount,
+    referenceId: `referral-threshold:${referrer.id}:${Date.now()}`,
     note
   });
 
   await createNotification({
     userId: referrer.id,
     title: "Referral income credited",
-    body: `Rs ${commissionAmount.toFixed(2)} referral income added from ${player.name}.`,
+    body: `Rs ${payoutAmount.toFixed(2)} referral income threshold complete hua.`,
     channel: "wallet"
   });
 

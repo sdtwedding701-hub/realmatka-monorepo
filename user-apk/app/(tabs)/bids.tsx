@@ -80,7 +80,7 @@ function formatBoardLabel(label: string) {
 function formatStatus(status: "Pending" | "Won" | "Lost") {
   if (status === "Won") return "WIN";
   if (status === "Lost") return "LOSS";
-  return "PENDING";
+  return "BET";
 }
 
 function formatSessionDigit(sessionType: "Open" | "Close" | "NA", digit: string) {
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   bidMarket: { color: "#111827", fontSize: 14, fontWeight: "700" },
   bidBoard: { color: "#111827", fontSize: 13, fontWeight: "400", lineHeight: 18 },
   statusText: { fontSize: 13, fontWeight: "500" },
-  pendingText: { color: colors.primaryDark },
+  pendingText: { color: "#0ea5e9" },
   wonText: { color: "#15803d" },
   lostText: { color: "#dc2626" },
   dateText: { color: "#475467", fontSize: 11, fontWeight: "400" },

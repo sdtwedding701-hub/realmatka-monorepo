@@ -1,6 +1,5 @@
 import { buildMetadata } from "@/lib/seo";
-
-const apkDownloadUrl = "https://pub-6623a0d99133406b850cfa8224871d15.r2.dev/app-release.apk";
+import { getLatestApkUrl } from "@/lib/settings";
 
 export const metadata = buildMetadata({
   title: "Download Real Matka APK",
@@ -9,7 +8,9 @@ export const metadata = buildMetadata({
   keywords: ["real matka apk", "download real matka", "realmatka apk"]
 });
 
-export default function DownloadPage() {
+export default async function DownloadPage() {
+  const apkDownloadUrl = await getLatestApkUrl();
+
   return (
     <div className="min-h-[72vh] px-4 py-10 text-white">
       <section className="section-shell mx-auto flex max-w-2xl flex-col items-center gap-5 px-6 py-10 text-center">

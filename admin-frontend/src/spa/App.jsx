@@ -1736,24 +1736,28 @@ function BidsPage({ apiBase, token }) {
             {filtered.map((bid) => (
               <div className="data-row bid-row" key={bid.id}>
                 <div className="row-main bid-row-main">
-                <div className="bid-row-head">
-                  <strong>{bid.user?.name || "Unknown"} ({bid.user?.phone || "n/a"})</strong>
-                  <span>{formatDate(bid.createdAt)}</span>
+                  <div className="bid-row-head">
+                    <strong>{bid.user?.name || "Unknown"} ({bid.user?.phone || "n/a"})</strong>
+                    <span>{bid.settledAt ? `Settled ${formatDate(bid.settledAt)}` : `Placed ${formatDate(bid.createdAt)}`}</span>
+                  </div>
+                  <div className="bid-row-market">
+                    <strong>{bid.market}</strong>
+                    <span>{bid.boardLabel}</span>
+                  </div>
+                  <div className="bid-row-meta">
+                    <span>Placed: {formatDate(bid.createdAt)}</span>
+                    <span>Settled: {bid.settledAt ? formatDate(bid.settledAt) : "Pending"}</span>
+                  </div>
+                  <div className="bid-row-meta">
+                    <span>Game: {bid.gameType || bid.boardLabel || "-"}</span>
+                    <span>Session: {bid.sessionType || "-"}</span>
+                    <span>Digit: {bid.digit || "-"}</span>
+                  </div>
+                  <div className="bid-row-meta muted">
+                    <span>Bid ID: {bid.id}</span>
+                    <span>Settled Result: {bid.settledResult || "-"}</span>
+                  </div>
                 </div>
-                <div className="bid-row-market">
-                  <strong>{bid.market}</strong>
-                  <span>{bid.boardLabel}</span>
-                </div>
-                <div className="bid-row-meta">
-                  <span>Game: {bid.gameType || bid.boardLabel || "-"}</span>
-                  <span>Session: {bid.sessionType || "-"}</span>
-                  <span>Digit: {bid.digit || "-"}</span>
-                </div>
-                <div className="bid-row-meta muted">
-                  <span>Bid ID: {bid.id}</span>
-                  <span>Result: {bid.settledResult || "-"}</span>
-                </div>
-              </div>
               <div className="bid-row-side">
                 <div className="bid-metric-card">
                   <span>Bet Amount</span>
@@ -1773,16 +1777,16 @@ function BidsPage({ apiBase, token }) {
   );
 }
 
-function UserLedgerModal({ state, onClose }) {
-  const detail = state.detail;
-  const walletEntries = detail?.walletEntries || [];
-  const bids = detail?.bids || [];
-  const walletTimeline = walletEntries
-    .slice()
-    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
-  const bidTimeline = bids
-    .slice()
-    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  function UserLedgerModal({ state, onClose }) {
+    const detail = state.detail;
+    const walletEntries = detail?.walletEntries || [];
+    const bids = detail?.bids || [];
+    const walletTimeline = walletEntries
+      .slice()
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+    const bidTimeline = bids
+      .slice()
+      .sort((left, right) => getBidTimelineStamp(right) - getBidTimelineStamp(left));
   const lossDays = buildBidLossDays(bidTimeline);
   const winningDays = buildBidWinningDays(bidTimeline);
 
@@ -1896,30 +1900,33 @@ function UserLedgerModal({ state, onClose }) {
                   )) : <div className="empty-card">No wallet entries available.</div>}
                 </div>
               </div>
-              <div className="subpanel">
-                <h3>Bid Timeline</h3>
-                <div className="ledger-feed">
-                  {bidTimeline.length ? bidTimeline.map((bid) => (
-                    <div className="ledger-row" key={bid.id}>
+                <div className="subpanel">
+                  <h3>Bid Timeline</h3>
+                  <div className="ledger-feed">
+                    {bidTimeline.length ? bidTimeline.map((bid) => (
+                      <div className="ledger-row" key={bid.id}>
                       <div className="ledger-row-main">
-                        <div className="ledger-row-head">
-                          <strong>{bid.market} / {bid.boardLabel}</strong>
-                          <span className={`risk-chip ${getBidStatusTone(bid.status)}`}>{bid.status}</span>
-                        </div>
-                        <div className="ledger-row-meta">
-                          <span>{formatDate(bid.createdAt)}</span>
-                          <span>Game: {bid.gameType || bid.boardLabel || "-"}</span>
-                          <span>Session: {bid.sessionType || "-"}</span>
-                          <span>Digit: {bid.digit || "-"}</span>
-                        </div>
-                        <div className="ledger-row-meta">
-                          <span>Bet: {formatCurrency(bid.points)}</span>
-                          <span>Win: {formatCurrency(bid.payout)}</span>
-                          <span>Result: {bid.settledResult || "-"}</span>
+                          <div className="ledger-row-head">
+                            <strong>{bid.market} / {bid.boardLabel}</strong>
+                            <span className={`risk-chip ${getBidStatusTone(bid.status)}`}>{bid.status}</span>
+                          </div>
+                          <div className="ledger-row-meta">
+                            <span>Placed: {formatDate(bid.createdAt)}</span>
+                            <span>Settled: {bid.settledAt ? formatDate(bid.settledAt) : "Pending"}</span>
+                          </div>
+                          <div className="ledger-row-meta">
+                            <span>Game: {bid.gameType || bid.boardLabel || "-"}</span>
+                            <span>Session: {bid.sessionType || "-"}</span>
+                            <span>Digit: {bid.digit || "-"}</span>
+                          </div>
+                          <div className="ledger-row-meta">
+                            <span>Bet: {formatCurrency(bid.points)}</span>
+                            <span>Win: {formatCurrency(bid.payout)}</span>
+                            <span>Settled Result: {bid.settledResult || "-"}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )) : <div className="empty-card">No bids available.</div>}
+                    )) : <div className="empty-card">No bids available.</div>}
                 </div>
               </div>
             </div>
@@ -1934,11 +1941,12 @@ function buildBidLossDays(bids) {
   const grouped = new Map();
   for (const bid of bids) {
     if (bid.status !== "Lost") continue;
-    const key = getDateGroupLabel(bid.createdAt);
-    const current = grouped.get(key) || { label: key, lossCount: 0, lossAmount: 0, stamp: new Date(bid.createdAt).getTime() };
+    const timelineStamp = getBidTimelineStamp(bid);
+    const key = getDateGroupLabel(bid.settledAt || bid.createdAt);
+    const current = grouped.get(key) || { label: key, lossCount: 0, lossAmount: 0, stamp: timelineStamp };
     current.lossCount += 1;
     current.lossAmount += Number(bid.points || 0);
-    current.stamp = Math.max(current.stamp, new Date(bid.createdAt).getTime());
+    current.stamp = Math.max(current.stamp, timelineStamp);
     grouped.set(key, current);
   }
   return [...grouped.values()].sort((left, right) => right.stamp - left.stamp);
@@ -1948,14 +1956,24 @@ function buildBidWinningDays(bids) {
   const grouped = new Map();
   for (const bid of bids) {
     if (bid.status !== "Won") continue;
-    const key = getDateGroupLabel(bid.createdAt);
-    const current = grouped.get(key) || { label: key, winCount: 0, winAmount: 0, stamp: new Date(bid.createdAt).getTime() };
+    const timelineStamp = getBidTimelineStamp(bid);
+    const key = getDateGroupLabel(bid.settledAt || bid.createdAt);
+    const current = grouped.get(key) || { label: key, winCount: 0, winAmount: 0, stamp: timelineStamp };
     current.winCount += 1;
     current.winAmount += Number(bid.payout || 0);
-    current.stamp = Math.max(current.stamp, new Date(bid.createdAt).getTime());
+    current.stamp = Math.max(current.stamp, timelineStamp);
     grouped.set(key, current);
   }
   return [...grouped.values()].sort((left, right) => right.stamp - left.stamp);
+}
+
+function getBidTimelineStamp(bid) {
+  const settledStamp = bid?.settledAt ? new Date(bid.settledAt).getTime() : Number.NaN;
+  if (Number.isFinite(settledStamp)) {
+    return settledStamp;
+  }
+  const createdStamp = bid?.createdAt ? new Date(bid.createdAt).getTime() : Number.NaN;
+  return Number.isFinite(createdStamp) ? createdStamp : 0;
 }
 
 function getDateGroupLabel(value) {

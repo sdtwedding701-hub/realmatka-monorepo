@@ -11,6 +11,7 @@ import {
   getWalletAdminRequestItems,
   getWalletEntriesForUser,
   listAllBids,
+  listBidsPage,
   rejectWalletRequest,
   resolveWalletApprovalRequest,
   updateUserAccountStatus,
@@ -336,4 +337,92 @@ export async function listAdminBids() {
       };
     })
   );
+}
+
+function doesAdminBidMatchFilter(bid, search, status) {
+  const normalizedSearch = String(search || "").trim().toLowerCase();
+  const normalizedStatus = String(status || "all").trim();
+  const matchesStatus = normalizedStatus === "all" || bid.status === normalizedStatus;
+  if (!matchesStatus) {
+    return false;
+  }
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  return [
+    bid.user?.name,
+    bid.user?.phone,
+    bid.market,
+    bid.boardLabel,
+    bid.gameType,
+    bid.sessionType,
+    bid.digit,
+    bid.id,
+    bid.settledResult
+  ]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(normalizedSearch));
+}
+
+export async function listAdminBidsPage({ limit = 50, offset = 0, search = "", status = "all" } = {}) {
+  const normalizedLimit = Math.max(1, Math.min(200, Number(limit) || 50));
+  const normalizedOffset = Math.max(0, Number(offset) || 0);
+  const normalizedSearch = String(search || "").trim();
+  const normalizedStatus = String(status || "all").trim();
+  const users = await getUserAdminSummaries();
+  const usersById = new Map(users.map((user) => [user.id, user]));
+
+  const mapBidWithUser = (bid) => {
+    const user = usersById.get(bid.userId) ?? null;
+    return {
+      ...bid,
+      user: user ? { id: user.id, name: user.name, phone: user.phone } : null
+    };
+  };
+
+  if (!normalizedSearch && normalizedStatus === "all") {
+    const page = await listBidsPage({ limit: normalizedLimit, offset: normalizedOffset });
+    return {
+      items: page.items.map(mapBidWithUser),
+      pagination: page.pagination
+    };
+  }
+
+  const batchSize = 500;
+  let sourceOffset = 0;
+  let matchedCount = 0;
+  const matchedItems = [];
+  let hasMore = true;
+
+  while (hasMore) {
+    const page = await listBidsPage({ limit: batchSize, offset: sourceOffset });
+    const mappedItems = page.items.map(mapBidWithUser);
+
+    for (const bid of mappedItems) {
+      if (!doesAdminBidMatchFilter(bid, normalizedSearch, normalizedStatus)) {
+        continue;
+      }
+      if (matchedCount >= normalizedOffset && matchedItems.length < normalizedLimit) {
+        matchedItems.push(bid);
+      }
+      matchedCount += 1;
+    }
+
+    hasMore = Boolean(page.pagination?.hasMore);
+    sourceOffset += page.items.length;
+    if (!hasMore || (matchedItems.length >= normalizedLimit && matchedCount >= normalizedOffset + normalizedLimit)) {
+      break;
+    }
+  }
+
+  return {
+    items: matchedItems,
+    pagination: {
+      limit: normalizedLimit,
+      offset: normalizedOffset,
+      total: matchedCount,
+      hasMore: normalizedOffset + matchedItems.length < matchedCount
+    }
+  };
 }

@@ -5,7 +5,7 @@ import {
   cleanupWalletData,
   createWalletAdjustment,
   getAdminUserDetail,
-  listAdminBids,
+  listAdminBidsPage,
   listAdminUsers,
   listWalletRequests,
   processWalletRequestAction,
@@ -189,7 +189,20 @@ export async function adminCleanupWalletTestDataController(request) {
 export async function adminBidsListController(request) {
   const admin = await requireAdminUser(request);
   if (admin.response) return admin.response;
-  return ok(await listAdminBids(), request);
+  const url = new URL(request.url);
+  const limit = Number(url.searchParams.get("limit") ?? 50);
+  const offset = Number(url.searchParams.get("offset") ?? 0);
+  const search = String(url.searchParams.get("search") ?? "");
+  const status = String(url.searchParams.get("status") ?? "all");
+  return ok(
+    await listAdminBidsPage({
+      limit,
+      offset,
+      search,
+      status
+    }),
+    request
+  );
 }
 
 export async function adminAuditLogsController(request) {

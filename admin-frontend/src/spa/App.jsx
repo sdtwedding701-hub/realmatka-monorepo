@@ -1629,44 +1629,73 @@ function ReportsPage({ apiBase, token }) {
 }
 
 function BidsPage({ apiBase, token }) {
-  const [state, setState] = useState({ loading: true, error: "", bids: [] });
+  const PAGE_SIZE = 50;
+  const [state, setState] = useState({
+    loading: true,
+    error: "",
+    bids: [],
+    pagination: { limit: PAGE_SIZE, offset: 0, total: 0, hasMore: false }
+  });
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
+  const [pageOffset, setPageOffset] = useState(0);
 
   useEffect(() => {
-    fetchApi(apiBase, "/api/admin/bids", token)
-      .then((bids) => setState({ loading: false, error: "", bids }))
-      .catch((error) => setState({ loading: false, error: formatApiError(error, "Bids load failed"), bids: [] }));
-  }, [apiBase, token]);
+    setState((current) => ({
+      ...current,
+      loading: true,
+      error: ""
+    }));
+    const searchParams = new URLSearchParams({
+      limit: String(PAGE_SIZE),
+      offset: String(pageOffset),
+      search: query,
+      status
+    });
+    fetchApi(apiBase, `/api/admin/bids?${searchParams.toString()}`, token)
+      .then((data) =>
+        setState({
+          loading: false,
+          error: "",
+          bids: data.items || [],
+          pagination: data.pagination || { limit: PAGE_SIZE, offset: pageOffset, total: (data.items || []).length, hasMore: false }
+        })
+      )
+      .catch((error) =>
+        setState({
+          loading: false,
+          error: formatApiError(error, "Bids load failed"),
+          bids: [],
+          pagination: { limit: PAGE_SIZE, offset: pageOffset, total: 0, hasMore: false }
+        })
+      );
+  }, [apiBase, token, pageOffset, query, status]);
+
+  useEffect(() => {
+    setPageOffset(0);
+  }, [query, status]);
 
   if (state.loading) return <PageState title="All Bids" subtitle="Loading bids..." />;
   if (state.error) return <PageState title="All Bids" subtitle={state.error} tone="error" />;
 
-  const filtered = state.bids.filter((bid) => {
-    const matchesQuery =
-      !query ||
-      bid.user?.name?.toLowerCase().includes(query.toLowerCase()) ||
-      bid.user?.phone?.includes(query) ||
-      String(bid.market).toLowerCase().includes(query.toLowerCase());
-    const matchesStatus = status === "all" || bid.status === status;
-    return matchesQuery && matchesStatus;
-  });
-
+  const filtered = state.bids;
   const visibleBetAmount = filtered.reduce((sum, bid) => sum + Number(bid.points || 0), 0);
   const visibleWinAmount = filtered.reduce((sum, bid) => sum + Number(bid.payout || 0), 0);
   const pendingCount = filtered.filter((bid) => bid.status === "Pending").length;
   const wonCount = filtered.filter((bid) => bid.status === "Won").length;
   const lostCount = filtered.filter((bid) => bid.status === "Lost").length;
+  const pageStart = state.pagination.total ? state.pagination.offset + 1 : 0;
+  const pageEnd = state.pagination.offset + filtered.length;
 
   return (
     <>
       <PageHeader title="All Bids" subtitle="Every placed bid with user, board, amount, payout, result, and settlement status in one cleaner view." />
       <section className="panel">
         <div className="form-grid">
-          <label className="wide"><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="User, phone, market" /></label>
+          <label className="wide"><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="User, phone, market, digit, bid ID" /></label>
           <label><span>Status</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All</option><option value="Pending">Pending</option><option value="Won">Won</option><option value="Lost">Lost</option></select></label>
           <div className="actions">
-            <button className="secondary" onClick={() => void exportAdminData(apiBase, token, "bids")}>Export Bids CSV</button>
+              <button className="secondary" onClick={() => void exportAdminData(apiBase, token, "bids")}>Export Bids CSV</button>
           </div>
         </div>
       </section>
@@ -1676,18 +1705,37 @@ function BidsPage({ apiBase, token }) {
             miniStat("Visible Bids", filtered.length),
             miniStat("Bet Amount", formatCurrency(visibleBetAmount)),
             miniStat("Win Amount", formatCurrency(visibleWinAmount)),
-            miniStat("Pending", pendingCount),
-            miniStat("Won", wonCount),
-            miniStat("Lost", lostCount)
-          ]}
-        </div>
-      </section>
-      <section className="panel">
-        <div className="table-list">
-          {!filtered.length ? <div className="empty-card">Is filter ke andar koi bid nahi mili.</div> : null}
-          {filtered.map((bid) => (
-            <div className="data-row bid-row" key={bid.id}>
-              <div className="row-main bid-row-main">
+              miniStat("Pending", pendingCount),
+              miniStat("Won", wonCount),
+              miniStat("Lost", lostCount)
+            ]}
+          </div>
+        </section>
+        <section className="panel">
+          <div className="pagination">
+            <span className="pagination-info">
+              {pageStart}-{pageEnd} of {state.pagination.total} bids
+            </span>
+            <button
+              className="secondary"
+              disabled={state.pagination.offset <= 0}
+              onClick={() => setPageOffset((current) => Math.max(0, current - PAGE_SIZE))}
+            >
+              Previous
+            </button>
+            <button
+              className="secondary"
+              disabled={!state.pagination.hasMore}
+              onClick={() => setPageOffset((current) => current + PAGE_SIZE)}
+            >
+              Next
+            </button>
+          </div>
+          <div className="table-list">
+            {!filtered.length ? <div className="empty-card">Is filter ke andar koi bid nahi mili.</div> : null}
+            {filtered.map((bid) => (
+              <div className="data-row bid-row" key={bid.id}>
+                <div className="row-main bid-row-main">
                 <div className="bid-row-head">
                   <strong>{bid.user?.name || "Unknown"} ({bid.user?.phone || "n/a"})</strong>
                   <span>{formatDate(bid.createdAt)}</span>

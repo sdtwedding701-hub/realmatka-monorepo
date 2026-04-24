@@ -938,7 +938,7 @@ function RequestsPage({ apiBase, token }) {
               <div className="row-main">
                 <strong>{getPayoutStatusLabel(item.status)}</strong>
                 <span>{getWalletRequestStatusHint(item)}</span>
-                <span>{item.note || "No note"}</span>
+                {getWalletRequestNoteLine(item) ? <span>{getWalletRequestNoteLine(item)}</span> : null}
               </div>
               <div className="row-actions">
                 <button className="secondary" type="button" onClick={() => openAction(item, "annotate")}>Add Note</button>
@@ -978,7 +978,7 @@ function RequestsPage({ apiBase, token }) {
               <div className="row-main">
                 <strong>{getPayoutStatusLabel(item.status)}</strong>
                 <span>Balance {formatCurrency(item.liveBalance)}</span>
-                <span>{item.note || "No note"}</span>
+                {getWalletRequestNoteLine(item) ? <span>{getWalletRequestNoteLine(item)}</span> : null}
               </div>
               <div className="row-actions">
                 <button className="secondary" type="button" onClick={() => openAction(item, "annotate")}>Add Note</button>
@@ -1909,6 +1909,11 @@ function getWalletRequestStatusHint(item) {
     return item.status === "BACKOFFICE" ? "Wallet already credited, close request after review." : "Review UPI payment details before crediting wallet.";
   }
   return "Verify bank transfer state before closing request.";
+}
+
+function getWalletRequestNoteLine(item) {
+  const note = typeof item.note === "string" ? item.note.trim() : "";
+  return note || null;
 }
 
 function getWalletApproveLabel(item) {

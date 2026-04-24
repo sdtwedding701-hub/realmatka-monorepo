@@ -252,6 +252,7 @@ export default function RegisterScreen() {
                   setError("");
                   setSuccess("");
                   await register(normalizedFirstName, normalizedLastName, normalizedPhone, normalizedOtp, password.trim(), confirmPassword.trim(), referenceCode);
+                  setError("");
                   await clearStoredReferralCode();
                   setRegistered(true);
                   setSuccess("Phone verified. Account created successfully. Ab aap direct login kar sakte ho.");

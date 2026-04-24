@@ -159,6 +159,15 @@ function mapUserFacingErrorMessage(message: string, fallback: string) {
   if (lower.includes("invalid otp")) {
     return "Wrong OTP. Dobara try karo.";
   }
+  if (
+    lower.includes("verificationcheck was not found") ||
+    lower.includes("/v2/services/") ||
+    lower.includes("unable to verify otp") ||
+    lower.includes("verify service") ||
+    lower.includes("twilio")
+  ) {
+    return "OTP verify karne me problem aa rahi hai. Dobara try karo.";
+  }
   if (lower.includes("invalid authenticator code")) {
     return "Wrong 2FA code. Dobara try karo.";
   }

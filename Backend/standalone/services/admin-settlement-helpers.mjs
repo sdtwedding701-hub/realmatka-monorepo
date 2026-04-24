@@ -29,6 +29,56 @@ function roundAmount(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
 
+const MARKET_DAY_ROLLOVER_MINUTES = 30;
+
+function getIndiaDateParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+  return Object.fromEntries(formatter.formatToParts(new Date(date)).map((part) => [part.type, part.value]));
+}
+
+function getIndiaDateWithRollover(date = new Date()) {
+  const parts = getIndiaDateParts(date);
+  const result = new Date(
+    Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second)
+    )
+  );
+  const currentMinutes = result.getUTCHours() * 60 + result.getUTCMinutes();
+  if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
+    result.setUTCDate(result.getUTCDate() - 1);
+  }
+  result.setUTCHours(0, 0, 0, 0);
+  return result;
+}
+
+function getMarketDayKey(date = new Date()) {
+  const normalized = getIndiaDateWithRollover(date);
+  const year = normalized.getUTCFullYear();
+  const month = String(normalized.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(normalized.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+async function getMarketCycleBids(market) {
+  const settlementDayKey = getMarketDayKey(new Date());
+  const bids = await getBidsForMarket(market.name);
+  return bids.filter((bid) => getMarketDayKey(bid.createdAt) === settlementDayKey);
+}
+
 export function isPlaceholderMarketResult(result) {
   return String(result ?? "").trim() === "***-**-***";
 }
@@ -344,7 +394,7 @@ export async function settlePendingBidsForMarket(market) {
     return { processed: 0, won: 0, lost: 0, wins: 0, losses: 0, skipped: 0, totalPayout: 0 };
   }
 
-  const bids = (await getBidsForMarket(market.name)).filter((bid) => bid.status === "Pending");
+  const bids = (await getMarketCycleBids(market)).filter((bid) => bid.status === "Pending");
   let processed = 0;
   let won = 0;
   let lost = 0;
@@ -410,7 +460,7 @@ export async function settlePendingBidsForMarket(market) {
 }
 
 export async function resettleMarket(market) {
-  const settled = (await getBidsForMarket(market.name)).filter((bid) => bid.status !== "Pending");
+  const settled = (await getMarketCycleBids(market)).filter((bid) => bid.status !== "Pending");
   for (const bid of settled) {
     if (bid.status === "Won" && bid.payout > 0) {
       const beforeBalance = await getUserBalance(bid.userId);
@@ -431,7 +481,7 @@ export async function resettleMarket(market) {
 }
 
 export async function resetMarketSettlement(market) {
-  const settled = (await getBidsForMarket(market.name)).filter((bid) => bid.status !== "Pending");
+  const settled = (await getMarketCycleBids(market)).filter((bid) => bid.status !== "Pending");
   let reversedWins = 0;
   let reversedPayout = 0;
 

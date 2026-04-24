@@ -1113,6 +1113,16 @@ function getSqlite() {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS otp_challenges (
+      id TEXT PRIMARY KEY,
+      phone TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      consumed_at TEXT,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS markets (
       id TEXT PRIMARY KEY,
       slug TEXT NOT NULL UNIQUE,

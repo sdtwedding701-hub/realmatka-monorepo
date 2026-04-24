@@ -370,13 +370,21 @@ export async function settlePendingBidsForMarket(market) {
     processed += 1;
     const notificationState = impactedUsers.get(updated.userId) || { userId: updated.userId, wins: 0, losses: 0, payout: 0 };
 
-    if (outcome.status === "Won" && outcome.payout > 0) {
-      const beforeBalance = await getUserBalance(updated.userId);
-      await addWalletEntry({ userId: updated.userId, type: "BID_WIN", status: "SUCCESS", amount: outcome.payout, beforeBalance, afterBalance: beforeBalance + outcome.payout });
-      won += 1;
-      totalPayout += outcome.payout;
-      notificationState.wins += 1;
-      notificationState.payout += outcome.payout;
+      if (outcome.status === "Won" && outcome.payout > 0) {
+        const beforeBalance = await getUserBalance(updated.userId);
+        await addWalletEntry({
+          userId: updated.userId,
+          type: "BID_WIN",
+          status: "SUCCESS",
+          amount: outcome.payout,
+          beforeBalance,
+          afterBalance: beforeBalance + outcome.payout,
+          note: `${market.name} result ${market.result}`
+        });
+        won += 1;
+        totalPayout += outcome.payout;
+        notificationState.wins += 1;
+        notificationState.payout += outcome.payout;
     } else {
       await applyReferralLossCommission({ userId: updated.userId, lostAmount: updated.points, bidId: updated.id, market: updated.market, boardLabel: updated.boardLabel });
       lost += 1;
@@ -407,7 +415,15 @@ export async function resettleMarket(market) {
     if (bid.status === "Won" && bid.payout > 0) {
       const beforeBalance = await getUserBalance(bid.userId);
       const afterBalance = Math.max(0, beforeBalance - bid.payout);
-      await addWalletEntry({ userId: bid.userId, type: "BID_WIN_REVERSAL", status: "SUCCESS", amount: bid.payout, beforeBalance, afterBalance });
+      await addWalletEntry({
+        userId: bid.userId,
+        type: "BID_WIN_REVERSAL",
+        status: "SUCCESS",
+        amount: bid.payout,
+        beforeBalance,
+        afterBalance,
+        note: `Previous ${bid.market} win reversed from result ${bid.settledResult || "unknown"} before resettle to ${market.result}`
+      });
     }
     await updateBidSettlement(bid.id, "Pending", 0, "");
   }

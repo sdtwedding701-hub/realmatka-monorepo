@@ -35,6 +35,11 @@ export function SupportChatPage({
   const [search, setSearch] = useState("");
   const [inboxFilter, setInboxFilter] = useState("all");
   const messagesRef = useRef(null);
+  const conversationsRef = useRef([]);
+
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
 
   function normalizeConversationListResponse(data) {
     const items = Array.isArray(data) ? data : Array.isArray(data?.conversations) ? data.conversations : Array.isArray(data?.items) ? data.items : [];
@@ -69,6 +74,22 @@ export function SupportChatPage({
         if (!active) return;
         const normalizedResponse = normalizeConversationListResponse(data);
         const nextConversations = normalizedResponse.items;
+        const shouldKeepCurrentConversations =
+          !showLoader &&
+          !nextConversations.length &&
+          !normalizedSearch &&
+          (options.filter || inboxFilter) === "all" &&
+          conversationsRef.current.length > 0;
+
+        if (shouldKeepCurrentConversations) {
+          setConversationMeta((current) => ({
+            ...current,
+            total: Math.max(Number(normalizedResponse.pagination.total || 0), conversationsRef.current.length)
+          }));
+          setError("");
+          return;
+        }
+
         setConversations(nextConversations);
         setConversationMeta(normalizedResponse.pagination);
         setSelectedId((current) => {

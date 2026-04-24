@@ -462,7 +462,7 @@ export async function listSupportConversations(options = {}) {
          COALESCE(uc.unread_for_admin, 0) AS unread_for_admin,
          COUNT(*) OVER()::int AS total_count
        FROM chat_conversations c
-       JOIN users u ON u.id = c.user_id
+       LEFT JOIN users u ON u.id = c.user_id
        LEFT JOIN (
          SELECT DISTINCT ON (conversation_id)
            conversation_id,
@@ -517,7 +517,7 @@ export async function listSupportConversations(options = {}) {
                AND read_by_admin = 0
            ) AS unread_for_admin
          FROM chat_conversations c
-         JOIN users u ON u.id = c.user_id
+         LEFT JOIN users u ON u.id = c.user_id
          ORDER BY COALESCE(c.last_message_at, c.updated_at, c.created_at) DESC, c.id DESC`
       )
       .all()

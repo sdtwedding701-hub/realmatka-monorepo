@@ -27,13 +27,14 @@ const DEFAULT_API_BASE = getDefaultAdminApiBase();
 
 const navItems = [
   { key: "results", label: "Result Engine" },
-  { key: "dashboard", label: "Dashboard" },
+  { key: "bids", label: "All Bids" },
   { key: "users", label: "Users" },
-  { key: "requests", label: "Withdraw Request" },
+  { key: "requests", label: "Withdraw History" },
+  { key: "deposits", label: "Deposit History" },
+  { key: "dashboard", label: "Dashboard" },
   { key: "support", label: "Support Chat" },
   { key: "charts", label: "All Chart" },
   { key: "reports", label: "Reports" },
-  { key: "bids", label: "All Bids" },
   { key: "notifications", label: "Notifications" },
   { key: "settings", label: "Settings" },
   { key: "audit", label: "Audit Logs" }
@@ -42,7 +43,8 @@ const navItems = [
 const routeMeta = {
   dashboard: { eyebrow: "Control Room", title: "Operational Dashboard", subtitle: "Live business totals, payout watch, alerts, and active platform health in one place." },
   users: { eyebrow: "Identity", title: "User Management", subtitle: "Review approvals, wallet exposure, lifecycle state, and operator history faster." },
-  requests: { eyebrow: "", title: "", subtitle: "" },
+  requests: { eyebrow: "Withdraw", title: "Withdraw History", subtitle: "Manual withdraw queue, paid entries, and operator notes in one place." },
+  deposits: { eyebrow: "Deposit", title: "Deposit History", subtitle: "All deposit requests, proofs, and credit actions in one place." },
   support: { eyebrow: "Support", title: "Support Chat Desk", subtitle: "Respond to player issues quickly with a focused conversation workspace." },
   results: { eyebrow: "Settlement", title: "Result Engine", subtitle: "Publish results, preview settlements, and control payout impact before release." },
   charts: { eyebrow: "Data", title: "Chart Operations", subtitle: "Edit and verify chart rows with better visibility into changes and history." },
@@ -134,7 +136,30 @@ export function App() {
       pageFactory={(refreshKey, refresh) => {
         const shared = { apiBase, token, me, refresh };
         if (route === "users") return <UsersPage {...shared} key={`users-${refreshKey}`} />;
-        if (route === "requests") return <RequestsPage {...shared} key={`requests-${refreshKey}`} />;
+        if (route === "requests") {
+          return (
+            <RequestsPage
+              {...shared}
+              initialRequestType="WITHDRAW"
+              key={`requests-${refreshKey}`}
+              lockedRequestType="WITHDRAW"
+              pageTitle="Withdraw History"
+              pageSubtitle="Manual withdraw queue, paid entries, and operator notes in one place."
+            />
+          );
+        }
+        if (route === "deposits") {
+          return (
+            <RequestsPage
+              {...shared}
+              initialRequestType="DEPOSIT"
+              key={`deposits-${refreshKey}`}
+              lockedRequestType="DEPOSIT"
+              pageTitle="Deposit History"
+              pageSubtitle="All deposit requests, proofs, and wallet credit actions in one place."
+            />
+          );
+        }
         if (route === "support") {
           return (
             <SupportChatPage
@@ -803,11 +828,18 @@ function UsersPage({ apiBase, token, me }) {
   }
 }
 
-function RequestsPage({ apiBase, token }) {
+function RequestsPage({
+  apiBase,
+  token,
+  initialRequestType = "all",
+  lockedRequestType = "",
+  pageTitle = "Wallet Requests",
+  pageSubtitle = "Loading deposit and withdraw history..."
+}) {
   const [state, setState] = useState({ loading: true, error: "", items: [], pending: [], reconciliation: null });
   const [proof, setProof] = useState(null);
   const [query, setQuery] = useState("");
-  const [requestType, setRequestType] = useState("all");
+  const [requestType, setRequestType] = useState(initialRequestType);
   const [status, setStatus] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -819,8 +851,13 @@ function RequestsPage({ apiBase, token }) {
     void load();
   }, [apiBase, token]);
 
-  const historyItems = requestType === "all" ? state.items : state.items.filter((item) => item.type === requestType);
-  const pendingItems = requestType === "all" ? state.pending : state.pending.filter((item) => item.type === requestType);
+  useEffect(() => {
+    setRequestType(initialRequestType);
+  }, [initialRequestType]);
+
+  const effectiveRequestType = lockedRequestType || requestType;
+  const historyItems = effectiveRequestType === "all" ? state.items : state.items.filter((item) => item.type === effectiveRequestType);
+  const pendingItems = effectiveRequestType === "all" ? state.pending : state.pending.filter((item) => item.type === effectiveRequestType);
 
   const filteredItems = historyItems.filter((item) => {
     const matchesQuery =
@@ -851,8 +888,8 @@ function RequestsPage({ apiBase, token }) {
   const urgentPendingCount = prioritizedPending.filter((item) => getWalletQueuePriority(item) >= 3).length;
   const oldestPending = prioritizedPending[0] || null;
 
-  if (state.loading) return <PageState title="Wallet Requests" subtitle="Loading deposit and withdraw history..." />;
-  if (state.error) return <PageState title="Wallet Requests" subtitle={state.error} tone="error" />;
+  if (state.loading) return <PageState title={pageTitle} subtitle={pageSubtitle} />;
+  if (state.error) return <PageState title={pageTitle} subtitle={state.error} tone="error" />;
 
   return (
     <>
@@ -876,14 +913,16 @@ function RequestsPage({ apiBase, token }) {
             <span>Search</span>
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="User, phone, reference ID" />
           </label>
-          <label className="toolbar-field">
-            <span>Type</span>
-            <select value={requestType} onChange={(event) => setRequestType(event.target.value)}>
-              <option value="all">All</option>
-              <option value="DEPOSIT">Deposit</option>
-              <option value="WITHDRAW">Withdraw</option>
-            </select>
-          </label>
+          {!lockedRequestType ? (
+            <label className="toolbar-field">
+              <span>Type</span>
+              <select value={requestType} onChange={(event) => setRequestType(event.target.value)}>
+                <option value="all">All</option>
+                <option value="DEPOSIT">Deposit</option>
+                <option value="WITHDRAW">Withdraw</option>
+              </select>
+            </label>
+          ) : null}
           <label className="toolbar-field">
             <span>Status</span>
             <select value={status} onChange={(event) => setStatus(event.target.value)}>
@@ -906,7 +945,7 @@ function RequestsPage({ apiBase, token }) {
           </label>
           <div className="toolbar-actions">
             <button className="secondary" onClick={() => void exportAdminData(apiBase, token, "requests")}>Export CSV</button>
-            <button className="secondary" onClick={() => { setQuery(""); setRequestType("all"); setStatus("all"); setFromDate(""); setToDate(""); }}>Reset</button>
+            <button className="secondary" onClick={() => { setQuery(""); setRequestType(initialRequestType); setStatus("all"); setFromDate(""); setToDate(""); }}>Reset</button>
           </div>
         </div>
         {message ? <p className={`message ${message.toLowerCase().includes("fail") || message.toLowerCase().includes("error") ? "error" : "success"}`}>{message}</p> : null}

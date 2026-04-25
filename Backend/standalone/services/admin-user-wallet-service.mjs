@@ -365,11 +365,28 @@ function doesAdminBidMatchFilter(bid, search, status) {
     .some((value) => String(value).toLowerCase().includes(normalizedSearch));
 }
 
-export async function listAdminBidsPage({ limit = 50, offset = 0, search = "", status = "all" } = {}) {
+function matchesAdminBidDateRange(bid, from, to) {
+  if (!from && !to) return true;
+  const createdAt = new Date(bid?.createdAt || "");
+  if (Number.isNaN(createdAt.getTime())) return false;
+  if (from) {
+    const fromDate = new Date(`${from}T00:00:00`);
+    if (createdAt < fromDate) return false;
+  }
+  if (to) {
+    const toDate = new Date(`${to}T23:59:59.999`);
+    if (createdAt > toDate) return false;
+  }
+  return true;
+}
+
+export async function listAdminBidsPage({ limit = 50, offset = 0, search = "", status = "all", from = "", to = "" } = {}) {
   const normalizedLimit = Math.max(1, Math.min(200, Number(limit) || 50));
   const normalizedOffset = Math.max(0, Number(offset) || 0);
   const normalizedSearch = String(search || "").trim();
   const normalizedStatus = String(status || "all").trim();
+  const normalizedFrom = String(from || "").trim();
+  const normalizedTo = String(to || "").trim();
   const users = await getUserAdminSummaries();
   const usersById = new Map(users.map((user) => [user.id, user]));
 
@@ -380,14 +397,6 @@ export async function listAdminBidsPage({ limit = 50, offset = 0, search = "", s
       user: user ? { id: user.id, name: user.name, phone: user.phone } : null
     };
   };
-
-  if (!normalizedSearch && normalizedStatus === "all") {
-    const page = await listBidsPage({ limit: normalizedLimit, offset: normalizedOffset });
-    return {
-      items: page.items.map(mapBidWithUser),
-      pagination: page.pagination
-    };
-  }
 
   const batchSize = 500;
   let sourceOffset = 0;
@@ -400,6 +409,9 @@ export async function listAdminBidsPage({ limit = 50, offset = 0, search = "", s
     const mappedItems = page.items.map(mapBidWithUser);
 
     for (const bid of mappedItems) {
+      if (!matchesAdminBidDateRange(bid, normalizedFrom, normalizedTo)) {
+        continue;
+      }
       if (!doesAdminBidMatchFilter(bid, normalizedSearch, normalizedStatus)) {
         continue;
       }

@@ -47,7 +47,7 @@ const routeMeta = {
   results: { eyebrow: "Settlement", title: "Result Engine", subtitle: "Publish results, preview settlements, and control payout impact before release." },
   charts: { eyebrow: "Data", title: "Chart Operations", subtitle: "Edit and verify chart rows with better visibility into changes and history." },
   reports: { eyebrow: "Reports", title: "Revenue Reports", subtitle: "Track collection, payout, and user-level exposure across time ranges." },
-  bids: { eyebrow: "Betting", title: "All Bets", subtitle: "Search and inspect every placed bid with cleaner operational visibility." },
+  bids: { eyebrow: "Betting", title: "All Bets", subtitle: "" },
   notifications: { eyebrow: "Messaging", title: "Notification Center", subtitle: "Broadcast platform updates and target users from one operator screen." },
   settings: { eyebrow: "Configuration", title: "Platform Settings", subtitle: "Control notices, support info, and promotional text from one panel." },
   audit: { eyebrow: "Compliance", title: "Audit Trail", subtitle: "Review sensitive actions, exports, and recovery operations with confidence." }
@@ -1630,6 +1630,7 @@ function ReportsPage({ apiBase, token }) {
 
 function BidsPage({ apiBase, token }) {
   const PAGE_SIZE = 50;
+  const todayInput = toDateInputValue(new Date());
   const [state, setState] = useState({
     loading: true,
     error: "",
@@ -1639,6 +1640,8 @@ function BidsPage({ apiBase, token }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [pageOffset, setPageOffset] = useState(0);
+  const [fromDate, setFromDate] = useState(todayInput);
+  const [toDate, setToDate] = useState(todayInput);
 
   useEffect(() => {
     setState((current) => ({
@@ -1650,7 +1653,9 @@ function BidsPage({ apiBase, token }) {
       limit: String(PAGE_SIZE),
       offset: String(pageOffset),
       search: query,
-      status
+      status,
+      from: fromDate,
+      to: toDate
     });
     fetchApi(apiBase, `/api/admin/bids?${searchParams.toString()}`, token)
       .then((data) =>
@@ -1669,11 +1674,11 @@ function BidsPage({ apiBase, token }) {
           pagination: { limit: PAGE_SIZE, offset: pageOffset, total: 0, hasMore: false }
         })
       );
-  }, [apiBase, token, pageOffset, query, status]);
+  }, [apiBase, token, pageOffset, query, status, fromDate, toDate]);
 
   useEffect(() => {
     setPageOffset(0);
-  }, [query, status]);
+  }, [query, status, fromDate, toDate]);
 
   if (state.loading) return <PageState title="All Bids" subtitle="Loading bids..." />;
   if (state.error) return <PageState title="All Bids" subtitle={state.error} tone="error" />;
@@ -1686,16 +1691,28 @@ function BidsPage({ apiBase, token }) {
   const lostCount = filtered.filter((bid) => bid.status === "Lost").length;
   const pageStart = state.pagination.total ? state.pagination.offset + 1 : 0;
   const pageEnd = state.pagination.offset + filtered.length;
+  const rangeLabel = fromDate && toDate ? fromDate === toDate ? "Today only" : `${fromDate} to ${toDate}` : "All history";
 
   return (
     <>
-      <PageHeader title="All Bids" subtitle="Every placed bid with user, board, amount, payout, result, and settlement status in one cleaner view." />
+      <PageHeader title="All Bids" subtitle="" />
       <section className="panel">
+        <div className="section-head">
+          <div>
+            <h3>All Bids</h3>
+            <p className="muted">{rangeLabel}</p>
+          </div>
+          <div className="inline-actions">
+            <label><span>From</span><input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
+            <label><span>To</span><input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
+            <button className="secondary" type="button" onClick={() => { setFromDate(todayInput); setToDate(todayInput); }}>Today</button>
+          </div>
+        </div>
         <div className="form-grid">
           <label className="wide"><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="User, phone, market, digit, bid ID" /></label>
           <label><span>Status</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All</option><option value="Pending">Pending</option><option value="Won">Won</option><option value="Lost">Lost</option></select></label>
           <div className="actions">
-              <button className="secondary" onClick={() => void exportAdminData(apiBase, token, "bids")}>Export Bids CSV</button>
+              <button className="secondary" onClick={() => void exportAdminData(apiBase, token, "bids")}>Export CSV</button>
           </div>
         </div>
       </section>

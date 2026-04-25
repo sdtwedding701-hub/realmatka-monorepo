@@ -194,12 +194,16 @@ export async function adminBidsListController(request) {
   const offset = Number(url.searchParams.get("offset") ?? 0);
   const search = String(url.searchParams.get("search") ?? "");
   const status = String(url.searchParams.get("status") ?? "all");
+  const from = String(url.searchParams.get("from") ?? "");
+  const to = String(url.searchParams.get("to") ?? "");
   return ok(
     await listAdminBidsPage({
       limit,
       offset,
       search,
-      status
+      status,
+      from,
+      to
     }),
     request
   );

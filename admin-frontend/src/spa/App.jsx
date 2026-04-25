@@ -1806,6 +1806,22 @@ function UserLedgerModal({ state, onClose }) {
   const rangeLabel = fromDate && toDate ? fromDate === toDate ? "Today only" : `${fromDate} to ${toDate}` : "All history";
   const walletVisibleLabel = `${filteredWalletTimeline.length} of ${walletTimeline.length}`;
   const bidVisibleLabel = `${filteredBidTimeline.length} of ${bidTimeline.length}`;
+  const canShiftDay = Boolean(fromDate && toDate && fromDate === toDate);
+
+  const setSingleDay = (value) => {
+    if (!value) return;
+    setFromDate(value);
+    setToDate(value);
+  };
+
+  const shiftSingleDay = (diff) => {
+    if (!canShiftDay) return;
+    const current = new Date(`${fromDate}T00:00:00`);
+    if (Number.isNaN(current.getTime())) return;
+    current.setDate(current.getDate() + diff);
+    const nextValue = toDateInputValue(current);
+    setSingleDay(nextValue);
+  };
 
   return (
     <div className="modal-shell" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -1838,10 +1854,10 @@ function UserLedgerModal({ state, onClose }) {
                     <p className="muted">{rangeLabel}</p>
                   </div>
                   <div className="inline-actions">
-                    <label><span>From</span><input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
-                    <label><span>To</span><input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
-                    <button className="secondary" type="button" onClick={() => { setFromDate(todayInput); setToDate(todayInput); }}>Today</button>
-                    <button className="secondary" type="button" onClick={() => { setFromDate(""); setToDate(""); }}>All</button>
+                    <button className="secondary" type="button" onClick={() => shiftSingleDay(-1)} disabled={!canShiftDay}>Previous Day</button>
+                    <button className="secondary" type="button" onClick={() => setSingleDay(todayInput)}>Today</button>
+                    <button className="secondary" type="button" onClick={() => shiftSingleDay(1)} disabled={!canShiftDay || fromDate === todayInput}>Next Day</button>
+                    <button className="secondary" type="button" onClick={() => { setFromDate(""); setToDate(""); }}>All History</button>
                   </div>
                 </div>
                 <div className="mini-stats">
@@ -1919,7 +1935,21 @@ function UserLedgerModal({ state, onClose }) {
                   <div className="section-head">
                     <div>
                       <h3>Wallet Timeline</h3>
-                      <p className="muted">{rangeLabel} • {walletVisibleLabel} entries</p>
+                      <p className="muted">{rangeLabel} | {walletVisibleLabel} entries</p>
+                    </div>
+                  </div>
+                  <div className="ledger-toolbar">
+                    <div className="ledger-toolbar-copy">
+                      <strong>{rangeLabel}</strong>
+                      <span>Wallet entries ko date wise yahin se change karo.</span>
+                    </div>
+                    <div className="ledger-toolbar-actions">
+                      <button className="secondary" type="button" onClick={() => shiftSingleDay(-1)} disabled={!canShiftDay}>Previous Day</button>
+                      <button className="secondary" type="button" onClick={() => setSingleDay(todayInput)}>Today</button>
+                      <button className="secondary" type="button" onClick={() => shiftSingleDay(1)} disabled={!canShiftDay || fromDate === todayInput}>Next Day</button>
+                      <label><span>From</span><input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
+                      <label><span>To</span><input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
+                      <button className="secondary" type="button" onClick={() => { setFromDate(""); setToDate(""); }}>All History</button>
                     </div>
                   </div>
                   <div className="ledger-feed">
@@ -1950,7 +1980,21 @@ function UserLedgerModal({ state, onClose }) {
                     <div className="section-head">
                       <div>
                         <h3>Bid Timeline</h3>
-                        <p className="muted">{rangeLabel} • {bidVisibleLabel} bids</p>
+                        <p className="muted">{rangeLabel} | {bidVisibleLabel} bids</p>
+                      </div>
+                    </div>
+                    <div className="ledger-toolbar">
+                      <div className="ledger-toolbar-copy">
+                        <strong>{rangeLabel}</strong>
+                        <span>Bid history ko previous ya selected date se dekho.</span>
+                      </div>
+                      <div className="ledger-toolbar-actions">
+                        <button className="secondary" type="button" onClick={() => shiftSingleDay(-1)} disabled={!canShiftDay}>Previous Day</button>
+                        <button className="secondary" type="button" onClick={() => setSingleDay(todayInput)}>Today</button>
+                        <button className="secondary" type="button" onClick={() => shiftSingleDay(1)} disabled={!canShiftDay || fromDate === todayInput}>Next Day</button>
+                        <label><span>From</span><input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
+                        <label><span>To</span><input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
+                        <button className="secondary" type="button" onClick={() => { setFromDate(""); setToDate(""); }}>All History</button>
                       </div>
                     </div>
                     <div className="ledger-feed">

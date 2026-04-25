@@ -1955,22 +1955,27 @@ function UserLedgerModal({ state, onClose }) {
                   <div className="ledger-feed">
                     {filteredWalletTimeline.length ? filteredWalletTimeline.map((entry) => (
                       <div className="ledger-row" key={entry.id}>
-                        <div className="ledger-row-main">
-                          <div className="ledger-row-head">
-                          <strong>{entry.type}</strong>
-                          <span className={`risk-chip ${getWalletEntryTone(entry)}`}>{entry.status}</span>
+                        <div className="history-card-top">
+                          <span className="history-date">{formatDate(entry.createdAt)}</span>
+                          <span className={`history-status ${getWalletEntryTone(entry)}`}>{formatWalletEntryStatus(entry.status)}</span>
                         </div>
-                        <div className="ledger-row-meta">
-                          <span>{formatDate(entry.createdAt)}</span>
-                          <span>Amount: {formatCurrency(entry.amount)}</span>
-                          <span>Before: {formatCurrency(entry.beforeBalance)}</span>
-                          <span>After: {formatCurrency(entry.afterBalance)}</span>
-                        </div>
-                        <div className="ledger-row-meta muted">
-                          <span>Reference: {entry.referenceId || "-"}</span>
-                          <span>Proof: {entry.proofUrl || "-"}</span>
-                          <span>Note: {entry.note || "-"}</span>
+                        <div className="history-passbook-grid">
+                          <div className="history-passbook-cell">
+                            <span>Before</span>
+                            <strong>{Number(entry.beforeBalance || 0).toFixed(2)}</strong>
                           </div>
+                          <div className="history-passbook-cell">
+                            <span>Amount</span>
+                            <strong>{Number(entry.amount || 0).toFixed(2)}</strong>
+                          </div>
+                          <div className="history-passbook-cell last">
+                            <span>After</span>
+                            <strong>{Number(entry.afterBalance || 0).toFixed(2)}</strong>
+                          </div>
+                        </div>
+                        <div className="history-meta-copy">
+                          <span>Request Type</span>
+                          <strong>{formatWalletEntryTitle(entry.type)}</strong>
                         </div>
                       </div>
                     )) : <div className="empty-card">Is selected date range me wallet entries available nahi hain.</div>}
@@ -2000,24 +2005,44 @@ function UserLedgerModal({ state, onClose }) {
                     <div className="ledger-feed">
                       {filteredBidTimeline.length ? filteredBidTimeline.map((bid) => (
                         <div className="ledger-row" key={bid.id}>
-                        <div className="ledger-row-main">
-                            <div className="ledger-row-head">
-                            <strong>{bid.market} / {bid.boardLabel}</strong>
-                            <span className={`risk-chip ${getBidStatusTone(bid.status)}`}>{bid.status}</span>
+                          <div className="history-card-top">
+                            <span className="history-date">{formatDate(bid.createdAt)}</span>
+                            <span className="history-kind">MATKA</span>
                           </div>
-                          <div className="ledger-row-meta">
-                            <span>Placed: {formatDate(bid.createdAt)}</span>
-                            <span>Settled: {bid.settledAt ? formatDate(bid.settledAt) : "Pending"}</span>
-                          </div>
-                          <div className="ledger-row-meta">
-                            <span>Game: {bid.gameType || bid.boardLabel || "-"}</span>
-                            <span>Session: {bid.sessionType || "-"}</span>
-                            <span>Digit: {bid.digit || "-"}</span>
-                          </div>
-                          <div className="ledger-row-meta">
-                            <span>Bet: {formatCurrency(bid.points)}</span>
-                            <span>Win: {formatCurrency(bid.payout)}</span>
-                            <span>Settled Result: {bid.settledResult || "-"}</span>
+                          <div className="history-info-stack">
+                            <div className="history-info-row">
+                              <div className="history-meta-copy">
+                                <span>Game Name</span>
+                                <strong>{bid.market}</strong>
+                              </div>
+                            </div>
+                            <div className="history-info-row">
+                              <div className="history-meta-copy">
+                                <span>Bet Type</span>
+                                <strong>{bid.gameType || bid.boardLabel || "-"}</strong>
+                              </div>
+                            </div>
+                            <div className="history-info-row">
+                              <div className="history-meta-copy">
+                                <span>Game Session</span>
+                                <strong>{bid.sessionType || "-"}</strong>
+                              </div>
+                            </div>
+                            <div className="history-info-row">
+                              <div className="history-meta-copy">
+                                <span>Digit</span>
+                                <strong>{bid.digit || "-"}</strong>
+                              </div>
+                            </div>
+                            <div className="history-info-row">
+                              <div className="history-meta-copy">
+                                <span>Bet Amount</span>
+                                <strong>{formatCurrency(bid.points)}</strong>
+                              </div>
+                              <div className="history-meta-copy align-end">
+                                <span className={`history-status ${getBidStatusTone(bid.status)}`}>{bid.status}</span>
+                                <strong>{bid.settledResult || "-"}</strong>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -2178,6 +2203,29 @@ function getBidStatusTone(status) {
   if (status === "Won") return "high";
   if (status === "Lost") return "medium";
   return "low";
+}
+
+function formatWalletEntryTitle(type) {
+  const normalized = String(type || "").replace(/_/g, " ").trim().toUpperCase();
+  if (normalized.includes("DEPOSIT")) return "Deposit";
+  if (normalized.includes("WITHDRAW")) return "Withdraw";
+  if (normalized.includes("BONUS")) return "Bonus";
+  if (normalized.includes("REFERRAL")) return "Referral";
+  if (normalized.includes("BID WIN REVERSAL")) return "Bid Win Reversal";
+  if (normalized.includes("BID PLACED")) return "Bid Placed";
+  if (normalized.includes("BID WIN")) return "Bid Win";
+  if (normalized.includes("ADMIN CREDIT")) return "Admin Credit";
+  if (normalized.includes("ADMIN DEBIT")) return "Admin Debit";
+  return String(type || "").replace(/_/g, " ").trim() || "-";
+}
+
+function formatWalletEntryStatus(status) {
+  if (status === "SUCCESS") return "SUCCESS";
+  if (status === "BACKOFFICE") return "PROCESSING";
+  if (status === "REJECTED") return "REJECTED";
+  if (status === "FAILED") return "FAILED";
+  if (status === "CANCELLED") return "CANCELLED";
+  return "PENDING";
 }
 
 function getPayoutActionTitle(action) {

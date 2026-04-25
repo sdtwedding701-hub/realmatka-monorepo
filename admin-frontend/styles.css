@@ -1765,6 +1765,8 @@ button.secondary.danger {
   border-radius: 18px;
   background: linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
   padding: 14px 16px;
+  display: grid;
+  gap: 12px;
 }
 
 .ledger-row-main {
@@ -1789,6 +1791,105 @@ button.secondary.danger {
 
 .ledger-row-meta.muted span {
   font-size: 11px;
+}
+
+.history-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.history-date {
+  color: #475467;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.history-status {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.history-status.low {
+  color: #2563eb;
+}
+
+.history-status.medium {
+  color: #dc2626;
+}
+
+.history-status.high {
+  color: #15803d;
+}
+
+.history-kind {
+  color: #06b6d4;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.history-passbook-grid {
+  display: flex;
+  border: 1px solid #e5edf7;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.history-passbook-cell {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  padding: 12px 10px;
+  border-right: 1px solid #e5edf7;
+}
+
+.history-passbook-cell.last {
+  border-right: 0;
+}
+
+.history-passbook-cell span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.history-passbook-cell strong {
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.history-meta-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.history-meta-copy.align-end {
+  text-align: right;
+}
+
+.history-meta-copy span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.history-meta-copy strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.history-info-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.history-info-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .inline-note {

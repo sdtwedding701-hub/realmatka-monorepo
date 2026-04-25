@@ -1781,8 +1781,16 @@ function UserLedgerModal({ state, onClose }) {
   const detail = state.detail;
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const todayInput = toDateInputValue(new Date());
   const walletEntries = detail?.walletEntries || [];
   const bids = detail?.bids || [];
+
+  useEffect(() => {
+    if (!detail) return;
+    setFromDate(todayInput);
+    setToDate(todayInput);
+  }, [detail?.user?.id, todayInput]);
+
   const walletTimeline = walletEntries
     .slice()
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
@@ -1795,6 +1803,9 @@ function UserLedgerModal({ state, onClose }) {
   const filteredBidSummary = buildFilteredBidSummary(filteredBidTimeline);
   const lossDays = buildBidLossDays(filteredBidTimeline);
   const winningDays = buildBidWinningDays(filteredBidTimeline);
+  const rangeLabel = fromDate && toDate ? fromDate === toDate ? "Today only" : `${fromDate} to ${toDate}` : "All history";
+  const walletVisibleLabel = `${filteredWalletTimeline.length} of ${walletTimeline.length}`;
+  const bidVisibleLabel = `${filteredBidTimeline.length} of ${bidTimeline.length}`;
 
   return (
     <div className="modal-shell" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -1821,20 +1832,24 @@ function UserLedgerModal({ state, onClose }) {
                 ]}
               </div>
               <div className="subpanel">
-                <h3>History Range</h3>
-                <div className="form-grid">
-                  <label><span>From</span><input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
-                  <label><span>To</span><input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
-                  <div className="actions">
-                    <button className="secondary" type="button" onClick={() => { setFromDate(""); setToDate(""); }}>Clear Range</button>
+                <div className="section-head">
+                  <div>
+                    <h3>History Range</h3>
+                    <p className="muted">{rangeLabel}</p>
+                  </div>
+                  <div className="inline-actions">
+                    <label><span>From</span><input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
+                    <label><span>To</span><input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
+                    <button className="secondary" type="button" onClick={() => { setFromDate(todayInput); setToDate(todayInput); }}>Today</button>
+                    <button className="secondary" type="button" onClick={() => { setFromDate(""); setToDate(""); }}>All</button>
                   </div>
                 </div>
                 <div className="mini-stats">
                   {[
-                    miniStat("Wallet Rows", filteredWalletTimeline.length),
+                    miniStat("Wallet Rows", walletVisibleLabel),
                     miniStat("Credits", formatCurrency(filteredWalletSummary.credits)),
                     miniStat("Debits", formatCurrency(filteredWalletSummary.debits)),
-                    miniStat("Visible Bids", filteredBidTimeline.length),
+                    miniStat("Visible Bids", bidVisibleLabel),
                     miniStat("Bet Amount", formatCurrency(filteredBidSummary.betAmount)),
                     miniStat("Win Amount", formatCurrency(filteredBidSummary.winAmount))
                   ]}
@@ -1901,7 +1916,12 @@ function UserLedgerModal({ state, onClose }) {
             </div>
             <div className="dashboard-grid">
                 <div className="subpanel">
-                  <h3>Wallet Timeline</h3>
+                  <div className="section-head">
+                    <div>
+                      <h3>Wallet Timeline</h3>
+                      <p className="muted">{rangeLabel} • {walletVisibleLabel} entries</p>
+                    </div>
+                  </div>
                   <div className="ledger-feed">
                     {filteredWalletTimeline.length ? filteredWalletTimeline.map((entry) => (
                       <div className="ledger-row" key={entry.id}>
@@ -1927,7 +1947,12 @@ function UserLedgerModal({ state, onClose }) {
                   </div>
                 </div>
                   <div className="subpanel">
-                    <h3>Bid Timeline</h3>
+                    <div className="section-head">
+                      <div>
+                        <h3>Bid Timeline</h3>
+                        <p className="muted">{rangeLabel} • {bidVisibleLabel} bids</p>
+                      </div>
+                    </div>
                     <div className="ledger-feed">
                       {filteredBidTimeline.length ? filteredBidTimeline.map((bid) => (
                         <div className="ledger-row" key={bid.id}>

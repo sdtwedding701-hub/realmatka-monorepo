@@ -25,6 +25,8 @@ export const payoutRates = {
   "Odd Even": 10
 };
 
+export { getMarketDayKey };
+
 function roundAmount(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
@@ -73,10 +75,21 @@ function getMarketDayKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function getMarketSettlementAnchor(market) {
+  return market?.updatedAt || market?.resultUpdatedAt || market?.publishedAt || new Date();
+}
+
 async function getMarketCycleBids(market) {
-  const settlementDayKey = getMarketDayKey(new Date());
+  const settlementDayKey = getMarketDayKey(getMarketSettlementAnchor(market));
   const bids = await getBidsForMarket(market.name);
-  return bids.filter((bid) => getMarketDayKey(bid.createdAt) === settlementDayKey);
+  const matched = [];
+  let skippedCrossDay = 0;
+  for (const bid of bids) {
+    const bidDayKey = String(bid.marketDay || "").trim() || getMarketDayKey(bid.createdAt);
+    if (bidDayKey === settlementDayKey) matched.push(bid);
+    else skippedCrossDay += 1;
+  }
+  return { settlementDayKey, matched, skippedCrossDay };
 }
 
 export function isPlaceholderMarketResult(result) {
@@ -391,10 +404,11 @@ export function evaluateBidAgainstMarket(bid, market) {
 
 export async function settlePendingBidsForMarket(market) {
   if (!canSettleMarketResult(market.result)) {
-    return { processed: 0, won: 0, lost: 0, wins: 0, losses: 0, skipped: 0, totalPayout: 0 };
+    return { processed: 0, won: 0, lost: 0, wins: 0, losses: 0, skipped: 0, totalPayout: 0, settlementDayKey: null, skippedCrossDay: 0 };
   }
 
-  const bids = (await getMarketCycleBids(market)).filter((bid) => bid.status === "Pending");
+  const cycle = await getMarketCycleBids(market);
+  const bids = cycle.matched.filter((bid) => bid.status === "Pending");
   let processed = 0;
   let won = 0;
   let lost = 0;
@@ -456,11 +470,12 @@ export async function settlePendingBidsForMarket(market) {
   }));
 
   if (notificationEntries.length) await sendUserNotifications(notificationEntries);
-  return { processed, won, lost, wins: won, losses: lost, skipped, totalPayout: roundAmount(totalPayout) };
+  return { processed, won, lost, wins: won, losses: lost, skipped, totalPayout: roundAmount(totalPayout), settlementDayKey: cycle.settlementDayKey, skippedCrossDay: cycle.skippedCrossDay };
 }
 
 export async function resettleMarket(market) {
-  const settled = (await getMarketCycleBids(market)).filter((bid) => bid.status !== "Pending");
+  const cycle = await getMarketCycleBids(market);
+  const settled = cycle.matched.filter((bid) => bid.status !== "Pending");
   for (const bid of settled) {
     if (bid.status === "Won" && bid.payout > 0) {
       const beforeBalance = await getUserBalance(bid.userId);
@@ -477,11 +492,17 @@ export async function resettleMarket(market) {
     }
     await updateBidSettlement(bid.id, "Pending", 0, "");
   }
-  return settlePendingBidsForMarket(market);
+  const result = await settlePendingBidsForMarket(market);
+  return {
+    ...result,
+    settlementDayKey: result.settlementDayKey || cycle.settlementDayKey,
+    skippedCrossDay: Number(result.skippedCrossDay || 0) + cycle.skippedCrossDay
+  };
 }
 
 export async function resetMarketSettlement(market) {
-  const settled = (await getMarketCycleBids(market)).filter((bid) => bid.status !== "Pending");
+  const cycle = await getMarketCycleBids(market);
+  const settled = cycle.matched.filter((bid) => bid.status !== "Pending");
   let reversedWins = 0;
   let reversedPayout = 0;
 
@@ -504,5 +525,17 @@ export async function resetMarketSettlement(market) {
     await updateBidSettlement(bid.id, "Pending", 0, "");
   }
 
-  return { processed: settled.length, won: 0, lost: 0, wins: 0, losses: 0, skipped: 0, totalPayout: 0, reversedWins, reversedPayout: roundAmount(reversedPayout) };
+  return {
+    processed: settled.length,
+    won: 0,
+    lost: 0,
+    wins: 0,
+    losses: 0,
+    skipped: 0,
+    totalPayout: 0,
+    reversedWins,
+    reversedPayout: roundAmount(reversedPayout),
+    settlementDayKey: cycle.settlementDayKey,
+    skippedCrossDay: cycle.skippedCrossDay
+  };
 }

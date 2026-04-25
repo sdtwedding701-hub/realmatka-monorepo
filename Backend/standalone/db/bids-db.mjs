@@ -7,27 +7,27 @@ import {
   __internalNowIso
 } from "../db.mjs";
 
-export async function addBid({ userId, market, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult }) {
+export async function addBid({ userId, market, marketDay, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult }) {
   const id = `bid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const createdAt = __internalNowIso();
 
   if (isStandalonePostgresEnabled()) {
     const pool = __internalGetPgPool();
     await pool.query(
-      `INSERT INTO bids (id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-      [id, userId, market, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult, createdAt]
+      `INSERT INTO bids (id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      [id, userId, market, marketDay, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult, createdAt]
     );
   } else {
     __internalGetSqlite()
       .prepare(
-        `INSERT INTO bids (id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO bids (id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(id, userId, market, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult, createdAt);
+      .run(id, userId, market, marketDay, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult, createdAt);
   }
 
-  return { id, userId, market, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult, createdAt };
+  return { id, userId, market, marketDay, boardLabel, gameType, sessionType, digit, points, status, payout, settledAt, settledResult, createdAt };
 }
 
 export async function getBidsForUser(userId, limit = 50) {
@@ -35,7 +35,7 @@ export async function getBidsForUser(userId, limit = 50) {
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     const result = await pool.query(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+      `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
        FROM bids
        WHERE user_id = $1
        ORDER BY created_at DESC, id DESC
@@ -47,7 +47,7 @@ export async function getBidsForUser(userId, limit = 50) {
 
   return __internalGetSqlite()
     .prepare(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+      `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
        FROM bids
        WHERE user_id = ?
        ORDER BY created_at DESC, id DESC
@@ -61,7 +61,7 @@ export async function getBidsForMarket(marketName) {
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     const result = await pool.query(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+      `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
        FROM bids
        WHERE market = $1
        ORDER BY created_at ASC, id ASC`,
@@ -72,7 +72,7 @@ export async function getBidsForMarket(marketName) {
 
   return __internalGetSqlite()
     .prepare(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+      `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
        FROM bids
        WHERE market = ?
        ORDER BY created_at ASC, id ASC`
@@ -86,7 +86,7 @@ export async function listAllBids(limit = 300) {
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     const result = await pool.query(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+      `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
        FROM bids
        ORDER BY created_at DESC, id DESC
        LIMIT $1`,
@@ -97,7 +97,7 @@ export async function listAllBids(limit = 300) {
 
   return __internalGetSqlite()
     .prepare(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+      `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
        FROM bids
        ORDER BY created_at DESC, id DESC
        LIMIT ?`
@@ -114,7 +114,7 @@ export async function listBidsPage({ limit = 500, offset = 0 } = {}) {
     const [countResult, rowsResult] = await Promise.all([
       pool.query(`SELECT COUNT(*)::int AS total FROM bids`),
       pool.query(
-        `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+        `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
          FROM bids
          ORDER BY created_at DESC, id DESC
          LIMIT $1 OFFSET $2`,
@@ -137,7 +137,7 @@ export async function listBidsPage({ limit = 500, offset = 0 } = {}) {
   const total = Number(sqlite.prepare(`SELECT COUNT(*) AS total FROM bids`).get()?.total ?? 0);
   const items = sqlite
     .prepare(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+      `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
        FROM bids
        ORDER BY created_at DESC, id DESC
        LIMIT ? OFFSET ?`
@@ -181,7 +181,7 @@ export async function updateBidSettlement(bidId, status, payout, settledResult) 
   );
   return __internalMapBidRow(
     db.prepare(
-      `SELECT id, user_id, market, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+      `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
        FROM bids WHERE id = ? LIMIT 1`
     ).get(bidId)
   );

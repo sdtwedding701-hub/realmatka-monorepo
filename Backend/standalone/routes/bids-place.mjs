@@ -9,6 +9,7 @@ import {
   isValidPanna
 } from "../matka-rules.mjs";
 import { corsPreflight, fail, getJsonBody, ok } from "../http.mjs";
+import { getMarketDayKey } from "../services/admin-settlement-helpers.mjs";
 
 const MIN_BID_POINTS = 5;
 const MAX_BID_POINTS = 99999;
@@ -92,6 +93,7 @@ export async function place(request) {
       addBid({
         userId: user.id,
         market,
+        marketDay: getMarketDayKey(new Date()),
         boardLabel,
         gameType: String(item?.gameType ?? boardLabel),
         sessionType,

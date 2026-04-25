@@ -558,6 +558,7 @@ function mapBidRow(row) {
         id: row.id,
         userId: row.user_id,
         market: row.market,
+        marketDay: row.market_day ?? null,
         boardLabel: row.board_label,
         gameType: row.game_type ?? row.board_label,
         sessionType: row.session_type,
@@ -763,6 +764,7 @@ async function ensurePostgresBootstrap(pool) {
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_deposit_bonus_granted BOOLEAN NOT NULL DEFAULT FALSE`);
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by_user_id TEXT`);
       await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_commission_carry NUMERIC(12,2) NOT NULL DEFAULT 0`);
+      await client.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS market_day TEXT`);
       await client.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS game_type TEXT`);
       await client.query(`ALTER TABLE markets ADD COLUMN IF NOT EXISTS result_locked_at TIMESTAMPTZ`);
       await client.query(`ALTER TABLE markets ADD COLUMN IF NOT EXISTS result_locked_by_user_id TEXT REFERENCES users(id)`);
@@ -992,6 +994,7 @@ function getSqlite() {
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       market TEXT NOT NULL,
+      market_day TEXT,
       board_label TEXT NOT NULL,
       game_type TEXT,
       session_type TEXT NOT NULL DEFAULT 'Close',
@@ -1165,6 +1168,7 @@ function getSqlite() {
   ensureSqliteColumn(sqlite, "users", "first_deposit_bonus_granted", "INTEGER NOT NULL DEFAULT 0");
   ensureSqliteColumn(sqlite, "users", "referred_by_user_id", "TEXT");
   ensureSqliteColumn(sqlite, "users", "referral_commission_carry", "REAL NOT NULL DEFAULT 0");
+  ensureSqliteColumn(sqlite, "bids", "market_day", "TEXT");
   ensureSqliteColumn(sqlite, "bids", "game_type", "TEXT");
   ensureSqliteColumn(sqlite, "markets", "result_locked_at", "TEXT");
   ensureSqliteColumn(sqlite, "markets", "result_locked_by_user_id", "TEXT");

@@ -148,8 +148,8 @@ export async function getAdminUserDetail(userId) {
   }
 
   const [walletEntries, bids, bankAccounts, walletBalance] = await Promise.all([
-    getWalletEntriesForUser(userId, 300),
-    getBidsForUser(userId, 300),
+    getWalletEntriesForUser(userId, 1000),
+    getBidsForUser(userId, 1000),
     getBankAccountsForUser(userId),
     getUserBalance(userId)
   ]);

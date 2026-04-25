@@ -31,7 +31,7 @@ export async function addBid({ userId, market, boardLabel, gameType, sessionType
 }
 
 export async function getBidsForUser(userId, limit = 50) {
-  const normalizedLimit = Math.max(1, Math.min(500, Number(limit) || 50));
+  const normalizedLimit = Math.max(1, Math.min(5000, Number(limit) || 50));
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     const result = await pool.query(

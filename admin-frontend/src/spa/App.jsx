@@ -1777,18 +1777,24 @@ function BidsPage({ apiBase, token }) {
   );
 }
 
-  function UserLedgerModal({ state, onClose }) {
-    const detail = state.detail;
-    const walletEntries = detail?.walletEntries || [];
-    const bids = detail?.bids || [];
-    const walletTimeline = walletEntries
-      .slice()
-      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
-    const bidTimeline = bids
-      .slice()
-      .sort((left, right) => getBidTimelineStamp(right) - getBidTimelineStamp(left));
-  const lossDays = buildBidLossDays(bidTimeline);
-  const winningDays = buildBidWinningDays(bidTimeline);
+function UserLedgerModal({ state, onClose }) {
+  const detail = state.detail;
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const walletEntries = detail?.walletEntries || [];
+  const bids = detail?.bids || [];
+  const walletTimeline = walletEntries
+    .slice()
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const bidTimeline = bids
+    .slice()
+    .sort((left, right) => getBidTimelineStamp(right) - getBidTimelineStamp(left));
+  const filteredWalletTimeline = walletTimeline.filter((entry) => isWithinDateRange(entry.createdAt, fromDate, toDate));
+  const filteredBidTimeline = bidTimeline.filter((bid) => isWithinDateRange(bid.settledAt || bid.createdAt, fromDate, toDate));
+  const filteredWalletSummary = buildFilteredWalletSummary(filteredWalletTimeline);
+  const filteredBidSummary = buildFilteredBidSummary(filteredBidTimeline);
+  const lossDays = buildBidLossDays(filteredBidTimeline);
+  const winningDays = buildBidWinningDays(filteredBidTimeline);
 
   return (
     <div className="modal-shell" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -1799,10 +1805,10 @@ function BidsPage({ apiBase, token }) {
         </div>
         {state.loading ? <div className="empty-card">Loading user ledger...</div> : null}
         {state.error ? <p className="message error">{state.error}</p> : null}
-        {detail ? (
-          <div className="compact-list">
-            <div className="mini-stats">
-              {[
+          {detail ? (
+            <div className="compact-list">
+              <div className="mini-stats">
+                {[
                 miniStat("Wallet", formatCurrency(detail.summary?.walletBalance ?? 0)),
                 miniStat("Deposits", formatCurrency(detail.summary?.deposits ?? 0)),
                 miniStat("Withdraws", formatCurrency(detail.summary?.withdraws ?? 0)),
@@ -1811,12 +1817,32 @@ function BidsPage({ apiBase, token }) {
                 miniStat("Pending Bids", detail.summary?.pendingBids ?? 0),
                 miniStat("Won Bids", detail.summary?.wonBids ?? 0),
                 miniStat("Lost Bids", detail.summary?.lostBids ?? 0),
-                miniStat("Referral Income", formatCurrency(detail.summary?.referralIncome ?? 0))
-              ]}
-            </div>
-            <div className="dashboard-grid">
+                  miniStat("Referral Income", formatCurrency(detail.summary?.referralIncome ?? 0))
+                ]}
+              </div>
               <div className="subpanel">
-                <h3>{detail.user.name} ({detail.user.phone})</h3>
+                <h3>History Range</h3>
+                <div className="form-grid">
+                  <label><span>From</span><input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label>
+                  <label><span>To</span><input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></label>
+                  <div className="actions">
+                    <button className="secondary" type="button" onClick={() => { setFromDate(""); setToDate(""); }}>Clear Range</button>
+                  </div>
+                </div>
+                <div className="mini-stats">
+                  {[
+                    miniStat("Wallet Rows", filteredWalletTimeline.length),
+                    miniStat("Credits", formatCurrency(filteredWalletSummary.credits)),
+                    miniStat("Debits", formatCurrency(filteredWalletSummary.debits)),
+                    miniStat("Visible Bids", filteredBidTimeline.length),
+                    miniStat("Bet Amount", formatCurrency(filteredBidSummary.betAmount)),
+                    miniStat("Win Amount", formatCurrency(filteredBidSummary.winAmount))
+                  ]}
+                </div>
+              </div>
+              <div className="dashboard-grid">
+                <div className="subpanel">
+                  <h3>{detail.user.name} ({detail.user.phone})</h3>
                 <div className="compact-list">
                   <div className="compact-row"><strong>Referral</strong><span>{detail.user.referralCode || "-"}</span></div>
                   <div className="compact-row"><strong>Approval</strong><span>{detail.user.approvalStatus || "-"}</span></div>
@@ -1874,13 +1900,13 @@ function BidsPage({ apiBase, token }) {
               </div>
             </div>
             <div className="dashboard-grid">
-              <div className="subpanel">
-                <h3>Wallet Timeline</h3>
-                <div className="ledger-feed">
-                  {walletTimeline.length ? walletTimeline.map((entry) => (
-                    <div className="ledger-row" key={entry.id}>
-                      <div className="ledger-row-main">
-                        <div className="ledger-row-head">
+                <div className="subpanel">
+                  <h3>Wallet Timeline</h3>
+                  <div className="ledger-feed">
+                    {filteredWalletTimeline.length ? filteredWalletTimeline.map((entry) => (
+                      <div className="ledger-row" key={entry.id}>
+                        <div className="ledger-row-main">
+                          <div className="ledger-row-head">
                           <strong>{entry.type}</strong>
                           <span className={`risk-chip ${getWalletEntryTone(entry)}`}>{entry.status}</span>
                         </div>
@@ -1894,19 +1920,19 @@ function BidsPage({ apiBase, token }) {
                           <span>Reference: {entry.referenceId || "-"}</span>
                           <span>Proof: {entry.proofUrl || "-"}</span>
                           <span>Note: {entry.note || "-"}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )) : <div className="empty-card">No wallet entries available.</div>}
+                    )) : <div className="empty-card">Is selected date range me wallet entries available nahi hain.</div>}
+                  </div>
                 </div>
-              </div>
-                <div className="subpanel">
-                  <h3>Bid Timeline</h3>
-                  <div className="ledger-feed">
-                    {bidTimeline.length ? bidTimeline.map((bid) => (
-                      <div className="ledger-row" key={bid.id}>
-                      <div className="ledger-row-main">
-                          <div className="ledger-row-head">
+                  <div className="subpanel">
+                    <h3>Bid Timeline</h3>
+                    <div className="ledger-feed">
+                      {filteredBidTimeline.length ? filteredBidTimeline.map((bid) => (
+                        <div className="ledger-row" key={bid.id}>
+                        <div className="ledger-row-main">
+                            <div className="ledger-row-head">
                             <strong>{bid.market} / {bid.boardLabel}</strong>
                             <span className={`risk-chip ${getBidStatusTone(bid.status)}`}>{bid.status}</span>
                           </div>
@@ -1923,13 +1949,13 @@ function BidsPage({ apiBase, token }) {
                             <span>Bet: {formatCurrency(bid.points)}</span>
                             <span>Win: {formatCurrency(bid.payout)}</span>
                             <span>Settled Result: {bid.settledResult || "-"}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )) : <div className="empty-card">No bids available.</div>}
+                      )) : <div className="empty-card">Is selected date range me bids available nahi hain.</div>}
+                  </div>
                 </div>
               </div>
-            </div>
           </div>
         ) : null}
       </div>
@@ -1974,6 +2000,34 @@ function getBidTimelineStamp(bid) {
   }
   const createdStamp = bid?.createdAt ? new Date(bid.createdAt).getTime() : Number.NaN;
   return Number.isFinite(createdStamp) ? createdStamp : 0;
+}
+
+function buildFilteredWalletSummary(entries) {
+  return entries.reduce(
+    (summary, entry) => {
+      const type = String(entry?.type || "").toUpperCase();
+      const amount = Number(entry?.amount || 0);
+      if (["DEPOSIT", "REFERRAL_COMMISSION", "BID_WIN", "SIGNUP_BONUS", "FIRST_DEPOSIT_BONUS", "ADMIN_CREDIT"].includes(type)) {
+        summary.credits += amount;
+      }
+      if (["WITHDRAW", "BID_PLACED", "BID_WIN_REVERSAL", "ADMIN_DEBIT"].includes(type)) {
+        summary.debits += amount;
+      }
+      return summary;
+    },
+    { credits: 0, debits: 0 }
+  );
+}
+
+function buildFilteredBidSummary(bids) {
+  return bids.reduce(
+    (summary, bid) => {
+      summary.betAmount += Number(bid?.points || 0);
+      summary.winAmount += Number(bid?.payout || 0);
+      return summary;
+    },
+    { betAmount: 0, winAmount: 0 }
+  );
 }
 
 function getDateGroupLabel(value) {

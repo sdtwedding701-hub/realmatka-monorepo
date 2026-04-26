@@ -198,6 +198,7 @@ export default function HomeScreen() {
           style={styles.noticeMarqueeWindow}
         >
           <Animated.Text
+            ellipsizeMode="clip"
             onLayout={(event) => setNoticeTextWidth(event.nativeEvent.layout.width)}
             onTextLayout={(event) => {
               const firstLineWidth = event.nativeEvent.lines?.[0]?.width;
@@ -205,6 +206,7 @@ export default function HomeScreen() {
                 setNoticeTextWidth(Math.ceil(firstLineWidth));
               }
             }}
+            numberOfLines={1}
             style={[styles.noticeText, { transform: [{ translateX: noticeScrollX }] }]}
           >
             {noticeText}
@@ -547,7 +549,8 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     lineHeight: 17,
     paddingRight: 24,
-    minWidth: "100%"
+    minWidth: "100%",
+    flexShrink: 0
   },
   errorTitle: {
     color: colors.textPrimary,

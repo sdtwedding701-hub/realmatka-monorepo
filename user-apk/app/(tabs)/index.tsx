@@ -198,7 +198,6 @@ export default function HomeScreen() {
           style={styles.noticeMarqueeWindow}
         >
           <Animated.Text
-            numberOfLines={1}
             onLayout={(event) => setNoticeTextWidth(event.nativeEvent.layout.width)}
             onTextLayout={(event) => {
               const firstLineWidth = event.nativeEvent.lines?.[0]?.width;
@@ -547,7 +546,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 17,
-    paddingRight: 24
+    paddingRight: 24,
+    minWidth: "100%"
   },
   errorTitle: {
     color: colors.textPrimary,

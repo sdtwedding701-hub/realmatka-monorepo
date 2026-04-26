@@ -92,9 +92,29 @@ export function AppHeader({
   showRightMeta?: boolean;
 }) {
   const { currentUser, walletBalance } = useAppState();
+  const { width } = useWindowDimensions();
   const chrome = useAppChrome();
   const handleLeftPress = onBackPress ?? onMenuPress ?? chrome?.openDrawer;
   const showHeaderLogo = title === "Real Matka" && !onBackPress;
+  const isNarrowScreen = width < 390;
+  const isVeryNarrowScreen = width < 360;
+  const headerLogoStyle = showHeaderLogo
+    ? [
+        styles.headerLogo,
+        isNarrowScreen && styles.headerLogoNarrow,
+        isVeryNarrowScreen && styles.headerLogoVeryNarrow
+      ]
+    : null;
+  const headerBalanceValueStyle = [
+    styles.headerBalanceValue,
+    isNarrowScreen && styles.headerBalanceValueNarrow,
+    isVeryNarrowScreen && styles.headerBalanceValueVeryNarrow
+  ];
+  const headerBalanceLabelStyle = [
+    styles.headerBalanceLabel,
+    isVeryNarrowScreen && styles.headerBalanceLabelVeryNarrow
+  ];
+  const headerBadgeStyle = [styles.headerBadge, isVeryNarrowScreen && styles.headerBadgeNarrow];
 
   return (
     <SafeAreaView edges={["top"]} style={styles.headerSafeArea}>
@@ -110,7 +130,7 @@ export function AppHeader({
               <Pressable disabled={!handleLeftPress} hitSlop={10} onPress={handleLeftPress} style={styles.headerIcon}>
                 <Ionicons color={colors.surface} name={onBackPress ? "arrow-back" : "menu"} size={22} />
               </Pressable>
-              <Image source={require("../assets/images/adaptive-icon.png")} style={styles.headerLogo} resizeMode="contain" />
+              <Image source={require("../assets/images/adaptive-icon.png")} style={headerLogoStyle} resizeMode="contain" />
             </View>
           ) : (
             <>
@@ -126,10 +146,10 @@ export function AppHeader({
           {showRightMeta ? (
             <>
               <View style={styles.headerBalance}>
-                <Text style={styles.headerBalanceValue}>{rightLabel ?? `${walletBalance}`}</Text>
-                <Text style={styles.headerBalanceLabel}>Wallet</Text>
+                <Text numberOfLines={1} style={headerBalanceValueStyle}>{rightLabel ?? `${walletBalance}`}</Text>
+                <Text style={headerBalanceLabelStyle}>Wallet</Text>
               </View>
-              <View style={styles.headerBadge}>
+              <View style={headerBadgeStyle}>
                 <Ionicons color={colors.surface} name="wallet-outline" size={16} />
               </View>
             </>
@@ -307,13 +327,14 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md
+    gap: spacing.sm
   },
   headerBrandRow: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 1
+    minWidth: 0,
+    gap: 6
   },
   headerIcon: {
     width: 36,
@@ -329,8 +350,17 @@ const styles = StyleSheet.create({
   headerLogo: {
     width: 238,
     height: 54,
+    flexShrink: 1,
     marginLeft: 0,
     marginBottom: 0
+  },
+  headerLogoNarrow: {
+    width: 196,
+    height: 48
+  },
+  headerLogoVeryNarrow: {
+    width: 168,
+    height: 42
   },
   headerTitle: {
     color: colors.surface,
@@ -343,16 +373,28 @@ const styles = StyleSheet.create({
     fontSize: 11
   },
   headerBalance: {
-    alignItems: "flex-end"
+    minWidth: 54,
+    maxWidth: 72,
+    alignItems: "flex-end",
+    flexShrink: 0
   },
   headerBalanceValue: {
     color: colors.surface,
     fontSize: 13,
     fontWeight: "800"
   },
+  headerBalanceValueNarrow: {
+    fontSize: 12
+  },
+  headerBalanceValueVeryNarrow: {
+    fontSize: 11
+  },
   headerBalanceLabel: {
     color: colors.whiteOverlayTextStrong,
     fontSize: 10
+  },
+  headerBalanceLabelVeryNarrow: {
+    fontSize: 9
   },
   headerBadge: {
     width: 28,
@@ -362,6 +404,11 @@ const styles = StyleSheet.create({
     borderColor: colors.whiteOverlayBorder,
     alignItems: "center",
     justifyContent: "center"
+  },
+  headerBadgeNarrow: {
+    width: 26,
+    height: 26,
+    borderRadius: 13
   },
   sectionTitleWrap: {
     gap: 4

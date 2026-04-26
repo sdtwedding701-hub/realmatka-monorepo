@@ -5,6 +5,17 @@ const MARKET_SNAPSHOT_TTL_MS = 60_000;
 const MARKET_RESULT_RESET_AFTER_MINUTES = 30;
 const MARKET_RESULT_RESET_SETTING_KEY = "market_results_reset_day_india";
 const MARKET_DAY_ROLLOVER_MINUTES = 30;
+const MARKET_TIME_CHANGE_SCHEDULES = [
+  {
+    effectiveDate: "2026-04-27",
+    markets: new Map([
+      ["kalyan", { open: "03:45 PM", close: "05:45 PM" }],
+      ["time-bazar", { open: "01:10 PM", close: "02:10 PM" }],
+      ["milan-day", { open: "03:10 PM", close: "05:10 PM" }],
+      ["milan-night", { open: "09:10 PM", close: "11:10 PM" }]
+    ])
+  }
+];
 const OPEN_CUTOFF_ONLY_BOARDS = [
   "Jodi Digit",
   "Jodi Digit Bulk",
@@ -97,6 +108,35 @@ function isMarketWeeklyOff(market, date = getIndiaNow()) {
   return Boolean(offDays && offDays.has(getIndiaWeekday(date)));
 }
 
+function getScheduledMarketTimeOverride(slug, date = getIndiaNow()) {
+  const dateKey = getIndiaDateKey(date);
+  let activeOverride = null;
+  for (const schedule of MARKET_TIME_CHANGE_SCHEDULES) {
+    if (dateKey >= schedule.effectiveDate) {
+      const override = schedule.markets.get(String(slug || "").trim());
+      if (override) {
+        activeOverride = override;
+      }
+    }
+  }
+  return activeOverride;
+}
+
+function applyScheduledMarketTimeOverride(market, date = getIndiaNow()) {
+  if (!market) {
+    return market;
+  }
+  const override = getScheduledMarketTimeOverride(market.slug, date);
+  if (!override) {
+    return market;
+  }
+  return {
+    ...market,
+    open: override.open,
+    close: override.close
+  };
+}
+
 function getBlockedBoardLabelsForPhase(phase) {
   if (phase === "closed") {
     return [...OPEN_CUTOFF_ONLY_BOARDS];
@@ -108,13 +148,14 @@ function getBlockedBoardLabelsForPhase(phase) {
 }
 
 export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
+  const scheduledMarket = applyScheduledMarketTimeOverride(market, date);
   const currentMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
 
-  if (isMarketWeeklyOff(market, date)) {
+  if (isMarketWeeklyOff(scheduledMarket, date)) {
     return {
       phase: "closed",
       sortBucket: 2,
-      anchor: parseClockTimeToMinutes(market?.close),
+      anchor: parseClockTimeToMinutes(scheduledMarket?.close),
       canPlaceBet: false,
       isClosed: true,
       label: "Betting is Closed for Today",
@@ -136,8 +177,8 @@ export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
     };
   }
 
-  const openMinutes = parseClockTimeToMinutes(market?.open);
-  const closeMinutes = parseClockTimeToMinutes(market?.close);
+  const openMinutes = parseClockTimeToMinutes(scheduledMarket?.open);
+  const closeMinutes = parseClockTimeToMinutes(scheduledMarket?.close);
 
   if (currentMinutes < openMinutes) {
     return {
@@ -178,14 +219,15 @@ export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
 }
 
 function getMarketPhaseMeta(market, currentMinutes) {
-  if (isMarketWeeklyOff(market)) {
-    return { sortBucket: 2, anchor: parseClockTimeToMinutes(market?.close) };
+  const scheduledMarket = applyScheduledMarketTimeOverride(market);
+  if (isMarketWeeklyOff(scheduledMarket)) {
+    return { sortBucket: 2, anchor: parseClockTimeToMinutes(scheduledMarket?.close) };
   }
   if (currentMinutes < MARKET_DAY_ROLLOVER_MINUTES) {
     return { sortBucket: 0, anchor: 0 };
   }
-  const openMinutes = parseClockTimeToMinutes(market?.open);
-  const closeMinutes = parseClockTimeToMinutes(market?.close);
+  const openMinutes = parseClockTimeToMinutes(scheduledMarket?.open);
+  const closeMinutes = parseClockTimeToMinutes(scheduledMarket?.close);
 
   if (currentMinutes < openMinutes) {
     return { sortBucket: 1, anchor: openMinutes };
@@ -362,13 +404,15 @@ function decorateMarketWithLookup(market, chartLookup) {
     return market;
   }
 
-  const jodiChart = chartLookup.get(`${market.slug}:jodi`) ?? null;
-  const pannaChart = chartLookup.get(`${market.slug}:panna`) ?? null;
-  const runtimeMeta = getMarketRuntimeMeta(market);
-  const nextResult = jodiChart && pannaChart ? deriveTodayResultFromCharts(market, jodiChart, pannaChart) : market.result;
+  const scheduledMarket = applyScheduledMarketTimeOverride(market);
+
+  const jodiChart = chartLookup.get(`${scheduledMarket.slug}:jodi`) ?? null;
+  const pannaChart = chartLookup.get(`${scheduledMarket.slug}:panna`) ?? null;
+  const runtimeMeta = getMarketRuntimeMeta(scheduledMarket);
+  const nextResult = jodiChart && pannaChart ? deriveTodayResultFromCharts(scheduledMarket, jodiChart, pannaChart) : scheduledMarket.result;
 
   return {
-    ...market,
+    ...scheduledMarket,
     result: nextResult,
     phase: runtimeMeta.phase,
     label: runtimeMeta.label,
@@ -462,15 +506,17 @@ export async function getDecoratedMarketBySlug(slug) {
     return sourceMarket;
   }
 
+  const scheduledMarket = applyScheduledMarketTimeOverride(sourceMarket);
+
   const [jodiChart, pannaChart] = await Promise.all([
-    getChartRecord(sourceMarket.slug, "jodi"),
-    getChartRecord(sourceMarket.slug, "panna")
+    getChartRecord(scheduledMarket.slug, "jodi"),
+    getChartRecord(scheduledMarket.slug, "panna")
   ]);
-  const runtimeMeta = getMarketRuntimeMeta(sourceMarket);
+  const runtimeMeta = getMarketRuntimeMeta(scheduledMarket);
 
   return {
-    ...sourceMarket,
-    result: deriveTodayResultFromCharts(sourceMarket, jodiChart, pannaChart),
+    ...scheduledMarket,
+    result: deriveTodayResultFromCharts(scheduledMarket, jodiChart, pannaChart),
     phase: runtimeMeta.phase,
     label: runtimeMeta.label,
     canPlaceBet: runtimeMeta.canPlaceBet,

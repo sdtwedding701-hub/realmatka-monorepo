@@ -1,6 +1,8 @@
 import { MarketsSection, type MarketCard } from "./markets-section";
 import { buildMetadata } from "@/lib/seo";
 
+export const revalidate = 60;
+
 export const metadata = buildMetadata({
   title: "Real Matka - Game Rates, Market Results, Jodi & Panna Charts",
   description:
@@ -24,7 +26,25 @@ const rates = [
   { name: "Full Sangam", rate: "10000" }
 ] as const;
 
-const marketCatalog: MarketCard[] = [
+const MARKET_TIME_CHANGE_EFFECTIVE_DATE = "2026-04-27";
+const MARKET_TIME_CHANGE_OVERRIDES: Record<string, Pick<MarketCard, "open" | "close">> = {
+  "kalyan": { open: "03:45 PM", close: "05:45 PM" },
+  "time-bazar": { open: "01:10 PM", close: "02:10 PM" },
+  "milan-day": { open: "03:10 PM", close: "05:10 PM" },
+  "milan-night": { open: "09:10 PM", close: "11:10 PM" }
+};
+
+function getIndiaDateKey() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
+function getMarketCatalog(): MarketCard[] {
+  const baseMarketCatalog: MarketCard[] = [
   { slug: "ntr-morning", name: "NTR Morning", open: "09:00 AM", close: "10:00 AM", tag: "Games" },
   { slug: "sita-morning", name: "Sita Morning", open: "09:40 AM", close: "10:40 AM", tag: "Games" },
   { slug: "karnataka-day", name: "Karnataka Day", open: "09:55 AM", close: "10:55 AM", tag: "Games" },
@@ -57,7 +77,17 @@ const marketCatalog: MarketCard[] = [
   { slug: "rajdhani-night", name: "Rajdhani Night", open: "09:30 PM", close: "11:40 PM", tag: "Games" },
   { slug: "main-bazar", name: "Main Bazar", open: "09:45 PM", close: "11:55 PM", tag: "Games" },
   { slug: "mangal-bazar", name: "Mangal Bazar", open: "10:05 PM", close: "11:05 PM", tag: "Games" }
-] as const;
+  ];
+
+  if (getIndiaDateKey() < MARKET_TIME_CHANGE_EFFECTIVE_DATE) {
+    return baseMarketCatalog;
+  }
+
+  return baseMarketCatalog.map((market) => {
+    const override = MARKET_TIME_CHANGE_OVERRIDES[market.slug];
+    return override ? { ...market, ...override } : market;
+  });
+}
 
 const games = [
   "Single Digit",
@@ -94,6 +124,8 @@ const structuredData = {
 };
 
 export default function HomePage() {
+  const marketCatalog = getMarketCatalog();
+
   return (
     <div className="min-h-screen text-white">
       <script

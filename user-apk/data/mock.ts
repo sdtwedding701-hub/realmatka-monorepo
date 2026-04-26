@@ -34,7 +34,35 @@ export const drawerItems = [
   { label: "Rules", href: "/rules", icon: "document-text-outline" }
 ] as const;
 
-export const marketCatalog = [
+const MARKET_TIME_CHANGE_EFFECTIVE_DATE = "2026-04-27";
+const MARKET_TIME_CHANGE_OVERRIDES: Record<string, { open: string; close: string }> = {
+  "kalyan": { open: "03:45 PM", close: "05:45 PM" },
+  "time-bazar": { open: "01:10 PM", close: "02:10 PM" },
+  "milan-day": { open: "03:10 PM", close: "05:10 PM" },
+  "milan-night": { open: "09:10 PM", close: "11:10 PM" }
+};
+
+function getIndiaDateKey() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  return formatter.format(new Date());
+}
+
+function applyMarketTimeOverrides<T extends { slug: string; open: string; close: string }>(markets: T[]) {
+  if (getIndiaDateKey() < MARKET_TIME_CHANGE_EFFECTIVE_DATE) {
+    return markets;
+  }
+  return markets.map((market) => {
+    const override = MARKET_TIME_CHANGE_OVERRIDES[market.slug];
+    return override ? { ...market, open: override.open, close: override.close } : market;
+  });
+}
+
+const baseMarketCatalog = [
   { slug: "ntr-morning", name: "NTR Morning", category: "games", open: "09:00 AM", close: "10:00 AM" },
   { slug: "sita-morning", name: "Sita Morning", category: "games", open: "09:40 AM", close: "10:40 AM" },
   { slug: "karnataka-day", name: "Karnataka Day", category: "games", open: "09:55 AM", close: "10:55 AM" },
@@ -68,3 +96,5 @@ export const marketCatalog = [
   { slug: "main-bazar", name: "Main Bazar", category: "games", open: "09:45 PM", close: "11:55 PM" },
   { slug: "mangal-bazar", name: "Mangal Bazar", category: "games", open: "10:05 PM", close: "11:05 PM" }
 ] as const;
+
+export const marketCatalog = applyMarketTimeOverrides([...baseMarketCatalog]);

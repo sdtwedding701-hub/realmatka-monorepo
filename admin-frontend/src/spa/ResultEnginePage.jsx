@@ -153,25 +153,17 @@ export function AdminMarketPublishList({
 
 export function ResultPublishSettlementSection({
   busy,
-  exposure,
-  formatCurrency,
   handleResultSlotChange,
   handleResultSlotKeyDown,
   isChartsMode,
-  lastSettlement,
   marketForm,
-  marketTiming,
   markets,
   message,
-  preview,
   publishResult,
   resultInputRefs,
   resultSlots,
-  resultStage,
   resultSummaryCards,
-  selectedMarket,
   selectedSlug,
-  setChartType,
   setMarketForm,
   setSelectedSlug
 }) {
@@ -227,86 +219,6 @@ export function ResultPublishSettlementSection({
               <label><span>Category</span><select value={marketForm.category} onChange={(event) => setMarketForm((current) => ({ ...current, category: event.target.value }))}><option value="games">Games</option><option value="starline">Starline</option><option value="jackpot">Jackpot</option></select></label>
             </div>
             {message ? <p className={`message ${message.toLowerCase().includes("failed") || message.toLowerCase().includes("error") ? "error" : "success"}`}>{message}</p> : null}
-          </div>
-          <div className="result-side-stack">
-            <div className="subpanel">
-              <h3>Market Snapshot</h3>
-              <div className="compact-list">
-                <div className="compact-row"><strong>Market</strong><span>{selectedMarket?.name || "-"}</span></div>
-                <div className="compact-row"><strong>Current Result</strong><span>{selectedMarket?.result || "-"}</span></div>
-                <div className="compact-row"><strong>Timing</strong><span>{marketTiming}</span></div>
-                <div className="compact-row"><strong>Category</strong><span>{marketForm.category || "-"}</span></div>
-              </div>
-            </div>
-            <div className="subpanel">
-              <h3>Settlement Summary</h3>
-              <div className="compact-list">
-                <div className="compact-row"><strong>Total Bids</strong><span>{preview?.summary?.totalBids ?? 0}</span></div>
-                <div className="compact-row"><strong>Eligible</strong><span>{preview?.summary?.eligible ?? 0}</span></div>
-                <div className="compact-row"><strong>Pending</strong><span>{preview?.summary?.pending ?? 0}</span></div>
-                <div className="compact-row"><strong>Preview Payout</strong><span>{formatCurrency(preview?.summary?.payout ?? 0)}</span></div>
-                {lastSettlement ? <div className="compact-row"><strong>Last Final Payout</strong><span>{formatCurrency(lastSettlement.totalPayout)}</span></div> : null}
-              </div>
-            </div>
-            <div className="subpanel">
-              <h3>Bid Exposure</h3>
-              <div className="compact-list">
-                <div className="compact-row"><strong>Pending Bids</strong><span>{exposure?.summary?.pendingBids ?? 0}</span></div>
-                <div className="compact-row"><strong>Total Stake</strong><span>{formatCurrency(exposure?.summary?.totalStake ?? 0)}</span></div>
-                <div className="compact-row"><strong>Max Liability</strong><span>{formatCurrency(exposure?.summary?.totalPotentialPayout ?? 0)}</span></div>
-                <div className="compact-row"><strong>Top Single Hit</strong><span>{formatCurrency(exposure?.summary?.maxSinglePotentialPayout ?? 0)}</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-      <section className="panel">
-        <div className="panel-head">
-          <h2>Current Market Snapshot</h2>
-          <p>Current result and timing details moved below chart preview.</p>
-        </div>
-        <div className="compact-list">
-          <div className="compact-row"><strong>Market</strong><span>{selectedMarket?.name || "-"}</span></div>
-          <div className="compact-row"><strong>Current Result</strong><span>{selectedMarket?.result || "-"}</span></div>
-          <div className="compact-row"><strong>Workflow Stage</strong><span>{resultStage}</span></div>
-          <div className="compact-row"><strong>Accepted Format</strong><span>Reset: ***-**-*** | Open: 123-4*-*** | Full: 123-45-678</span></div>
-          <div className="compact-row"><strong>Current Action</strong><span>{selectedMarket?.action || "-"}</span></div>
-          <div className="compact-row"><strong>Current Timings</strong><span>{marketTiming}</span></div>
-        </div>
-      </section>
-      <section className="panel">
-        <div className="dashboard-grid">
-          <div className="subpanel">
-            <h3>Settlement Verification</h3>
-            <div className="compact-list">
-              <div className="compact-row"><strong>Total Bids</strong><span>{preview?.summary?.totalBids ?? 0}</span></div>
-              <div className="compact-row"><strong>Eligible</strong><span>{preview?.summary?.eligible ?? 0}</span></div>
-              <div className="compact-row"><strong>Pending</strong><span>{preview?.summary?.pending ?? 0}</span></div>
-              <div className="compact-row"><strong>Wins / Losses</strong><span>{preview?.summary?.wins ?? 0} / {preview?.summary?.losses ?? 0}</span></div>
-              <div className="compact-row"><strong>Preview Payout</strong><span>{formatCurrency(preview?.summary?.payout ?? 0)}</span></div>
-            </div>
-          </div>
-          <div className="subpanel">
-            <h3>Verification Samples</h3>
-            <div className="compact-list">
-              {preview?.items?.length ? preview.items.map((item) => (
-                <div className="compact-row" key={item.id}>
-                  <strong>{item.userName} - {item.boardLabel}</strong>
-                  <span>{item.digit} | {item.previewStatus} | {formatCurrency(item.previewPayout)}</span>
-                </div>
-              )) : <div className="empty-card">No preview items available.</div>}
-            </div>
-          </div>
-          <div className="subpanel">
-            <h3>Top Exposure Spots</h3>
-            <div className="compact-list">
-              {exposure?.topExposures?.length ? exposure.topExposures.map((item) => (
-                <div className="compact-row" key={`${item.boardLabel}-${item.sessionType}-${item.digit}`}>
-                  <strong>{item.boardLabel} / {item.sessionType} / {item.digit}</strong>
-                  <span>{formatCurrency(item.stake)} stake | {formatCurrency(item.potentialPayout)} payout</span>
-                </div>
-              )) : <div className="empty-card">No exposure data available.</div>}
-            </div>
           </div>
         </div>
       </section>
@@ -506,67 +418,6 @@ export function ChartEditorPreviewSection({
 }) {
   return (
     <>
-      {!isChartsMode ? <section className="panel">
-        <div className="panel-head">
-          <h2>Recent 3 Week Chart Preview</h2>
-          <p>Result publish ke baad yahin se turant check kar sakte ho ki chart latest date/day par update hua ya nahi.</p>
-        </div>
-        <div className="chart-preview-toolbar">
-          <div className="chart-preview-title">
-            <strong>{selectedMarket?.name || "-"}</strong>
-            <span>{chartType === "panna" ? "Panna Chart" : "Jodi Chart"} - Last 3 Weeks</span>
-          </div>
-          <label className="chart-type-picker">
-            <span>Chart Type</span>
-            <select value={chartType} onChange={handleChartTypeChange}>
-              <option value="jodi">Jodi</option>
-              <option value="panna">Panna</option>
-            </select>
-          </label>
-        </div>
-        <div className="chart-preview-shell">
-          <table className="chart-preview-table">
-            <thead>
-              <tr>
-                {chartHeaders.map((label, index) => <th key={`recent-preview-head-${index}`}>{label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {recentPreviewRows.length ? recentPreviewRows.map((row, rowIndex) => (
-                <tr key={`recent-preview-row-${rowIndex}`}>
-                  <td>
-                    <div className="chart-date-stack">
-                      <span className="chart-date-year">{row.date.year}</span>
-                      <span className="chart-date-line">{row.date.start}</span>
-                      <span className="chart-date-bridge">{row.date.middle}</span>
-                      <span className="chart-date-line">{row.date.end}</span>
-                    </div>
-                  </td>
-                  {chartType === "panna"
-                    ? row.cells.map((cell, cellIndex) => (
-                      <td key={`recent-preview-cell-${rowIndex}-${cellIndex}`}>
-                        <div className="chart-panna-cell">
-                          <span className="chart-panna-open">{cell.open}</span>
-                          <span className={`chart-panna-jodi${highlightPreviewValue(cell.jodi) ? " hot" : ""}`}>{cell.jodi}</span>
-                          <span className="chart-panna-close">{cell.close}</span>
-                        </div>
-                      </td>
-                    ))
-                    : row.cells.map((cell, cellIndex) => (
-                      <td key={`recent-preview-cell-${rowIndex}-${cellIndex}`}>
-                        <div className={`chart-jodi-value${highlightPreviewValue(cell) ? " hot" : ""}`}>{cell}</div>
-                      </td>
-                    ))}
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={chartHeaders.length}>No recent chart rows available yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section> : null}
       {isChartsMode ? <section className="panel">
         <div className="panel-head">
           <h2>Chart Preview</h2>

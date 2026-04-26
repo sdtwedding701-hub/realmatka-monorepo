@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { buildMetadata } from "@/lib/seo";
+import { SeoFaq } from "@/components/SeoFaq";
 
 export const metadata = buildMetadata({
   title: "Matka Game Rates | Single Digit, Jodi, Panna",
@@ -17,6 +18,21 @@ const rateList = [
   ["Triple Pana", "1000"],
   ["Half Sangam", "1000"],
   ["Full Sangam", "10000"]
+] as const;
+
+const faqItems = [
+  {
+    question: "Game Rates page par kya milta hai?",
+    answer: "Yahan Single Digit, Jodi Digit, Single Pana, Double Pana, Triple Pana, Half Sangam aur Full Sangam ke rates diye gaye hain."
+  },
+  {
+    question: "Kya ye rates homepage se alag hain?",
+    answer: "Nahi, ye dedicated page same popular rates ko quick reference format me dikhata hai."
+  },
+  {
+    question: "Game rate dekhne ke baad play section kahan milega?",
+    answer: "Page ke niche diye gaye quick links se Online Play aur Satta Matka overview pages open kar sakte ho."
+  }
 ] as const;
 
 export default function GameRatesPage() {
@@ -44,6 +60,8 @@ export default function GameRatesPage() {
             <Link href="/satta-matka" className="action-secondary">Satta Matka</Link>
           </div>
         </section>
+
+        <SeoFaq title="Game Rates FAQ" items={[...faqItems]} />
       </div>
     </main>
   );

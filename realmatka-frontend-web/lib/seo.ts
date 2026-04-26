@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { SEO } from "@/seo.config";
 
 const defaultImage = {
-  url: "/app-icon.jpg",
+  url: `${SEO.siteUrl}/app-icon.jpg`,
   width: 1024,
   height: 1024,
   alt: "Real Matka"
@@ -28,15 +28,16 @@ export const defaultMetadata: Metadata = {
     type: "website",
     url: SEO.siteUrl,
     siteName: SEO.siteName,
+    locale: "en_IN",
     title: SEO.defaultTitle,
     description: SEO.defaultDescription,
     images: [defaultImage],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: SEO.defaultTitle,
     description: SEO.defaultDescription,
-    images: ["/app-icon.jpg"],
+    images: [`${SEO.siteUrl}/app-icon.jpg`],
   },
   robots: {
     index: true,
@@ -79,10 +80,10 @@ export function buildMetadata({
       images: [defaultImage],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title,
       description,
-      images: ["/app-icon.jpg"],
+      images: [`${SEO.siteUrl}/app-icon.jpg`],
     },
   };
 }

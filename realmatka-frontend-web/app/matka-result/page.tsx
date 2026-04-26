@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { buildMetadata } from "@/lib/seo";
 import { chartMarkets } from "@/lib/market-links";
+import { SeoFaq } from "@/components/SeoFaq";
 
 export const metadata = buildMetadata({
   title: "Matka Result Today | Kalyan, Main Bazar, Rajdhani",
@@ -33,6 +34,21 @@ const featuredResults = [
     title: "Rajdhani Night Result",
     href: "/rajdhani-night-result",
     timing: chartMarkets.find((market) => market.slug === "rajdhani-night")
+  }
+] as const;
+
+const faqItems = [
+  {
+    question: "Matka Result page par kya check kar sakte hain?",
+    answer: "Yahan major market result pages, market timing reference aur chart access links ek jagah milte hain."
+  },
+  {
+    question: "Kalyan, Main Bazar aur Rajdhani Night result kahan se open hoga?",
+    answer: "Popular result pages section se aap in markets ke dedicated result pages direct open kar sakte ho."
+  },
+  {
+    question: "Result ke baad chart kaise dekhein?",
+    answer: "Quick access section se Matka Chart page open karo aur wahan se Jodi Chart ya Panna Chart select karo."
   }
 ] as const;
 
@@ -94,6 +110,8 @@ export default function MatkaResultPage() {
             </Link>
           </div>
         </section>
+
+        <SeoFaq title="Matka Result FAQ" items={[...faqItems]} />
       </div>
     </main>
   );

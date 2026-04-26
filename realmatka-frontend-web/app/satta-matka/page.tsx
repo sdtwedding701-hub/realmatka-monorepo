@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { buildMetadata } from "@/lib/seo";
+import { SeoFaq } from "@/components/SeoFaq";
 
 export const metadata = buildMetadata({
   title: "Satta Matka | Live Market, Game Rate, Results",
@@ -26,6 +27,21 @@ const sections = [
       "Daily result, open close result, jodi chart aur panna chart access se users ko market tracking aur record review dono easy ho jata hai."
   }
 ];
+
+const faqItems = [
+  {
+    question: "Satta Matka page par kya milta hai?",
+    answer: "Is page par market timing, game rate, result access aur related chart pages ke quick links milte hain."
+  },
+  {
+    question: "Live result aur charts kaise open karein?",
+    answer: "Quick access buttons se Matka Result, Matka Chart aur online play pages direct open kar sakte ho."
+  },
+  {
+    question: "Kya yahan se app ya web play section par ja sakte hain?",
+    answer: "Haan, related links aur homepage se aap login, register aur APK download flow tak ja sakte ho."
+  }
+] as const;
 
 export default function SattaMatkaPage() {
   return (
@@ -67,6 +83,8 @@ export default function SattaMatkaPage() {
             </Link>
           </div>
         </section>
+
+        <SeoFaq title="Satta Matka FAQ" items={[...faqItems]} />
       </div>
     </main>
   );

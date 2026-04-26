@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { buildMetadata } from "@/lib/seo";
 import { chartMarkets } from "@/lib/market-links";
+import { SeoFaq } from "@/components/SeoFaq";
 
 export const metadata = buildMetadata({
   title: "Matka Chart | Jodi Chart And Panna Chart",
@@ -24,6 +25,21 @@ const chartBlocks = [
     body: "Historical rows aur old weekly chart review ko easy internal access dene ke liye."
   }
 ];
+
+const faqItems = [
+  {
+    question: "Matka Chart page par kya milta hai?",
+    answer: "Yahan all market chart links, Jodi Chart, Panna Chart aur old history access ek jagah milta hai."
+  },
+  {
+    question: "Kisi market ka direct chart kaise open karein?",
+    answer: "Choose market chart section me market select karke Jodi Chart ya Panna Chart button par click karo."
+  },
+  {
+    question: "Kya market-wise history direct dekh sakte hain?",
+    answer: "Haan, har market card se us market ki direct chart history khulti hai."
+  }
+] as const;
 
 export default function MatkaChartPage() {
   return (
@@ -90,6 +106,8 @@ export default function MatkaChartPage() {
             ))}
           </div>
         </section>
+
+        <SeoFaq title="Matka Chart FAQ" items={[...faqItems]} />
       </div>
     </main>
   );

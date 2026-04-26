@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MarketsSection, type MarketCard } from "./markets-section";
 import { buildMetadata } from "@/lib/seo";
+import { SeoFaq } from "@/components/SeoFaq";
 
 export const revalidate = 60;
 
@@ -177,6 +178,25 @@ const structuredData = {
   inLanguage: "en-IN"
 };
 
+const homeFaqItems = [
+  {
+    question: "Real Matka par kya dekh sakte hain?",
+    answer: "Yahan game rates, all market list, live result updates, jodi chart, panna chart aur APK download access dekh sakte ho."
+  },
+  {
+    question: "Jodi Chart aur Panna Chart kahan milta hai?",
+    answer: "Har market card ke niche Jodi Chart aur Panna Chart links diye gaye hain. Unpar click karke market-wise history open hoti hai."
+  },
+  {
+    question: "Real Matka web aur APK dono available hain kya?",
+    answer: "Haan, aap play web app use kar sakte ho aur download page se latest APK bhi le sakte ho."
+  },
+  {
+    question: "Game rate list kis section me hai?",
+    answer: "Homepage ke Game Rate section me Single Digit se Full Sangam tak saare popular game rates diye gaye hain."
+  }
+] as const;
+
 export default function HomePage() {
   const marketCatalog = getMarketCatalog();
 
@@ -257,6 +277,8 @@ export default function HomePage() {
             ))}
           </div>
         </section>
+
+        <SeoFaq title="Real Matka FAQ" items={[...homeFaqItems]} />
       </main>
     </div>
   );

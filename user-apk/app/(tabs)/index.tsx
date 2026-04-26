@@ -101,6 +101,7 @@ export default function HomeScreen() {
   const [noticeTextWidth, setNoticeTextWidth] = useState(0);
   const [noticeReady, setNoticeReady] = useState(false);
   const [selectedChartMarket, setSelectedChartMarket] = useState<Pick<MarketItem, "slug" | "name"> | null>(null);
+  const estimatedNoticeTextWidth = Math.max(noticeTextWidth, noticeText.length * 12);
   useEffect(() => {
     const cachedMarkets = getCachedMarkets();
     const initialMarkets = cachedMarkets?.length ? cachedMarkets : FALLBACK_MARKETS;
@@ -145,7 +146,7 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    const measuredNoticeTextWidth = Math.max(noticeTextWidth, noticeText.length * 9, noticeContainerWidth + 48);
+    const measuredNoticeTextWidth = Math.max(estimatedNoticeTextWidth, noticeContainerWidth + 48);
     noticeScrollX.stopAnimation();
     if (!noticeContainerWidth || !measuredNoticeTextWidth || !noticeReady) {
       noticeScrollX.setValue(0);
@@ -173,7 +174,7 @@ export default function HomeScreen() {
     return () => {
       animation.stop();
     };
-  }, [noticeContainerWidth, noticeReady, noticeScrollX, noticeText, noticeTextWidth]);
+  }, [estimatedNoticeTextWidth, noticeContainerWidth, noticeReady, noticeScrollX, noticeText]);
 
   useEffect(() => {
     setNoticeReady(false);
@@ -222,7 +223,7 @@ export default function HomeScreen() {
             style={[
               styles.noticeText,
               noticeReady ? styles.noticeTextVisible : styles.noticeTextHidden,
-              { width: Math.max(noticeTextWidth, noticeContainerWidth), transform: [{ translateX: noticeScrollX }] }
+              { width: Math.max(estimatedNoticeTextWidth, noticeContainerWidth), transform: [{ translateX: noticeScrollX }] }
             ]}
           >
             {noticeText}

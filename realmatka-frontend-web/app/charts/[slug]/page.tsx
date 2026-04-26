@@ -116,6 +116,40 @@ function ChartPageContent() {
   const pannaRows = useMemo(() => normalizePannaRows(chart?.rows ?? []), [chart]);
   const hasRows = hasRenderableChartRows(chart?.rows);
 
+  async function refreshChartAndResult() {
+    if (!slug) return;
+    try {
+      setRefreshing(true);
+      setError("");
+      const [chartResponse, marketResponse] = await Promise.all([
+        fetch(`/api/charts/${encodeURIComponent(slug)}?type=${chartType}`, {
+          cache: "no-store"
+        }),
+        fetch(`${apiBaseUrl}/api/markets/list`, {
+          cache: "no-store"
+        })
+      ]);
+
+      const chartPayload = await chartResponse.json();
+      if (!chartResponse.ok || !chartPayload?.ok) {
+        throw new Error(chartPayload?.error ?? "Unable to refresh chart");
+      }
+
+      const marketPayload = (await marketResponse.json()) as { data?: LiveMarket[] };
+      const market = Array.isArray(marketPayload?.data) ? marketPayload.data.find((item) => item.slug === slug) : null;
+
+      setChart(chartPayload.data as ChartPayload);
+      if (market) {
+        setMarketResult(String(market.result || "***-**-***").trim() || "***-**-***");
+        setMarketTiming(`${String(market.open || "--:--").trim()} - ${String(market.close || "--:--").trim()}`);
+      }
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : "Unable to refresh chart");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#07101d_0%,#08111f_36%,#060a14_100%)] text-white">
       <main className="mx-auto flex w-full max-w-[1800px] flex-col gap-5 px-2 py-4 sm:px-4 sm:py-6 xl:px-5">
@@ -161,6 +195,16 @@ function ChartPageContent() {
                 <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">{upperLabel}</div>
                 <div className="mt-1 text-lg font-extrabold text-orange-200">{marketResult}</div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void refreshChartAndResult();
+                }}
+                className="action-secondary"
+                disabled={refreshing}
+              >
+                {refreshing ? "Refreshing..." : "Refresh Result"}
+              </button>
             </div>
           </div>
           {loading ? <div className="py-12 text-center text-slate-300">Loading chart...</div> : null}
@@ -242,38 +286,8 @@ function ChartPageContent() {
               </div>
               <button
                 type="button"
-                onClick={async () => {
-                  if (!slug) return;
-                  try {
-                    setRefreshing(true);
-                    setError("");
-                    const [chartResponse, marketResponse] = await Promise.all([
-                      fetch(`/api/charts/${encodeURIComponent(slug)}?type=${chartType}`, {
-                        cache: "no-store"
-                      }),
-                      fetch(`${apiBaseUrl}/api/markets/list`, {
-                        cache: "no-store"
-                      })
-                    ]);
-
-                    const chartPayload = await chartResponse.json();
-                    if (!chartResponse.ok || !chartPayload?.ok) {
-                      throw new Error(chartPayload?.error ?? "Unable to refresh chart");
-                    }
-
-                    const marketPayload = (await marketResponse.json()) as { data?: LiveMarket[] };
-                    const market = Array.isArray(marketPayload?.data) ? marketPayload.data.find((item) => item.slug === slug) : null;
-
-                    setChart(chartPayload.data as ChartPayload);
-                    if (market) {
-                      setMarketResult(String(market.result || "***-**-***").trim() || "***-**-***");
-                      setMarketTiming(`${String(market.open || "--:--").trim()} - ${String(market.close || "--:--").trim()}`);
-                    }
-                  } catch (refreshError) {
-                    setError(refreshError instanceof Error ? refreshError.message : "Unable to refresh chart");
-                  } finally {
-                    setRefreshing(false);
-                  }
+                onClick={() => {
+                  void refreshChartAndResult();
                 }}
                 className="action-secondary"
                 disabled={refreshing}

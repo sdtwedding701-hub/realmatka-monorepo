@@ -4,10 +4,20 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 
+const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.realmatka.in").replace(/\/$/, "");
+
 type ChartPayload = {
   marketSlug: string;
   chartType: "jodi" | "panna";
   rows: string[][];
+};
+
+type LiveMarket = {
+  slug: string;
+  name?: string;
+  result?: string;
+  open?: string;
+  close?: string;
 };
 
 type PannaCell = {
@@ -35,6 +45,8 @@ function ChartPageContent() {
   const [chart, setChart] = useState<ChartPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [marketResult, setMarketResult] = useState("***-**-***");
+  const [marketTiming, setMarketTiming] = useState("--:-- - --:--");
 
   useEffect(() => {
     let active = true;
@@ -77,25 +89,53 @@ function ChartPageContent() {
     };
   }, [slug, chartType]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadMarketSnapshot() {
+      if (!slug) return;
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/markets/list`, {
+          cache: "no-store"
+        });
+        const payload = (await response.json()) as { data?: LiveMarket[] };
+        const market = Array.isArray(payload?.data) ? payload.data.find((item) => item.slug === slug) : null;
+        if (!active || !market) return;
+        setMarketResult(String(market.result || "***-**-***").trim() || "***-**-***");
+        setMarketTiming(`${String(market.open || "--:--").trim()} - ${String(market.close || "--:--").trim()}`);
+      } catch {
+        if (!active) return;
+      }
+    }
+
+    void loadMarketSnapshot();
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
   const jodiRows = useMemo(() => normalizeJodiRows(chart?.rows ?? []), [chart]);
   const pannaRows = useMemo(() => normalizePannaRows(chart?.rows ?? []), [chart]);
   const hasRows = hasRenderableChartRows(chart?.rows);
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#07101d_0%,#08111f_36%,#060a14_100%)] text-white">
-      <main className="mx-auto flex w-full max-w-[1620px] flex-col gap-6 px-3 py-6 sm:px-5 sm:py-8 xl:px-6">
-        <section className="section-shell px-5 py-6 sm:px-8 sm:py-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <main className="mx-auto flex w-full max-w-[1800px] flex-col gap-5 px-2 py-4 sm:px-4 sm:py-6 xl:px-5">
+        <section className="px-2 py-3 sm:px-3 sm:py-4">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <img src="/header-logo.png" alt="Real Matka" className="h-12 w-auto object-contain sm:h-16" />
             <div>
-              <div className="metric-pill">{chartType === "panna" ? "Panna Chart" : "Jodi Chart"}</div>
-              <h1 className="mt-4 text-3xl font-extrabold sm:text-5xl">{upperLabel}</h1>
+              <div className="text-sm font-semibold uppercase tracking-[0.28em] text-slate-400">
+                {chartType === "panna" ? "Panna Chart" : "Jodi Chart"}
+              </div>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                {chartType === "panna"
-                  ? `${upperLabel} ka panna history, old rows aur weekly chart record yahan clear format me dekh sakte ho.`
-                  : `${upperLabel} ka jodi history, old records aur weekly chart data yahan clear format me dekh sakte ho.`}
+                {upperLabel} chart history, market timing aur weekly records yahan clear format me dekh sakte ho.
               </p>
+              <div className="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-orange-200 sm:text-sm">
+                #RealMatka #MatkaChart #JodiChart #PannaChart
+              </div>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap justify-center gap-3">
               <Link href={`/charts/${slug}?type=jodi&label=${encodeURIComponent(label)}`} className={chartType === "jodi" ? "action-primary" : "action-secondary"}>
                 Jodi Chart
               </Link>
@@ -109,15 +149,21 @@ function ChartPageContent() {
           </div>
         </section>
 
-        <section className="section-shell overflow-hidden px-3 py-4 sm:px-5 sm:py-5">
+        <section className="overflow-hidden px-1 py-2 sm:px-2 sm:py-3">
           <div className="mb-5 flex justify-center">
-            <button
-              type="button"
-              onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })}
-              className="action-secondary"
-            >
-              Go to Bottom
-            </button>
+            <div className="flex flex-col items-center gap-3">
+              <button
+                type="button"
+                onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })}
+                className="action-secondary"
+              >
+                Go to Bottom
+              </button>
+              <div className="rounded-[16px] border border-white/10 bg-white/[0.04] px-4 py-2 text-center">
+                <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">{upperLabel}</div>
+                <div className="mt-1 text-lg font-extrabold text-orange-200">{marketResult}</div>
+              </div>
+            </div>
           </div>
           {loading ? <div className="py-12 text-center text-slate-300">Loading chart...</div> : null}
           {!loading && error ? <div className="py-12 text-center font-semibold text-rose-300">{error}</div> : null}
@@ -126,130 +172,76 @@ function ChartPageContent() {
           ) : null}
 
           {!loading && !error && hasRows && chartType === "jodi" ? (
-            <>
-              <div className="grid gap-3 lg:hidden">
-                {jodiRows.map((row, rowIndex) => (
-                  <article key={`jodi-mobile-${rowIndex}`} className="rounded-[22px] border border-white/10 bg-white/[0.03] p-3">
-                    <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                      Week {rowIndex + 1}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 min-[480px]:grid-cols-3">
-                      {WEEK_DAYS.map((day, cellIndex) => {
-                        const cell = row[cellIndex] ?? "--";
-                        return (
-                          <div key={`jodi-mobile-${rowIndex}-${day}`} className="rounded-[16px] border border-white/10 bg-white/[0.04] px-2.5 py-2.5 text-center">
-                            <div className="text-[12px] font-bold uppercase tracking-[0.14em] text-slate-400">{day}</div>
-                            <div className={`mt-1.5 text-base font-extrabold ${highlightCell(cell) ? "text-rose-300" : "text-slate-100"}`}>
-                              {cell}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </article>
-                ))}
-              </div>
-
-              <div className="hidden overflow-x-auto rounded-[22px] border border-white/10 bg-white/[0.02] lg:block">
-                <table className="w-full min-w-[720px] border-collapse text-center">
-                  <thead>
-                    <tr>
-                      {WEEK_DAYS.map((day) => (
-                        <th key={day} className="border border-white/10 bg-white/5 px-3 py-3 text-[13px] font-extrabold text-slate-100">
-                          {day}
-                        </th>
+            <div className="overflow-hidden">
+              <table className="w-full table-fixed border-collapse text-center">
+                <thead>
+                  <tr>
+                    {WEEK_DAYS.map((day) => (
+                      <th key={day} className="border border-white/10 bg-white/5 px-1 py-2 text-[10px] font-extrabold text-slate-100 sm:px-3 sm:py-3 sm:text-[13px]">
+                        {day}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {jodiRows.map((row, rowIndex) => (
+                    <tr key={`jodi-${rowIndex}`}>
+                      {row.map((cell, cellIndex) => (
+                        <td key={`jodi-${rowIndex}-${cellIndex}`} className="border border-white/10 px-1 py-2 text-[11px] font-extrabold leading-none text-slate-100 sm:px-3 sm:py-3 sm:text-[14px]">
+                          <span className={highlightCell(cell) ? "text-rose-300" : undefined}>{cell}</span>
+                        </td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {jodiRows.map((row, rowIndex) => (
-                      <tr key={`jodi-${rowIndex}`}>
-                        {row.map((cell, cellIndex) => (
-                          <td key={`jodi-${rowIndex}-${cellIndex}`} className="border border-white/10 px-3 py-3 text-[14px] font-extrabold text-slate-100">
-                            <span className={highlightCell(cell) ? "text-rose-300" : undefined}>{cell}</span>
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : null}
 
           {!loading && !error && hasRows && chartType === "panna" ? (
-            <>
-              <div className="grid gap-3 lg:hidden">
-                {pannaRows.map((row, rowIndex) => {
-                  const dateBlock = buildDateBlock(row.label);
-                  return (
-                    <article key={`panna-mobile-${rowIndex}`} className="rounded-[22px] border border-white/10 bg-white/[0.03] p-3">
-                      <div className="mb-3 rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
-                        <div className="text-[12px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                          {dateBlock.year || `Week ${rowIndex + 1}`}
-                        </div>
-                        <div className="mt-1 text-sm font-extrabold text-slate-100">{dateBlock.start}</div>
-                        <div className="text-sm font-bold text-slate-300">{dateBlock.end}</div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 min-[480px]:grid-cols-3">
-                        {WEEK_DAYS.map((day, cellIndex) => {
-                          const cell = row.cells[cellIndex] ?? { open: "---", jodi: "--", close: "---" };
-                          const highlighted = highlightCell(cell.jodi);
-                          return (
-                            <div key={`panna-mobile-${rowIndex}-${day}`} className="rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
-                              <div className="text-[12px] font-bold uppercase tracking-[0.14em] text-slate-400">{day}</div>
-                              <div className={`mt-1.5 text-xs font-bold ${highlighted ? "text-rose-300" : "text-slate-300"}`}>{cell.open}</div>
-                              <div className={`text-lg font-extrabold ${highlighted ? "text-rose-300" : "text-slate-100"}`}>{cell.jodi}</div>
-                              <div className={`text-sm font-bold ${highlighted ? "text-rose-300" : "text-slate-300"}`}>{cell.close}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-
-              <div className="hidden overflow-x-auto rounded-[22px] border border-white/10 bg-white/[0.02] lg:block">
-                <table className="w-full min-w-[980px] border-collapse text-center">
-                  <thead>
-                    <tr>
-                      <th className="border border-white/10 bg-white/5 px-3 py-3 text-[13px] font-extrabold text-slate-100">Date</th>
-                      {WEEK_DAYS.map((day) => (
-                        <th key={day} className="border border-white/10 bg-white/5 px-3 py-3 text-[13px] font-extrabold text-slate-100">
-                          {day}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pannaRows.map((row, rowIndex) => {
-                      const dateBlock = buildDateBlock(row.label);
-                      return (
-                        <tr key={`panna-${rowIndex}`}>
-                          <td className="border border-white/10 bg-white/[0.04] px-3 py-3 text-slate-200">
-                            <div className="text-[12px] font-bold text-slate-400">{dateBlock.year}</div>
-                            <div className="text-[13px] font-bold text-slate-100">{dateBlock.start}</div>
-                            <div className="text-[13px] font-bold text-slate-100">{dateBlock.end}</div>
+            <div className="overflow-hidden">
+              <table className="w-full table-fixed border-collapse text-center">
+                <thead>
+                  <tr>
+                    <th className="w-[72px] border border-white/10 bg-white/5 px-1 py-2 text-[10px] font-extrabold text-slate-100 sm:w-auto sm:px-3 sm:py-3 sm:text-[13px]">Date</th>
+                    {WEEK_DAYS.map((day) => (
+                      <th key={day} className="border border-white/10 bg-white/5 px-1 py-2 text-[9px] font-extrabold text-slate-100 sm:px-3 sm:py-3 sm:text-[13px]">
+                        {day}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pannaRows.map((row, rowIndex) => {
+                    const dateBlock = buildDateBlock(row.label);
+                    return (
+                      <tr key={`panna-${rowIndex}`}>
+                        <td className="border border-white/10 bg-white/[0.04] px-1 py-2 text-slate-200 sm:px-3 sm:py-3">
+                          <div className="text-[9px] font-bold leading-tight text-slate-400 sm:text-[12px]">{compactDateBlock(dateBlock.year)}</div>
+                          <div className="text-[10px] font-bold leading-tight text-slate-100 sm:text-[13px]">{compactDateBlock(dateBlock.start)}</div>
+                          <div className="text-[10px] font-bold leading-tight text-slate-100 sm:text-[13px]">{compactDateBlock(dateBlock.end)}</div>
+                        </td>
+                        {row.cells.map((cell, cellIndex) => (
+                          <td key={`panna-${rowIndex}-${cellIndex}`} className="border border-white/10 px-1 py-2 sm:px-3 sm:py-3">
+                            <div className={`text-[8px] font-bold leading-tight ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-400"} sm:text-[12px]`}>{cell.open}</div>
+                            <div className={`text-[11px] font-extrabold leading-none ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-100"} sm:text-[14px]`}>{cell.jodi}</div>
+                            <div className={`text-[8px] font-bold leading-tight ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-400"} sm:text-[12px]`}>{cell.close}</div>
                           </td>
-                          {row.cells.map((cell, cellIndex) => (
-                            <td key={`panna-${rowIndex}-${cellIndex}`} className="border border-white/10 px-3 py-3">
-                              <div className={`text-[12px] font-bold ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-400"}`}>{cell.open}</div>
-                              <div className={`text-[14px] font-extrabold ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-100"}`}>{cell.jodi}</div>
-                              <div className={`text-[12px] font-bold ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-400"}`}>{cell.close}</div>
-                            </td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           ) : null}
 
           {!loading && !error && hasRows ? (
-            <div className="mt-6 flex justify-center">
+            <div className="mt-5 flex flex-col items-center gap-4">
+              <div className="w-full rounded-[16px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center">
+                <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">{upperLabel}</div>
+                <div className="mt-1 text-lg font-extrabold text-orange-200">{marketResult}</div>
+              </div>
               <button
                 type="button"
                 onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
@@ -409,6 +401,24 @@ function buildDateBlock(label: string) {
     start: label,
     end: "--"
   };
+}
+
+function compactDateBlock(value: string) {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .replace("Aug", "AUG")
+    .replace("Sep", "SEP")
+    .replace("Oct", "OCT")
+    .replace("Nov", "NOV")
+    .replace("Dec", "DEC")
+    .replace("Jan", "JAN")
+    .replace("Feb", "FEB")
+    .replace("Mar", "MAR")
+    .replace("Apr", "APR")
+    .replace("May", "MAY")
+    .replace("Jun", "JUN")
+    .replace("Jul", "JUL")
+    .trim();
 }
 
 function highlightCell(value: string) {

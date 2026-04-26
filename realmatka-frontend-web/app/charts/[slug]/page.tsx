@@ -47,11 +47,12 @@ function ChartPageContent() {
   const [error, setError] = useState("");
   const [marketResult, setMarketResult] = useState("***-**-***");
   const [marketTiming, setMarketTiming] = useState("--:-- - --:--");
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    async function loadChart() {
+    async function loadPageData(showLoading = true) {
       if (!slug) {
         if (active) {
           setError("Invalid chart link");
@@ -60,17 +61,38 @@ function ChartPageContent() {
         return;
       }
       try {
-        setLoading(true);
-        setError("");
-        const response = await fetch(`/api/charts/${encodeURIComponent(slug)}?type=${chartType}`, {
-          cache: "no-store"
-        });
-        const payload = await response.json();
-        if (!response.ok || !payload?.ok) {
-          throw new Error(payload?.error ?? "Unable to load chart");
+        if (showLoading) {
+          setLoading(true);
+        } else {
+          setRefreshing(true);
         }
-        if (active) {
-          setChart(payload.data as ChartPayload);
+        setError("");
+
+        const [chartResponse, marketResponse] = await Promise.all([
+          fetch(`/api/charts/${encodeURIComponent(slug)}?type=${chartType}`, {
+            cache: "no-store"
+          }),
+          fetch(`${apiBaseUrl}/api/markets/list`, {
+            cache: "no-store"
+          })
+        ]);
+
+        const chartPayload = await chartResponse.json();
+        if (!chartResponse.ok || !chartPayload?.ok) {
+          throw new Error(chartPayload?.error ?? "Unable to load chart");
+        }
+
+        const marketPayload = (await marketResponse.json()) as { data?: LiveMarket[] };
+        const market = Array.isArray(marketPayload?.data) ? marketPayload.data.find((item) => item.slug === slug) : null;
+
+        if (!active) {
+          return;
+        }
+
+        setChart(chartPayload.data as ChartPayload);
+        if (market) {
+          setMarketResult(String(market.result || "***-**-***").trim() || "***-**-***");
+          setMarketTiming(`${String(market.open || "--:--").trim()} - ${String(market.close || "--:--").trim()}`);
         }
       } catch (loadError) {
         if (active) {
@@ -79,40 +101,16 @@ function ChartPageContent() {
       } finally {
         if (active) {
           setLoading(false);
+          setRefreshing(false);
         }
       }
     }
 
-    void loadChart();
+    void loadPageData(true);
     return () => {
       active = false;
     };
   }, [slug, chartType]);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadMarketSnapshot() {
-      if (!slug) return;
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/markets/list`, {
-          cache: "no-store"
-        });
-        const payload = (await response.json()) as { data?: LiveMarket[] };
-        const market = Array.isArray(payload?.data) ? payload.data.find((item) => item.slug === slug) : null;
-        if (!active || !market) return;
-        setMarketResult(String(market.result || "***-**-***").trim() || "***-**-***");
-        setMarketTiming(`${String(market.open || "--:--").trim()} - ${String(market.close || "--:--").trim()}`);
-      } catch {
-        if (!active) return;
-      }
-    }
-
-    void loadMarketSnapshot();
-    return () => {
-      active = false;
-    };
-  }, [slug]);
 
   const jodiRows = useMemo(() => normalizeJodiRows(chart?.rows ?? []), [chart]);
   const pannaRows = useMemo(() => normalizePannaRows(chart?.rows ?? []), [chart]);
@@ -242,6 +240,46 @@ function ChartPageContent() {
                 <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">{upperLabel}</div>
                 <div className="mt-1 text-lg font-extrabold text-orange-200">{marketResult}</div>
               </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!slug) return;
+                  try {
+                    setRefreshing(true);
+                    setError("");
+                    const [chartResponse, marketResponse] = await Promise.all([
+                      fetch(`/api/charts/${encodeURIComponent(slug)}?type=${chartType}`, {
+                        cache: "no-store"
+                      }),
+                      fetch(`${apiBaseUrl}/api/markets/list`, {
+                        cache: "no-store"
+                      })
+                    ]);
+
+                    const chartPayload = await chartResponse.json();
+                    if (!chartResponse.ok || !chartPayload?.ok) {
+                      throw new Error(chartPayload?.error ?? "Unable to refresh chart");
+                    }
+
+                    const marketPayload = (await marketResponse.json()) as { data?: LiveMarket[] };
+                    const market = Array.isArray(marketPayload?.data) ? marketPayload.data.find((item) => item.slug === slug) : null;
+
+                    setChart(chartPayload.data as ChartPayload);
+                    if (market) {
+                      setMarketResult(String(market.result || "***-**-***").trim() || "***-**-***");
+                      setMarketTiming(`${String(market.open || "--:--").trim()} - ${String(market.close || "--:--").trim()}`);
+                    }
+                  } catch (refreshError) {
+                    setError(refreshError instanceof Error ? refreshError.message : "Unable to refresh chart");
+                  } finally {
+                    setRefreshing(false);
+                  }
+                }}
+                className="action-secondary"
+                disabled={refreshing}
+              >
+                {refreshing ? "Refreshing..." : "Refresh Result"}
+              </button>
               <button
                 type="button"
                 onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}

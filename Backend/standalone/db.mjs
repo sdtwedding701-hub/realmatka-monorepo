@@ -323,7 +323,7 @@ async function syncChartsFromFilesToPostgres(client) {
   const chartPayloads = loadChartSeedPayloads();
   for (const payload of chartPayloads) {
     for (const chartType of ["jodi", "panna"]) {
-      const normalizedRows = normalizeChartRowsForStorage(chartType, payload[chartType]);
+      const fileRows = normalizeChartRowsForStorage(chartType, payload[chartType]);
       const existing = await client.query(
         `SELECT rows_json
          FROM charts
@@ -332,14 +332,13 @@ async function syncChartsFromFilesToPostgres(client) {
         [payload.slug, chartType]
       );
       const existingRows = normalizeChartRowsForStorage(chartType, toChartRows(existing.rows[0]?.rows_json));
-      if (hasMeaningfulChartRows(existingRows)) {
-        continue;
-      }
+      const mergedRows = normalizeChartRowsForStorage(chartType, [...existingRows, ...fileRows]);
+      const targetRows = hasMeaningfulChartRows(existingRows) ? mergedRows : fileRows;
       await client.query(
         `INSERT INTO charts (market_slug, chart_type, rows_json)
          VALUES ($1, $2, $3)
          ON CONFLICT (market_slug, chart_type) DO UPDATE SET rows_json = EXCLUDED.rows_json`,
-        [payload.slug, chartType, JSON.stringify(normalizedRows)]
+        [payload.slug, chartType, JSON.stringify(targetRows)]
       );
     }
   }
@@ -361,13 +360,12 @@ function syncChartsFromFilesToSqlite(db) {
 
   for (const payload of chartPayloads) {
     for (const chartType of ["jodi", "panna"]) {
-      const normalizedRows = normalizeChartRowsForStorage(chartType, payload[chartType]);
+      const fileRows = normalizeChartRowsForStorage(chartType, payload[chartType]);
       const existing = selectExistingStatement.get(payload.slug, chartType);
       const existingRows = normalizeChartRowsForStorage(chartType, toChartRows(existing?.rows_json));
-      if (hasMeaningfulChartRows(existingRows)) {
-        continue;
-      }
-      upsertChartStatement.run(payload.slug, chartType, JSON.stringify(normalizedRows));
+      const mergedRows = normalizeChartRowsForStorage(chartType, [...existingRows, ...fileRows]);
+      const targetRows = hasMeaningfulChartRows(existingRows) ? mergedRows : fileRows;
+      upsertChartStatement.run(payload.slug, chartType, JSON.stringify(targetRows));
     }
   }
 }

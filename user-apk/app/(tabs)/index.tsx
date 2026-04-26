@@ -99,6 +99,7 @@ export default function HomeScreen() {
   const noticeScrollX = useRef(new Animated.Value(0)).current;
   const [noticeContainerWidth, setNoticeContainerWidth] = useState(0);
   const [noticeTextWidth, setNoticeTextWidth] = useState(0);
+  const [noticeReady, setNoticeReady] = useState(false);
   const [selectedChartMarket, setSelectedChartMarket] = useState<Pick<MarketItem, "slug" | "name"> | null>(null);
   useEffect(() => {
     const cachedMarkets = getCachedMarkets();
@@ -146,7 +147,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const measuredNoticeTextWidth = Math.max(noticeTextWidth, noticeText.length * 8);
     noticeScrollX.stopAnimation();
-    if (!noticeContainerWidth || !measuredNoticeTextWidth) {
+    if (!noticeContainerWidth || !measuredNoticeTextWidth || !noticeReady) {
       noticeScrollX.setValue(0);
       return;
     }
@@ -172,7 +173,12 @@ export default function HomeScreen() {
     return () => {
       animation.stop();
     };
-  }, [noticeContainerWidth, noticeScrollX, noticeText, noticeTextWidth]);
+  }, [noticeContainerWidth, noticeReady, noticeScrollX, noticeText, noticeTextWidth]);
+
+  useEffect(() => {
+    setNoticeReady(false);
+    setNoticeTextWidth(0);
+  }, [noticeText]);
 
   const listedMarkets = markets;
   const isCompactScreen = height < 760;
@@ -197,17 +203,26 @@ export default function HomeScreen() {
           onLayout={(event) => setNoticeContainerWidth(event.nativeEvent.layout.width)}
           style={styles.noticeMarqueeWindow}
         >
-          <Animated.Text
-            ellipsizeMode="clip"
-            onLayout={(event) => setNoticeTextWidth(event.nativeEvent.layout.width)}
-            onTextLayout={(event) => {
-              const firstLineWidth = event.nativeEvent.lines?.[0]?.width;
-              if (typeof firstLineWidth === "number" && firstLineWidth > 0) {
-                setNoticeTextWidth(Math.ceil(firstLineWidth));
+          <Text
+            onLayout={(event) => {
+              const width = Math.ceil(event.nativeEvent.layout.width);
+              if (width > 0) {
+                setNoticeTextWidth(width);
+                setNoticeReady(true);
               }
             }}
+            style={styles.noticeMeasureText}
+          >
+            {noticeText}
+          </Text>
+          <Animated.Text
+            ellipsizeMode="clip"
             numberOfLines={1}
-            style={[styles.noticeText, { transform: [{ translateX: noticeScrollX }] }]}
+            style={[
+              styles.noticeText,
+              noticeReady ? styles.noticeTextVisible : styles.noticeTextHidden,
+              { width: Math.max(noticeTextWidth, noticeContainerWidth), transform: [{ translateX: noticeScrollX }] }
+            ]}
           >
             {noticeText}
           </Animated.Text>
@@ -542,6 +557,16 @@ const styles = StyleSheet.create({
     minHeight: 20,
     overflow: "hidden"
   },
+  noticeMeasureText: {
+    position: "absolute",
+    left: -9999,
+    top: -9999,
+    opacity: 0,
+    color: colors.warning,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17
+  },
   noticeText: {
     alignSelf: "flex-start",
     color: colors.warning,
@@ -551,6 +576,12 @@ const styles = StyleSheet.create({
     paddingRight: 24,
     minWidth: "100%",
     flexShrink: 0
+  },
+  noticeTextHidden: {
+    opacity: 0
+  },
+  noticeTextVisible: {
+    opacity: 1
   },
   errorTitle: {
     color: colors.textPrimary,

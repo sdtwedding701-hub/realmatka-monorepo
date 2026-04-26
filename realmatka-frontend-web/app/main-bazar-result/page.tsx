@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { buildMetadata } from "@/lib/seo";
 import { chartMarkets } from "@/lib/market-links";
+import { SeoFaq } from "@/components/SeoFaq";
+import { SeoBreadcrumbs } from "@/components/SeoBreadcrumbs";
 
 export const metadata = buildMetadata({
   title: "Main Bazar Result Today | Main Bazar Matka",
@@ -11,11 +13,26 @@ export const metadata = buildMetadata({
 });
 
 const mainBazar = chartMarkets.find((market) => market.slug === "main-bazar");
+const faqItems = [
+  {
+    question: "Main Bazar Result page par kya milta hai?",
+    answer: "Main Bazar timing, result information, chart links aur old history access yahan available hai."
+  },
+  {
+    question: "Main Bazar chart history kaise dekhein?",
+    answer: "Page ke quick links section se Main Bazar Jodi Chart aur Panna Chart direct open hota hai."
+  },
+  {
+    question: "Main Bazar result ke baad kya check kar sakte hain?",
+    answer: "Result ke baad jodi history, panna history aur market timing ko compare kar sakte ho."
+  }
+] as const;
 
 export default function MainBazarResultPage() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#07101d_0%,#08111f_36%,#060a14_100%)] text-white">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+        <SeoBreadcrumbs items={[{ name: "Home", href: "/" }, { name: "Matka Result", href: "/matka-result" }, { name: "Main Bazar Result" }]} />
         <section className="section-shell px-6 py-8 sm:px-8">
           <div className="metric-pill">Main Bazar</div>
           <h1 className="mt-4 text-3xl font-extrabold sm:text-5xl">Main Bazar result today aur chart-focused access</h1>
@@ -69,6 +86,15 @@ export default function MainBazarResultPage() {
             </article>
           </div>
         </section>
+
+        <section className="section-shell px-6 py-6 sm:px-8">
+          <h2 className="text-2xl font-extrabold">Main Bazar page ka focus</h2>
+          <p className="mt-3 text-sm leading-7 text-slate-300 sm:text-base">
+            Ye page Main Bazar ke current result, timing aur chart history ko ek focused format me dikhata hai jisse direct market access easy ho jata hai.
+          </p>
+        </section>
+
+        <SeoFaq title="Main Bazar Result FAQ" items={[...faqItems]} />
       </div>
     </main>
   );

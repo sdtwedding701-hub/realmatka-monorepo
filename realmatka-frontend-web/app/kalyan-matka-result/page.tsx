@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { buildMetadata } from "@/lib/seo";
 import { chartMarkets } from "@/lib/market-links";
+import { SeoFaq } from "@/components/SeoFaq";
+import { SeoBreadcrumbs } from "@/components/SeoBreadcrumbs";
 
 export const metadata = buildMetadata({
   title: "Kalyan Matka Result Today | Kalyan Open Close Result",
@@ -11,11 +13,26 @@ export const metadata = buildMetadata({
 });
 
 const kalyan = chartMarkets.find((market) => market.slug === "kalyan");
+const faqItems = [
+  {
+    question: "Kalyan Matka Result page par kya milta hai?",
+    answer: "Kalyan result timing, chart links, result navigation aur market overview ek jagah milta hai."
+  },
+  {
+    question: "Kalyan Jodi Chart aur Panna Chart kahan se open hoga?",
+    answer: "Quick links section me Kalyan Jodi Chart aur Kalyan Panna Chart ke direct buttons diye gaye hain."
+  },
+  {
+    question: "Kalyan timing kaise check kar sakte hain?",
+    answer: "Page par open-close timing visible hai, jisse current market schedule easily dekh sakte ho."
+  }
+] as const;
 
 export default function KalyanMatkaResultPage() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#07101d_0%,#08111f_36%,#060a14_100%)] text-white">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+        <SeoBreadcrumbs items={[{ name: "Home", href: "/" }, { name: "Matka Result", href: "/matka-result" }, { name: "Kalyan Result" }]} />
         <section className="section-shell px-6 py-8 sm:px-8">
           <div className="metric-pill">Kalyan Result</div>
           <h1 className="mt-4 text-3xl font-extrabold sm:text-5xl">Kalyan Matka Result today aur market access</h1>
@@ -63,6 +80,15 @@ export default function KalyanMatkaResultPage() {
             </article>
           </div>
         </section>
+
+        <section className="section-shell px-6 py-6 sm:px-8">
+          <h2 className="text-2xl font-extrabold">Kalyan result page ka use</h2>
+          <p className="mt-3 text-sm leading-7 text-slate-300 sm:text-base">
+            Agar user specifically Kalyan result dekhna chahta hai to is page se direct result flow, timing aur chart history tak pahunch sakta hai.
+          </p>
+        </section>
+
+        <SeoFaq title="Kalyan Result FAQ" items={[...faqItems]} />
       </div>
     </main>
   );

@@ -129,6 +129,7 @@ export async function createPaymentOrder({
 
 export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gatewayPaymentId, gatewaySignature }) {
   const verifiedAt = __internalNowIso();
+  let bonusPayload = null;
   const pool = __internalGetPgPool();
 
   if (pool) {
@@ -194,6 +195,11 @@ export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gat
             verifiedAt
           ]
         );
+        bonusPayload = {
+          userId: existing.user_id,
+          depositAmount: Number(existing.amount),
+          depositEntryId: gatewayPaymentId
+        };
       }
       await client.query("COMMIT");
     } catch (error) {
@@ -201,6 +207,11 @@ export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gat
       throw error;
     } finally {
       client.release();
+    }
+
+    if (bonusPayload) {
+      const { applyFirstDepositBonusIfEligible } = await import("../db.mjs");
+      await applyFirstDepositBonusIfEligible(bonusPayload);
     }
 
     return findPaymentOrderById(paymentOrderId);
@@ -265,11 +276,21 @@ export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gat
         `Razorpay payment ${gatewayPaymentId}`,
         verifiedAt
       );
+      bonusPayload = {
+        userId: existing.user_id,
+        depositAmount: Number(existing.amount),
+        depositEntryId: gatewayPaymentId
+      };
     }
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
+  }
+
+  if (bonusPayload) {
+    const { applyFirstDepositBonusIfEligible } = await import("../db.mjs");
+    await applyFirstDepositBonusIfEligible(bonusPayload);
   }
 
   return findPaymentOrderById(paymentOrderId);

@@ -22,6 +22,10 @@ body {
   box-sizing: border-box;
 }
 
+:where(body) :is(div, section, article, aside, nav, header, footer, main, button, a, input, textarea, select, table, th, td, span):is([class*="rounded"], [class*="section-shell"], [class*="glass-card"], [class*="action-"]) {
+  border-radius: 0 !important;
+}
+
 ::selection {
   background: rgba(251, 146, 60, 0.28);
   color: #fff7ed;
@@ -71,16 +75,24 @@ body {
   min-width: 0;
 }
 
+.market-name-text {
+  font-size: 1.55rem;
+  line-height: 1.85rem;
+}
+
 .market-links-stack {
-  display: grid;
-  gap: 0.55rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .market-chart-text-link {
   color: #dbeafe;
-  font-size: 0.98rem;
+  font-size: 0.84rem;
   font-weight: 700;
-  line-height: 1.35rem;
+  line-height: 1.1rem;
+  white-space: nowrap;
 }
 
 .market-chart-text-link:hover {
@@ -118,8 +130,8 @@ body {
   }
 
   .market-name-text {
-    font-size: 1.88rem;
-    line-height: 2.18rem;
+    font-size: 1.45rem;
+    line-height: 1.7rem;
   }
 
   .market-result-text {
@@ -139,13 +151,13 @@ body {
   }
 
   .market-links-stack {
-    margin-top: 0.8rem;
-    gap: 0.45rem;
+    margin-top: 0.65rem;
+    gap: 0.6rem;
   }
 
   .market-chart-text-link {
-    font-size: 0.94rem;
-    line-height: 1.2rem;
+    font-size: 0.78rem;
+    line-height: 1rem;
   }
 
   .market-play-mobile {

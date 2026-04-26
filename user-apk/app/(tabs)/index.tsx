@@ -145,7 +145,7 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    const measuredNoticeTextWidth = Math.max(noticeTextWidth, noticeText.length * 8);
+    const measuredNoticeTextWidth = Math.max(noticeTextWidth, noticeText.length * 9, noticeContainerWidth + 48);
     noticeScrollX.stopAnimation();
     if (!noticeContainerWidth || !measuredNoticeTextWidth || !noticeReady) {
       noticeScrollX.setValue(0);
@@ -211,6 +211,7 @@ export default function HomeScreen() {
                 setNoticeReady(true);
               }
             }}
+            numberOfLines={1}
             style={styles.noticeMeasureText}
           >
             {noticeText}

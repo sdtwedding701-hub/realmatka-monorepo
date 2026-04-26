@@ -91,8 +91,8 @@ function ChartPageContent() {
               <h1 className="mt-4 text-3xl font-extrabold sm:text-5xl">{upperLabel}</h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
                 {chartType === "panna"
-                  ? `${upperLabel} Panel Chart Patti Panna Panel Pana Single Double Triple Patta Record Old History Historical Data Results Old Chart Online Live Book`
-                  : `${upperLabel} Jodi Chart Satta Matka Record Old History Historical Data Bracket Results Chart Online Live Book Digits Numbers`}
+                  ? `${upperLabel} ka panna history, old rows aur weekly chart record yahan clear format me dekh sakte ho.`
+                  : `${upperLabel} ka jodi history, old records aur weekly chart data yahan clear format me dekh sakte ho.`}
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -126,68 +126,126 @@ function ChartPageContent() {
           ) : null}
 
           {!loading && !error && hasRows && chartType === "jodi" ? (
-            <div className="overflow-x-auto rounded-[22px] border border-white/10 bg-white/[0.02]">
-              <table className="w-full min-w-[720px] border-collapse text-center">
-                <thead>
-                  <tr>
-                    {WEEK_DAYS.map((day) => (
-                      <th key={day} className="border border-white/10 bg-white/5 px-3 py-3 text-[13px] font-extrabold text-slate-100">
-                        {day}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {jodiRows.map((row, rowIndex) => (
-                    <tr key={`jodi-${rowIndex}`}>
-                      {row.map((cell, cellIndex) => (
-                        <td key={`jodi-${rowIndex}-${cellIndex}`} className="border border-white/10 px-3 py-3 text-[14px] font-extrabold text-slate-100">
-                          <span className={highlightCell(cell) ? "text-rose-300" : undefined}>{cell}</span>
-                        </td>
+            <>
+              <div className="grid gap-3 lg:hidden">
+                {jodiRows.map((row, rowIndex) => (
+                  <article key={`jodi-mobile-${rowIndex}`} className="rounded-[22px] border border-white/10 bg-white/[0.03] p-3">
+                    <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                      Week {rowIndex + 1}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 min-[480px]:grid-cols-3">
+                      {WEEK_DAYS.map((day, cellIndex) => {
+                        const cell = row[cellIndex] ?? "--";
+                        return (
+                          <div key={`jodi-mobile-${rowIndex}-${day}`} className="rounded-[16px] border border-white/10 bg-white/[0.04] px-2.5 py-2.5 text-center">
+                            <div className="text-[12px] font-bold uppercase tracking-[0.14em] text-slate-400">{day}</div>
+                            <div className={`mt-1.5 text-base font-extrabold ${highlightCell(cell) ? "text-rose-300" : "text-slate-100"}`}>
+                              {cell}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto rounded-[22px] border border-white/10 bg-white/[0.02] lg:block">
+                <table className="w-full min-w-[720px] border-collapse text-center">
+                  <thead>
+                    <tr>
+                      {WEEK_DAYS.map((day) => (
+                        <th key={day} className="border border-white/10 bg-white/5 px-3 py-3 text-[13px] font-extrabold text-slate-100">
+                          {day}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-
-          {!loading && !error && hasRows && chartType === "panna" ? (
-            <div className="overflow-x-auto rounded-[22px] border border-white/10 bg-white/[0.02]">
-              <table className="w-full min-w-[980px] border-collapse text-center">
-                <thead>
-                  <tr>
-                    <th className="border border-white/10 bg-white/5 px-3 py-3 text-[13px] font-extrabold text-slate-100">Date</th>
-                    {WEEK_DAYS.map((day) => (
-                      <th key={day} className="border border-white/10 bg-white/5 px-3 py-3 text-[13px] font-extrabold text-slate-100">
-                        {day}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pannaRows.map((row, rowIndex) => {
-                    const dateBlock = buildDateBlock(row.label);
-                    return (
-                      <tr key={`panna-${rowIndex}`}>
-                        <td className="border border-white/10 bg-white/[0.04] px-3 py-3 text-slate-200">
-                          <div className="text-[12px] font-bold text-slate-400">{dateBlock.year}</div>
-                          <div className="text-[13px] font-bold text-slate-100">{dateBlock.start}</div>
-                          <div className="text-[13px] font-bold text-slate-100">{dateBlock.end}</div>
-                        </td>
-                        {row.cells.map((cell, cellIndex) => (
-                          <td key={`panna-${rowIndex}-${cellIndex}`} className="border border-white/10 px-3 py-3">
-                            <div className={`text-[12px] font-bold ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-400"}`}>{cell.open}</div>
-                            <div className={`text-[14px] font-extrabold ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-100"}`}>{cell.jodi}</div>
-                            <div className={`text-[12px] font-bold ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-400"}`}>{cell.close}</div>
+                  </thead>
+                  <tbody>
+                    {jodiRows.map((row, rowIndex) => (
+                      <tr key={`jodi-${rowIndex}`}>
+                        {row.map((cell, cellIndex) => (
+                          <td key={`jodi-${rowIndex}-${cellIndex}`} className="border border-white/10 px-3 py-3 text-[14px] font-extrabold text-slate-100">
+                            <span className={highlightCell(cell) ? "text-rose-300" : undefined}>{cell}</span>
                           </td>
                         ))}
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+
+          {!loading && !error && hasRows && chartType === "panna" ? (
+            <>
+              <div className="grid gap-3 lg:hidden">
+                {pannaRows.map((row, rowIndex) => {
+                  const dateBlock = buildDateBlock(row.label);
+                  return (
+                    <article key={`panna-mobile-${rowIndex}`} className="rounded-[22px] border border-white/10 bg-white/[0.03] p-3">
+                      <div className="mb-3 rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                        <div className="text-[12px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                          {dateBlock.year || `Week ${rowIndex + 1}`}
+                        </div>
+                        <div className="mt-1 text-sm font-extrabold text-slate-100">{dateBlock.start}</div>
+                        <div className="text-sm font-bold text-slate-300">{dateBlock.end}</div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 min-[480px]:grid-cols-3">
+                        {WEEK_DAYS.map((day, cellIndex) => {
+                          const cell = row.cells[cellIndex] ?? { open: "---", jodi: "--", close: "---" };
+                          const highlighted = highlightCell(cell.jodi);
+                          return (
+                            <div key={`panna-mobile-${rowIndex}-${day}`} className="rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                              <div className="text-[12px] font-bold uppercase tracking-[0.14em] text-slate-400">{day}</div>
+                              <div className={`mt-1.5 text-xs font-bold ${highlighted ? "text-rose-300" : "text-slate-300"}`}>{cell.open}</div>
+                              <div className={`text-lg font-extrabold ${highlighted ? "text-rose-300" : "text-slate-100"}`}>{cell.jodi}</div>
+                              <div className={`text-sm font-bold ${highlighted ? "text-rose-300" : "text-slate-300"}`}>{cell.close}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto rounded-[22px] border border-white/10 bg-white/[0.02] lg:block">
+                <table className="w-full min-w-[980px] border-collapse text-center">
+                  <thead>
+                    <tr>
+                      <th className="border border-white/10 bg-white/5 px-3 py-3 text-[13px] font-extrabold text-slate-100">Date</th>
+                      {WEEK_DAYS.map((day) => (
+                        <th key={day} className="border border-white/10 bg-white/5 px-3 py-3 text-[13px] font-extrabold text-slate-100">
+                          {day}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pannaRows.map((row, rowIndex) => {
+                      const dateBlock = buildDateBlock(row.label);
+                      return (
+                        <tr key={`panna-${rowIndex}`}>
+                          <td className="border border-white/10 bg-white/[0.04] px-3 py-3 text-slate-200">
+                            <div className="text-[12px] font-bold text-slate-400">{dateBlock.year}</div>
+                            <div className="text-[13px] font-bold text-slate-100">{dateBlock.start}</div>
+                            <div className="text-[13px] font-bold text-slate-100">{dateBlock.end}</div>
+                          </td>
+                          {row.cells.map((cell, cellIndex) => (
+                            <td key={`panna-${rowIndex}-${cellIndex}`} className="border border-white/10 px-3 py-3">
+                              <div className={`text-[12px] font-bold ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-400"}`}>{cell.open}</div>
+                              <div className={`text-[14px] font-extrabold ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-100"}`}>{cell.jodi}</div>
+                              <div className={`text-[12px] font-bold ${highlightCell(cell.jodi) ? "text-rose-300" : "text-slate-400"}`}>{cell.close}</div>
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : null}
 
           {!loading && !error && hasRows ? (

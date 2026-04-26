@@ -40,6 +40,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   const staticRoutes = [
     { path: "/", changeFrequency: "daily" as const, priority: 1 },
+    { path: "/satta-matka", changeFrequency: "weekly" as const, priority: 0.82 },
+    { path: "/matka-result", changeFrequency: "daily" as const, priority: 0.88 },
+    { path: "/online-play-satta-matka", changeFrequency: "weekly" as const, priority: 0.8 },
+    { path: "/matka-chart", changeFrequency: "weekly" as const, priority: 0.82 },
+    { path: "/jodi-chart", changeFrequency: "weekly" as const, priority: 0.78 },
+    { path: "/panna-chart", changeFrequency: "weekly" as const, priority: 0.78 },
+    { path: "/kalyan-matka-result", changeFrequency: "daily" as const, priority: 0.84 },
+    { path: "/main-bazar-result", changeFrequency: "daily" as const, priority: 0.84 },
+    { path: "/rajdhani-night-result", changeFrequency: "daily" as const, priority: 0.84 },
+    { path: "/game-rates", changeFrequency: "weekly" as const, priority: 0.76 },
     { path: "/support", changeFrequency: "monthly" as const, priority: 0.6 },
     { path: "/privacy", changeFrequency: "yearly" as const, priority: 0.3 },
     { path: "/terms", changeFrequency: "yearly" as const, priority: 0.3 }

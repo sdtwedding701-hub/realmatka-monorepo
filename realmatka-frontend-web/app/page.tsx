@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { MarketsSection, type MarketCard } from "./markets-section";
 import { buildMetadata } from "@/lib/seo";
 
@@ -107,6 +108,59 @@ const games = [
   "Choice Pana"
 ] as const;
 
+const seoPageLinks = [
+  {
+    href: "/satta-matka",
+    title: "Satta Matka",
+    body: "Satta Matka overview, market timing, game rate, result access aur charts ek jagah dekho."
+  },
+  {
+    href: "/matka-result",
+    title: "Matka Result",
+    body: "Aaj ke major market results, open close update aur live result access clear format me dekho."
+  },
+  {
+    href: "/online-play-satta-matka",
+    title: "Online Play Satta Matka",
+    body: "Register, login, download APK aur live web app access ke saath online play flow samjho."
+  },
+  {
+    href: "/matka-chart",
+    title: "Matka Chart",
+    body: "Jodi chart, panna chart, old chart aur market-wise chart usage details ek jagah pao."
+  },
+  {
+    href: "/jodi-chart",
+    title: "Jodi Chart",
+    body: "Daily jodi records aur market-wise jodi movement ko clear chart page par dekho."
+  },
+  {
+    href: "/panna-chart",
+    title: "Panna Chart",
+    body: "Open close panna records aur weekly chart understanding ke liye ek clear page."
+  },
+  {
+    href: "/kalyan-matka-result",
+    title: "Kalyan Matka Result",
+    body: "Kalyan market result, timing aur chart details ek jagah dekho."
+  },
+  {
+    href: "/main-bazar-result",
+    title: "Main Bazar Result",
+    body: "Main Bazar result, timing aur chart details ko ek alag page par dekho."
+  },
+  {
+    href: "/rajdhani-night-result",
+    title: "Rajdhani Night Result",
+    body: "Rajdhani Night result, timing aur chart details clear format me dekho."
+  },
+  {
+    href: "/game-rates",
+    title: "Game Rates",
+    body: "Single Digit se Full Sangam tak saare popular matka game rates ek jagah dekho."
+  }
+] as const;
+
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "WebSite",
@@ -179,6 +233,29 @@ export default function HomePage() {
 
         <section id="markets" className="section-shell px-4 py-6 sm:px-6 sm:py-8 xl:px-8">
           <MarketsSection initialMarkets={marketCatalog} loginUrl={loginUrl} registerUrl={registerUrl} />
+        </section>
+
+        <section className="section-shell px-4 py-6 sm:px-6 sm:py-8 xl:px-8">
+          <div className="mb-5">
+            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Explore More</div>
+            <h2 className="mt-2 text-2xl font-extrabold sm:text-3xl">Popular pages aur quick links</h2>
+            <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-300 sm:text-base">
+              Result, charts, game rates aur market-specific pages ko yahan se direct open kar sakte ho.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {seoPageLinks.map((item) => (
+              <Link
+                className="glass-card rounded-[28px] p-5 transition hover:border-orange-300/50 hover:bg-white/[0.06]"
+                href={item.href}
+                key={item.href}
+              >
+                <div className="text-lg font-extrabold text-slate-100">{item.title}</div>
+                <p className="mt-3 text-sm leading-7 text-slate-300">{item.body}</p>
+                <div className="mt-4 text-sm font-semibold text-orange-200">View Page</div>
+              </Link>
+            ))}
+          </div>
         </section>
       </main>
     </div>

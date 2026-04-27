@@ -17,6 +17,16 @@ function roundToPaise(amount) {
   return Math.round(Number(amount || 0) * 100);
 }
 
+function validateDepositAmount(amountPaise) {
+  if (amountPaise < 10000) {
+    return "Minimum deposit is Rs. 100";
+  }
+  if (amountPaise % 10000 !== 0) {
+    return "Deposit amount must be a multiple of Rs. 100";
+  }
+  return "";
+}
+
 function normalizeUpiClientStatus(value) {
   const status = String(value ?? "").trim().toUpperCase();
   if (status === "SUCCESS" || status === "SUBMITTED") {
@@ -33,8 +43,9 @@ function normalizeUpiClientStatus(value) {
 
 export async function createHostedPaymentOrder({ user, amount, createPaymentLink }) {
   const amountPaise = roundToPaise(amount);
-  if (amountPaise < 100) {
-    return { ok: false, status: 400, error: "Minimum deposit is Rs. 1" };
+  const validationError = validateDepositAmount(amountPaise);
+  if (validationError) {
+    return { ok: false, status: 400, error: validationError };
   }
 
   const paymentOrderId = `payment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -63,8 +74,9 @@ export async function createHostedPaymentOrder({ user, amount, createPaymentLink
 
 export async function createNativePaymentOrder({ user, amount, createOrder, getKeyId }) {
   const amountPaise = roundToPaise(amount);
-  if (amountPaise < 100) {
-    return { ok: false, status: 400, error: "Minimum deposit is Rs. 1" };
+  const validationError = validateDepositAmount(amountPaise);
+  if (validationError) {
+    return { ok: false, status: 400, error: validationError };
   }
 
   const paymentOrderId = `payment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

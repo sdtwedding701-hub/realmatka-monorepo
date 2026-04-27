@@ -9,8 +9,7 @@ import { useAppState } from "@/lib/app-state";
 import { getAddFundUnsupportedMessage, isSupportedAddFundPlatform } from "@/lib/payment-platform";
 import { colors } from "@/theme/colors";
 
-const QUICK_AMOUNTS = [1, 100, 200, 500, 1000];
-const MIN_DEPOSIT_AMOUNT = 1;
+const MIN_DEPOSIT_AMOUNT = 100;
 const PAYMENT_STATUS_REFRESH_MS = 10_000;
 
 function statusTone(status: string) {
@@ -36,6 +35,7 @@ export default function AddFundScreen() {
 
   const numericAmount = Number(amount || 0);
   const hasValidAmount = Number.isFinite(numericAmount) && numericAmount >= MIN_DEPOSIT_AMOUNT;
+  const isMultipleOfHundred = Number.isFinite(numericAmount) && numericAmount % 100 === 0;
   const displayStatus = useMemo(() => pendingOrder?.remoteStatus || pendingOrder?.status || "", [pendingOrder]);
 
   const pollPaymentStatus = useCallback(
@@ -154,31 +154,13 @@ export default function AddFundScreen() {
                 setError("");
                 setSuccessMessage("");
               }}
-              placeholder="Enter amount min 1"
+              placeholder="Enter amount min 100"
               placeholderTextColor={colors.textMuted}
               style={styles.amountInput}
               value={amount}
             />
           </View>
 
-          <View style={styles.quickGrid}>
-            {QUICK_AMOUNTS.map((quickAmount) => {
-              const active = String(quickAmount) === amount;
-              return (
-                <Pressable
-                  key={quickAmount}
-                  onPress={() => {
-                    setAmount(String(quickAmount));
-                    setError("");
-                    setSuccessMessage("");
-                  }}
-                  style={[styles.quickChip, active && styles.quickChipActive]}
-                >
-                  <Text style={[styles.quickChipText, active && styles.quickChipTextActive]}>Rs {quickAmount}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
         </SurfaceCard>
 
         {pendingOrder ? (
@@ -232,9 +214,9 @@ export default function AddFundScreen() {
 
         <View style={styles.footerActions}>
           <Pressable
-            disabled={!hasValidAmount || submitting || !sessionToken}
+            disabled={!hasValidAmount || !isMultipleOfHundred || submitting || !sessionToken}
             onPress={() => void startDeposit()}
-            style={[styles.primaryButton, (!hasValidAmount || submitting || !sessionToken) && styles.disabledButton]}
+            style={[styles.primaryButton, (!hasValidAmount || !isMultipleOfHundred || submitting || !sessionToken) && styles.disabledButton]}
           >
             {submitting ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.primaryButtonText}>Pay Now</Text>}
           </Pressable>
@@ -257,6 +239,10 @@ export default function AddFundScreen() {
 
     if (!Number.isFinite(numericAmount) || numericAmount < MIN_DEPOSIT_AMOUNT) {
       setError(`Minimum deposit is Rs ${MIN_DEPOSIT_AMOUNT}.`);
+      return;
+    }
+    if (!isMultipleOfHundred) {
+      setError("Deposit amount Rs 100 ke multiple me hona chahiye.");
       return;
     }
 
@@ -398,34 +384,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 20,
     fontWeight: "900"
-  },
-  quickGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10
-  },
-  quickChip: {
-    minWidth: 78,
-    minHeight: 40,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border
-  },
-  quickChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary
-  },
-  quickChipText: {
-    color: colors.primaryDark,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  quickChipTextActive: {
-    color: colors.surface
   },
   helperText: {
     color: colors.textMuted,

@@ -2,14 +2,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, AppState, AppStateStatus, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import RazorpayCheckout from "react-native-razorpay";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
 import { api, formatApiError, type PaymentOrder } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
 import { getAddFundUnsupportedMessage, isSupportedAddFundPlatform } from "@/lib/payment-platform";
 import { colors } from "@/theme/colors";
 
-const QUICK_AMOUNTS = [100, 200, 500, 1000];
-const MIN_DEPOSIT_AMOUNT = 100;
+const QUICK_AMOUNTS = [1, 100, 200, 500, 1000];
+const MIN_DEPOSIT_AMOUNT = 1;
 const PAYMENT_STATUS_REFRESH_MS = 10_000;
 
 function statusTone(status: string) {
@@ -24,7 +25,7 @@ function statusTone(status: string) {
 }
 
 export default function AddFundScreen() {
-  const { sessionToken, walletBalance, reloadSessionData } = useAppState();
+  const { sessionToken, currentUser, walletBalance, reloadSessionData, loadWalletHistory } = useAppState();
   const addFundSupported = isSupportedAddFundPlatform();
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +36,6 @@ export default function AddFundScreen() {
 
   const numericAmount = Number(amount || 0);
   const hasValidAmount = Number.isFinite(numericAmount) && numericAmount >= MIN_DEPOSIT_AMOUNT;
-  const isMultipleOfHundred = Number.isFinite(numericAmount) && numericAmount % 100 === 0;
   const displayStatus = useMemo(() => pendingOrder?.remoteStatus || pendingOrder?.status || "", [pendingOrder]);
 
   const pollPaymentStatus = useCallback(
@@ -120,7 +120,7 @@ export default function AddFundScreen() {
 
   return (
     <View style={styles.page}>
-      <BackHeader title="Add Fund" subtitle="Razorpay test payment link se wallet top-up karo." />
+      <BackHeader title="Add Fund" subtitle="Razorpay se wallet top-up karo." />
       <AppScreen showPromo={false}>
         {!addFundSupported ? (
           <SurfaceCard style={styles.unsupportedCard}>
@@ -154,7 +154,7 @@ export default function AddFundScreen() {
                 setError("");
                 setSuccessMessage("");
               }}
-              placeholder="Enter amount min 100"
+              placeholder="Enter amount min 1"
               placeholderTextColor={colors.textMuted}
               style={styles.amountInput}
               value={amount}
@@ -190,26 +190,22 @@ export default function AddFundScreen() {
             <View style={styles.statusMeta}>
               <Text style={styles.statusLine}>Reference: {pendingOrder.reference}</Text>
               <Text style={styles.statusLine}>Amount: Rs {pendingOrder.amount.toFixed(2)}</Text>
+              <Text style={styles.statusHint}>Payment complete karke app me wapas aao. Status auto verify ho jayega.</Text>
             </View>
-            <View style={styles.statusActions}>
-              <Pressable
-                disabled={checkingStatus}
-                onPress={() => void pollPaymentStatus(pendingOrder.reference)}
-                style={[styles.secondaryButton, checkingStatus && styles.disabledButton]}
-              >
-                {checkingStatus ? <ActivityIndicator color={colors.primary} size="small" /> : <Text style={styles.secondaryButtonText}>Check Status</Text>}
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  void Linking.openURL(pendingOrder.redirectUrl).catch(() => {
-                    setError("Checkout link browser me open nahi hua.");
-                  });
-                }}
-                style={styles.primaryButton}
-              >
-                <Text style={styles.primaryButtonText}>Open Checkout</Text>
-              </Pressable>
-            </View>
+            {Platform.OS === "web" && pendingOrder.redirectUrl ? (
+              <View style={styles.statusActions}>
+                <Pressable
+                  onPress={() => {
+                    void Linking.openURL(pendingOrder.redirectUrl as string).catch(() => {
+                      setError("Checkout link browser me open nahi hua.");
+                    });
+                  }}
+                  style={[styles.primaryButton, checkingStatus && styles.disabledButton]}
+                >
+                  {checkingStatus ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.primaryButtonText}>Open Checkout</Text>}
+                </Pressable>
+              </View>
+            ) : null}
           </SurfaceCard>
         ) : null}
 
@@ -228,9 +224,9 @@ export default function AddFundScreen() {
         <SurfaceCard>
           <Text style={styles.sectionTitle}>How It Works</Text>
           <View style={styles.steps}>
-            <Text style={styles.stepText}>1. Amount enter karo aur payment link generate karo.</Text>
-            <Text style={styles.stepText}>2. Browser me Razorpay checkout complete karo.</Text>
-            <Text style={styles.stepText}>3. App me wapas aakar status refresh karo.</Text>
+            <Text style={styles.stepText}>1. Amount enter karo aur checkout start karo.</Text>
+            <Text style={styles.stepText}>2. Razorpay/UPI app me payment complete karo.</Text>
+            <Text style={styles.stepText}>3. App me wapas aate hi status automatically verify ho jayega.</Text>
           </View>
         </SurfaceCard>
 
@@ -240,7 +236,7 @@ export default function AddFundScreen() {
             onPress={() => void startDeposit()}
             style={[styles.primaryButton, (!hasValidAmount || submitting || !sessionToken) && styles.disabledButton]}
           >
-            {submitting ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.primaryButtonText}>Generate Payment Link</Text>}
+            {submitting ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.primaryButtonText}>Pay Now</Text>}
           </Pressable>
 
           <Pressable onPress={() => router.push("/wallet/history")} style={styles.historyButton}>
@@ -263,19 +259,66 @@ export default function AddFundScreen() {
       setError(`Minimum deposit is Rs ${MIN_DEPOSIT_AMOUNT}.`);
       return;
     }
-    if (!isMultipleOfHundred) {
-      setError("Please enter amount multiple of 100.");
-      return;
-    }
 
-    try {
-      setSubmitting(true);
+      try {
+        setSubmitting(true);
       setError("");
       setSuccessMessage("");
 
       const order = await api.createPaymentOrder(sessionToken, numericAmount, Platform.OS === "web" ? "web" : "app");
       setPendingOrder(order);
-      await Linking.openURL(order.redirectUrl);
+
+      if (Platform.OS === "web" || order.checkoutMode !== "native") {
+        if (!order.redirectUrl) {
+          throw new Error("Checkout link unavailable.");
+        }
+        await Linking.openURL(order.redirectUrl);
+        return;
+      }
+
+      if (!order.gatewayOrderId || !order.keyId) {
+        throw new Error("Native checkout configuration missing.");
+      }
+
+      try {
+        const result = await RazorpayCheckout.open({
+          key: order.keyId,
+          amount: Math.round(order.amount * 100),
+          currency: "INR",
+          name: "Real Matka",
+          description: "Wallet Deposit",
+          order_id: order.gatewayOrderId,
+          prefill: currentUser?.phone ? { contact: currentUser.phone } : {},
+          notes: {
+            reference: order.reference,
+            paymentOrderId: order.id
+          },
+          theme: { color: colors.primary }
+        });
+
+        await api.confirmPaymentOrder(sessionToken, order.reference, {
+          razorpayPaymentId: String(result.razorpay_payment_id || "").trim(),
+          razorpayOrderId: String(result.razorpay_order_id || "").trim(),
+          razorpaySignature: String(result.razorpay_signature || "").trim()
+        });
+        await reloadSessionData({ force: true });
+        await loadWalletHistory({ force: true });
+        setSuccessMessage(`Deposit successful. Reference ${order.reference} wallet history me aa gaya hai.`);
+        router.replace({
+          pathname: "/wallet/history",
+          params: { payment: "success", reference: order.reference }
+        } as never);
+      } catch (checkoutError) {
+        const paymentCancelled =
+          typeof checkoutError === "object" &&
+          checkoutError != null &&
+          String((checkoutError as { code?: string | number }).code ?? "").toUpperCase() === "PAYMENT_CANCELLED";
+        if (paymentCancelled) {
+          setError("Payment cancel ho gaya. Dobara try kar sakte ho.");
+          return;
+        }
+        throw checkoutError;
+      }
     } catch (startError) {
       setError(formatApiError(startError, "Payment start nahi hua."));
     } finally {
@@ -424,6 +467,12 @@ const styles = StyleSheet.create({
   statusLine: {
     color: colors.textSecondary,
     fontSize: 13,
+    fontWeight: "600"
+  },
+  statusHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: "600"
   },
   statusActions: {

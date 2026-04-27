@@ -96,9 +96,12 @@ export type PaymentOrder = {
   amount: number;
   provider: string;
   reference: string;
-  redirectUrl: string;
+  redirectUrl: string | null;
   status: string;
   remoteStatus?: string;
+  checkoutMode?: "native" | "link";
+  gatewayOrderId?: string | null;
+  keyId?: string | null;
 };
 
 export type HealthSnapshot = {
@@ -582,6 +585,27 @@ export const api = {
       method: "POST",
       token,
       body: { amount, platform }
+    });
+  },
+
+  confirmPaymentOrder(
+    token: string,
+    referenceId: string,
+    payload: {
+      razorpayPaymentId: string;
+      razorpayOrderId: string;
+      razorpaySignature: string;
+    }
+  ) {
+    return request<PaymentOrder>("/api/payments/confirm", {
+      method: "POST",
+      token,
+      body: {
+        referenceId,
+        razorpayPaymentId: payload.razorpayPaymentId,
+        razorpayOrderId: payload.razorpayOrderId,
+        razorpaySignature: payload.razorpaySignature
+      }
     });
   },
 

@@ -32,8 +32,8 @@ function normalizeUpiClientStatus(value) {
 
 export async function createHostedPaymentOrder({ user, amount, createPaymentLink }) {
   const amountPaise = roundToPaise(amount);
-  if (amountPaise < 10000) {
-    return { ok: false, status: 400, error: "Minimum deposit is Rs. 100" };
+  if (amountPaise < 100) {
+    return { ok: false, status: 400, error: "Minimum deposit is Rs. 1" };
   }
 
   const paymentOrderId = `payment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -58,6 +58,44 @@ export async function createHostedPaymentOrder({ user, amount, createPaymentLink
   });
 
   return { ok: true, data: order };
+}
+
+export async function createNativePaymentOrder({ user, amount, createOrder, getKeyId }) {
+  const amountPaise = roundToPaise(amount);
+  if (amountPaise < 100) {
+    return { ok: false, status: 400, error: "Minimum deposit is Rs. 1" };
+  }
+
+  const paymentOrderId = `payment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const reference = `RM${Date.now()}${Math.random().toString(36).slice(2, 4).toUpperCase()}`.slice(0, 40);
+  const checkoutToken = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID().replace(/-/g, "") : `${Date.now()}${Math.random().toString(16).slice(2)}`;
+  const gatewayOrder = await createOrder({
+    amountPaise,
+    receipt: reference,
+    paymentOrderId,
+    user
+  });
+
+  const order = await createPaymentOrder({
+    id: paymentOrderId,
+    userId: user.id,
+    amount,
+    provider: "razorpay_checkout",
+    reference,
+    checkoutToken,
+    gatewayOrderId: gatewayOrder.id,
+    redirectUrl: null
+  });
+
+  return {
+    ok: true,
+    data: {
+      ...order,
+      checkoutMode: "native",
+      gatewayOrderId: gatewayOrder.id,
+      keyId: getKeyId()
+    }
+  };
 }
 
 export async function getPaymentOrderStatusSnapshot({ userId, referenceId, isProviderEnabled, fetchPaymentLinkStatus }) {
@@ -92,6 +130,30 @@ export async function getPaymentOrderStatusSnapshot({ userId, referenceId, isPro
   }
 
   return { ok: true, data: order };
+}
+
+export async function confirmNativePaymentOrder({ userId, referenceId, payload }) {
+  if (!referenceId) {
+    return { ok: false, status: 400, error: "referenceId is required" };
+  }
+
+  if (!payload?.razorpayPaymentId || !payload?.razorpayOrderId || !payload?.razorpaySignature) {
+    return { ok: false, status: 400, error: "Payment confirmation payload is incomplete" };
+  }
+
+  const order = await findPaymentOrderByReferenceForUser(userId, referenceId);
+  if (!order) {
+    return { ok: false, status: 404, error: "Payment order not found" };
+  }
+
+  const updatedOrder = await completePaymentOrder({
+    paymentOrderId: order.id,
+    gatewayOrderId: payload.razorpayOrderId,
+    gatewayPaymentId: payload.razorpayPaymentId,
+    gatewaySignature: payload.razorpaySignature
+  });
+
+  return { ok: true, data: updatedOrder ?? order };
 }
 
 export async function startUpiDepositEntry({ userId, amount, appName, referenceId }) {

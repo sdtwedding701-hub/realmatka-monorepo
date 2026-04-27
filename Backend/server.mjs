@@ -176,6 +176,7 @@ const standaloneRoutes = new Map([
   ["/api/chat/conversation", { loader: "chat", methods: { OPTIONS: "options", GET: "userConversation" } }],
   ["/api/chat/send", { loader: "chat", methods: { OPTIONS: "options", POST: "userSend" } }],
   ["/api/payments/create-order", { loader: "payments", methods: { OPTIONS: "options", POST: "createOrder" } }],
+  ["/api/payments/confirm", { loader: "payments", methods: { OPTIONS: "options", POST: "confirmOrder" } }],
   ["/api/payments/status", { loader: "payments", methods: { OPTIONS: "options", GET: "getPaymentOrderStatus", POST: "getPaymentOrderStatus" } }],
   ["/api/payments/upi-start", { loader: "payments", methods: { OPTIONS: "options", GET: "startUpiDeposit", POST: "startUpiDeposit" } }],
   ["/api/payments/upi-report", { loader: "payments", methods: { OPTIONS: "options", GET: "reportUpiDeposit", POST: "reportUpiDeposit" } }],

@@ -17,6 +17,39 @@ export function isRazorpayEnabled() {
   return Boolean(razorpayKeyId && razorpayKeySecret);
 }
 
+export function getRazorpayKeyId() {
+  return razorpayKeyId;
+}
+
+export async function createRazorpayOrder({ amount, receipt, paymentOrderId, user }) {
+  const amountPaise = roundToPaise(amount);
+
+  const response = await fetch("https://api.razorpay.com/v1/orders", {
+    method: "POST",
+    headers: {
+      Authorization: getRazorpayAuthHeader(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      amount: amountPaise,
+      currency: "INR",
+      receipt,
+      payment_capture: 1,
+      notes: {
+        paymentOrderId,
+        userId: user?.id || ""
+      }
+    })
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.id) {
+    throw new Error(payload?.error?.description || payload?.description || "Unable to create Razorpay order");
+  }
+
+  return payload;
+}
+
 export async function createRazorpayPaymentLink({ amount, receipt, paymentOrderId, user }) {
   const amountPaise = roundToPaise(amount);
   const appReturnBase = (standaloneConfig.appUrl || "https://play.realmatka.in").replace(/\/$/, "");

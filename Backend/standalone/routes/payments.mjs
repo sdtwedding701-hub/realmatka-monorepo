@@ -4,6 +4,8 @@ import { standaloneConfig } from "../config.mjs";
 import {
   completeCheckoutSession,
   createHostedPaymentOrder,
+  createNativePaymentOrder,
+  confirmNativePaymentOrder,
   getPaymentOrderStatusSnapshot,
   getUpiDepositEntry,
   processPaymentWebhook,
@@ -12,8 +14,10 @@ import {
   startUpiDepositEntry
 } from "../services/payment-service.mjs";
 import {
+  createRazorpayOrder,
   createRazorpayPaymentLink,
   fetchRazorpayPaymentLinkStatus,
+  getRazorpayKeyId,
   getRazorpayWebhookSecret,
   isRazorpayEnabled,
   verifyRazorpaySignature,
@@ -201,16 +205,65 @@ export async function createOrder(request) {
 
   const body = await getJsonBody(request);
   const amount = Number(body.amount ?? 0);
-  const result = await createHostedPaymentOrder({
-    user,
-    amount,
-    createPaymentLink: ({ amountPaise, receipt, paymentOrderId, user: paymentUser }) =>
-      createRazorpayPaymentLink({
-        amount: amountPaise / 100,
-        receipt,
-        paymentOrderId,
-        user: paymentUser
-      })
+  const platform = String(body.platform ?? "web").trim().toLowerCase();
+  const result =
+    platform === "web"
+      ? await createHostedPaymentOrder({
+          user,
+          amount,
+          createPaymentLink: ({ amountPaise, receipt, paymentOrderId, user: paymentUser }) =>
+            createRazorpayPaymentLink({
+              amount: amountPaise / 100,
+              receipt,
+              paymentOrderId,
+              user: paymentUser
+            })
+        })
+      : await createNativePaymentOrder({
+          user,
+          amount,
+          createOrder: ({ amountPaise, receipt, paymentOrderId, user: paymentUser }) =>
+            createRazorpayOrder({
+              amount: amountPaise / 100,
+              receipt,
+              paymentOrderId,
+              user: paymentUser
+            }),
+          getKeyId: getRazorpayKeyId
+        });
+  if (!result.ok) {
+    return fail(result.error, result.status, request);
+  }
+  return ok(result.data, request);
+}
+
+export async function confirmOrder(request) {
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+  const { user } = auth;
+
+  const body = await getJsonBody(request);
+  const referenceId = String(body.referenceId ?? body.reference ?? "").trim();
+  const payload = {
+    razorpayPaymentId: String(body.razorpayPaymentId ?? body.razorpay_payment_id ?? "").trim(),
+    razorpayOrderId: String(body.razorpayOrderId ?? body.razorpay_order_id ?? "").trim(),
+    razorpaySignature: String(body.razorpaySignature ?? body.razorpay_signature ?? "").trim()
+  };
+
+  if (
+    !verifyRazorpaySignature({
+      orderId: payload.razorpayOrderId,
+      paymentId: payload.razorpayPaymentId,
+      signature: payload.razorpaySignature
+    })
+  ) {
+    return fail("Payment signature could not be verified", 400, request);
+  }
+
+  const result = await confirmNativePaymentOrder({
+    userId: user.id,
+    referenceId,
+    payload
   });
   if (!result.ok) {
     return fail(result.error, result.status, request);

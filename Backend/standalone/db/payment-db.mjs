@@ -110,18 +110,94 @@ export async function createPaymentOrder({
   const pool = __internalGetPgPool();
 
   if (pool) {
-    await pool.query(
-      `INSERT INTO payment_orders (id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, redirect_url, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
-      [id, userId, provider, amount, status, reference, checkoutToken, gatewayOrderId, redirectUrl, createdAt]
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `INSERT INTO payment_orders (id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, redirect_url, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
+        [id, userId, provider, amount, status, reference, checkoutToken, gatewayOrderId, redirectUrl, createdAt]
+      );
+
+      const balanceResult = await client.query(
+        `SELECT COALESCE(
+           (
+             SELECT after_balance
+             FROM wallet_entries
+             WHERE user_id = $1
+             ORDER BY created_at DESC, id DESC
+             LIMIT 1
+           ),
+           0
+         ) AS balance`,
+        [userId]
+      );
+      const currentBalance = Number(balanceResult.rows[0]?.balance ?? 0);
+
+      await client.query(
+        `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, note, created_at)
+         VALUES ($1, $2, 'DEPOSIT', 'INITIATED', $3, $4, $4, $5, $6, $7)`,
+        [
+          `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          userId,
+          amount,
+          currentBalance,
+          reference,
+          "Processor flow deposit request",
+          createdAt
+        ]
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   } else {
-    __internalGetSqlite()
-      .prepare(
+    const db = __internalGetSqlite();
+    db.exec("BEGIN");
+    try {
+      db.prepare(
         `INSERT INTO payment_orders (id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, redirect_url, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(id, userId, provider, amount, status, reference, checkoutToken, gatewayOrderId, redirectUrl, createdAt, createdAt);
+      ).run(id, userId, provider, amount, status, reference, checkoutToken, gatewayOrderId, redirectUrl, createdAt, createdAt);
+
+      const currentBalance = Number(
+        db
+          .prepare(
+            `SELECT COALESCE(
+               (
+                 SELECT after_balance
+                 FROM wallet_entries
+                 WHERE user_id = ?
+                 ORDER BY created_at DESC, id DESC
+                 LIMIT 1
+               ),
+               0
+             ) AS balance`
+          )
+          .get(userId)?.balance ?? 0
+      );
+
+      db.prepare(
+        `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, note, created_at)
+         VALUES (?, ?, 'DEPOSIT', 'INITIATED', ?, ?, ?, ?, ?, ?)`
+      ).run(
+        `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        userId,
+        amount,
+        currentBalance,
+        currentBalance,
+        reference,
+        "Processor flow deposit request",
+        createdAt
+      );
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   return findPaymentOrderById(id);
@@ -181,20 +257,44 @@ export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gat
            WHERE id = $1`,
           [paymentOrderId, gatewayOrderId, gatewayPaymentId, gatewaySignature, verifiedAt]
         );
-        await client.query(
-          `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, note, created_at)
-           VALUES ($1, $2, 'DEPOSIT', 'SUCCESS', $3, $4, $5, $6, $7, $8)`,
-          [
-            `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            existing.user_id,
-            Number(existing.amount),
-            currentBalance,
-            nextBalance,
-            gatewayPaymentId,
-            `Razorpay payment ${gatewayPaymentId}`,
-            verifiedAt
-          ]
+        const initiatedResult = await client.query(
+          `SELECT id
+           FROM wallet_entries
+           WHERE user_id = $1 AND type = 'DEPOSIT' AND status = 'INITIATED' AND reference_id = $2
+           ORDER BY created_at DESC, id DESC
+           LIMIT 1
+           FOR UPDATE`,
+          [existing.user_id, existing.reference]
         );
+        const initiatedEntryId = initiatedResult.rows[0]?.id ? String(initiatedResult.rows[0].id) : "";
+        if (initiatedEntryId) {
+          await client.query(
+            `UPDATE wallet_entries
+             SET status = 'SUCCESS',
+                 amount = $2,
+                 before_balance = $3,
+                 after_balance = $4,
+                 reference_id = $5,
+                 note = $6
+             WHERE id = $1`,
+            [initiatedEntryId, Number(existing.amount), currentBalance, nextBalance, gatewayPaymentId, `Razorpay payment ${gatewayPaymentId}`]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, note, created_at)
+             VALUES ($1, $2, 'DEPOSIT', 'SUCCESS', $3, $4, $5, $6, $7, $8)`,
+            [
+              `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+              existing.user_id,
+              Number(existing.amount),
+              currentBalance,
+              nextBalance,
+              gatewayPaymentId,
+              `Razorpay payment ${gatewayPaymentId}`,
+              verifiedAt
+            ]
+          );
+        }
         bonusPayload = {
           userId: existing.user_id,
           depositAmount: Number(existing.amount),
@@ -263,19 +363,41 @@ export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gat
              updated_at = ?
          WHERE id = ?`
       ).run(gatewayOrderId, gatewayPaymentId, gatewaySignature, verifiedAt, verifiedAt, paymentOrderId);
-      db.prepare(
-        `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, note, created_at)
-         VALUES (?, ?, 'DEPOSIT', 'SUCCESS', ?, ?, ?, ?, ?, ?)`
-      ).run(
-        `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        existing.user_id,
-        Number(existing.amount),
-        currentBalance,
-        nextBalance,
-        gatewayPaymentId,
-        `Razorpay payment ${gatewayPaymentId}`,
-        verifiedAt
-      );
+      const initiatedEntry = db
+        .prepare(
+          `SELECT id
+           FROM wallet_entries
+           WHERE user_id = ? AND type = 'DEPOSIT' AND status = 'INITIATED' AND reference_id = ?
+           ORDER BY created_at DESC, id DESC
+           LIMIT 1`
+        )
+        .get(existing.user_id, existing.reference);
+      if (initiatedEntry?.id) {
+        db.prepare(
+          `UPDATE wallet_entries
+           SET status = 'SUCCESS',
+               amount = ?,
+               before_balance = ?,
+               after_balance = ?,
+               reference_id = ?,
+               note = ?
+           WHERE id = ?`
+        ).run(Number(existing.amount), currentBalance, nextBalance, gatewayPaymentId, `Razorpay payment ${gatewayPaymentId}`, initiatedEntry.id);
+      } else {
+        db.prepare(
+          `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, note, created_at)
+           VALUES (?, ?, 'DEPOSIT', 'SUCCESS', ?, ?, ?, ?, ?, ?)`
+        ).run(
+          `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          existing.user_id,
+          Number(existing.amount),
+          currentBalance,
+          nextBalance,
+          gatewayPaymentId,
+          `Razorpay payment ${gatewayPaymentId}`,
+          verifiedAt
+        );
+      }
       bonusPayload = {
         userId: existing.user_id,
         depositAmount: Number(existing.amount),

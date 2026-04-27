@@ -10,9 +10,9 @@ const MARKET_TIME_CHANGE_SCHEDULES = [
     effectiveDate: "2026-04-27",
     markets: new Map([
       ["kalyan", { open: "03:45 PM", close: "05:45 PM" }],
-      ["time-bazar", { open: "01:10 PM", close: "02:10 PM" }],
-      ["milan-day", { open: "03:10 PM", close: "05:10 PM" }],
-      ["milan-night", { open: "09:10 PM", close: "11:10 PM" }]
+  ["time-bazar", { open: "12:55 PM", close: "01:55 PM" }],
+  ["milan-day", { open: "02:55 PM", close: "04:55 PM" }],
+  ["milan-night", { open: "08:55 PM", close: "10:55 PM" }]
     ])
   }
 ];

@@ -31,9 +31,9 @@ const rates = [
 const MARKET_TIME_CHANGE_EFFECTIVE_DATE = "2026-04-27";
 const MARKET_TIME_CHANGE_OVERRIDES: Record<string, Pick<MarketCard, "open" | "close">> = {
   "kalyan": { open: "03:45 PM", close: "05:45 PM" },
-  "time-bazar": { open: "01:10 PM", close: "02:10 PM" },
-  "milan-day": { open: "03:10 PM", close: "05:10 PM" },
-  "milan-night": { open: "09:10 PM", close: "11:10 PM" }
+  "time-bazar": { open: "12:55 PM", close: "01:55 PM" },
+  "milan-day": { open: "02:55 PM", close: "04:55 PM" },
+  "milan-night": { open: "08:55 PM", close: "10:55 PM" }
 };
 
 function getIndiaDateKey() {
@@ -56,14 +56,14 @@ function getMarketCatalog(): MarketCard[] {
   { slug: "andhra-morning", name: "Andhra Morning", open: "10:35 AM", close: "11:35 AM", tag: "Games" },
   { slug: "sridevi", name: "Sridevi", open: "11:25 AM", close: "12:25 PM", tag: "Games" },
   { slug: "mahadevi-morning", name: "Mahadevi Morning", open: "11:40 AM", close: "12:40 PM", tag: "Games" },
-  { slug: "time-bazar", name: "Time Bazar", open: "12:45 PM", close: "01:45 PM", tag: "Games" },
+  { slug: "time-bazar", name: "Time Bazar", open: "12:55 PM", close: "01:55 PM", tag: "Games" },
   { slug: "madhur-day", name: "Madhur Day", open: "01:20 PM", close: "02:20 PM", tag: "Games" },
   { slug: "sita-day", name: "Sita Day", open: "01:40 PM", close: "02:40 PM", tag: "Games" },
   { slug: "star-tara-day", name: "Star Tara Day", open: "02:15 PM", close: "03:15 PM", tag: "Games" },
-  { slug: "milan-day", name: "Milan Day", open: "02:45 PM", close: "04:45 PM", tag: "Games" },
+  { slug: "milan-day", name: "Milan Day", open: "02:55 PM", close: "04:55 PM", tag: "Games" },
   { slug: "rajdhani-day", name: "Rajdhani Day", open: "03:00 PM", close: "05:00 PM", tag: "Games" },
   { slug: "andhra-day", name: "Andhra Day", open: "03:30 PM", close: "05:30 PM", tag: "Games" },
-  { slug: "kalyan", name: "Kalyan", open: "04:10 PM", close: "06:10 PM", tag: "Games" },
+  { slug: "kalyan", name: "Kalyan", open: "03:45 PM", close: "05:45 PM", tag: "Games" },
   { slug: "mahadevi", name: "Mahadevi", open: "04:25 PM", close: "06:25 PM", tag: "Games" },
   { slug: "ntr-day", name: "NTR Day", open: "04:50 PM", close: "06:50 PM", tag: "Games" },
   { slug: "sita-night", name: "Sita Night", open: "06:40 PM", close: "07:40 PM", tag: "Games" },
@@ -74,7 +74,7 @@ function getMarketCatalog(): MarketCard[] {
   { slug: "supreme-night", name: "Supreme Night", open: "08:35 PM", close: "10:35 PM", tag: "Games" },
   { slug: "andhra-night", name: "Andhra Night", open: "08:40 PM", close: "10:40 PM", tag: "Games" },
   { slug: "ntr-night", name: "NTR Night", open: "08:50 PM", close: "10:50 PM", tag: "Games" },
-  { slug: "milan-night", name: "Milan Night", open: "08:50 PM", close: "10:50 PM", tag: "Games" },
+  { slug: "milan-night", name: "Milan Night", open: "08:55 PM", close: "10:55 PM", tag: "Games" },
   { slug: "kalyan-night", name: "Kalyan Night", open: "09:25 PM", close: "11:25 PM", tag: "Games" },
   { slug: "rajdhani-night", name: "Rajdhani Night", open: "09:30 PM", close: "11:40 PM", tag: "Games" },
   { slug: "main-bazar", name: "Main Bazar", open: "09:45 PM", close: "11:55 PM", tag: "Games" },

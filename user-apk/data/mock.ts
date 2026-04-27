@@ -37,9 +37,9 @@ export const drawerItems = [
 const MARKET_TIME_CHANGE_EFFECTIVE_DATE = "2026-04-27";
 const MARKET_TIME_CHANGE_OVERRIDES: Record<string, { open: string; close: string }> = {
   "kalyan": { open: "03:45 PM", close: "05:45 PM" },
-  "time-bazar": { open: "01:10 PM", close: "02:10 PM" },
-  "milan-day": { open: "03:10 PM", close: "05:10 PM" },
-  "milan-night": { open: "09:10 PM", close: "11:10 PM" }
+  "time-bazar": { open: "12:55 PM", close: "01:55 PM" },
+  "milan-day": { open: "02:55 PM", close: "04:55 PM" },
+  "milan-night": { open: "08:55 PM", close: "10:55 PM" }
 };
 
 function getIndiaDateKey() {
@@ -72,14 +72,14 @@ const baseMarketCatalog = [
   { slug: "andhra-morning", name: "Andhra Morning", category: "games", open: "10:35 AM", close: "11:35 AM" },
   { slug: "sridevi", name: "Sridevi", category: "games", open: "11:25 AM", close: "12:25 PM" },
   { slug: "mahadevi-morning", name: "Mahadevi Morning", category: "games", open: "11:40 AM", close: "12:40 PM" },
-  { slug: "time-bazar", name: "Time Bazar", category: "games", open: "12:45 PM", close: "01:45 PM" },
+  { slug: "time-bazar", name: "Time Bazar", category: "games", open: "12:55 PM", close: "01:55 PM" },
   { slug: "madhur-day", name: "Madhur Day", category: "games", open: "01:20 PM", close: "02:20 PM" },
   { slug: "sita-day", name: "Sita Day", category: "games", open: "01:40 PM", close: "02:40 PM" },
   { slug: "star-tara-day", name: "Star Tara Day", category: "games", open: "02:15 PM", close: "03:15 PM" },
-  { slug: "milan-day", name: "Milan Day", category: "games", open: "02:45 PM", close: "04:45 PM" },
+  { slug: "milan-day", name: "Milan Day", category: "games", open: "02:55 PM", close: "04:55 PM" },
   { slug: "rajdhani-day", name: "Rajdhani Day", category: "games", open: "03:00 PM", close: "05:00 PM" },
   { slug: "andhra-day", name: "Andhra Day", category: "games", open: "03:30 PM", close: "05:30 PM" },
-  { slug: "kalyan", name: "Kalyan", category: "games", open: "04:10 PM", close: "06:10 PM" },
+  { slug: "kalyan", name: "Kalyan", category: "games", open: "03:45 PM", close: "05:45 PM" },
   { slug: "mahadevi", name: "Mahadevi", category: "games", open: "04:25 PM", close: "06:25 PM" },
   { slug: "ntr-day", name: "NTR Day", category: "games", open: "04:50 PM", close: "06:50 PM" },
   { slug: "sita-night", name: "Sita Night", category: "games", open: "06:40 PM", close: "07:40 PM" },
@@ -90,7 +90,7 @@ const baseMarketCatalog = [
   { slug: "supreme-night", name: "Supreme Night", category: "games", open: "08:35 PM", close: "10:35 PM" },
   { slug: "andhra-night", name: "Andhra Night", category: "games", open: "08:40 PM", close: "10:40 PM" },
   { slug: "ntr-night", name: "NTR Night", category: "games", open: "08:50 PM", close: "10:50 PM" },
-  { slug: "milan-night", name: "Milan Night", category: "games", open: "08:50 PM", close: "10:50 PM" },
+  { slug: "milan-night", name: "Milan Night", category: "games", open: "08:55 PM", close: "10:55 PM" },
   { slug: "kalyan-night", name: "Kalyan Night", category: "games", open: "09:25 PM", close: "11:25 PM" },
   { slug: "rajdhani-night", name: "Rajdhani Night", category: "games", open: "09:30 PM", close: "11:40 PM" },
   { slug: "main-bazar", name: "Main Bazar", category: "games", open: "09:45 PM", close: "11:55 PM" },

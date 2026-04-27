@@ -59,7 +59,7 @@ export function SettingsPage({ apiBase, token, fetchApi, PageHeader, PageState }
         <div className="mini-stats">
           {[
             <div className="mini-stat" key="signup-bonus"><span>Signup Bonus</span><strong>{form.bonus_enabled === "false" ? "Disabled" : "On Approval"}</strong></div>,
-            <div className="mini-stat" key="first-deposit"><span>First Deposit Bonus</span><strong>5% up to Rs 100</strong></div>,
+            <div className="mini-stat" key="first-deposit"><span>First Deposit Bonus</span><strong>Rs 1000 = 50 | Rs 2000+ = 100</strong></div>,
             <div className="mini-stat" key="repeat-rule"><span>Repeat Rule</span><strong>Only First Successful Deposit</strong></div>
           ]}
         </div>

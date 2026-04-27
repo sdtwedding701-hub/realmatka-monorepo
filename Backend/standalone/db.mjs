@@ -22,8 +22,10 @@ const sessionTtlMs = standaloneConfig.sessionTtlHours * 60 * 60 * 1000;
 const authSessionCache = new Map();
 const AUTH_SESSION_CACHE_TTL_MS = 15_000;
 const signupBonusAmount = 25;
-const firstDepositBonusRate = 5;
-const firstDepositBonusCap = 100;
+const firstDepositBonusMinimum = 1000;
+const firstDepositBonusUpperTierMinimum = 2000;
+const firstDepositBonusBaseAmount = 50;
+const firstDepositBonusUpperTierAmount = 100;
 const defaultNoticeText =
   "Abhi market aur betting running hai. Aap app me bet place kar sakte ho. First deposit bonus: Rs 1000 par 50 points aur Rs 2000 par 100 points milenge. Bonus sirf first deposit par milega.";
 const supportChatResolvedRetentionMs = Math.max(1, standaloneConfig.supportChatResolvedRetentionDays) * 24 * 60 * 60 * 1000;
@@ -1986,7 +1988,12 @@ export async function applyFirstDepositBonusIfEligible({ userId, depositAmount, 
     return null;
   }
 
-  const bonusAmount = Math.min(roundMoney(normalizedAmount * (firstDepositBonusRate / 100)), firstDepositBonusCap);
+  const bonusAmount =
+    normalizedAmount >= firstDepositBonusUpperTierMinimum
+      ? firstDepositBonusUpperTierAmount
+      : normalizedAmount >= firstDepositBonusMinimum
+        ? firstDepositBonusBaseAmount
+        : 0;
   if (bonusAmount <= 0) {
     return null;
   }
@@ -2006,7 +2013,10 @@ export async function applyFirstDepositBonusIfEligible({ userId, depositAmount, 
     beforeBalance,
     afterBalance: beforeBalance + bonusAmount,
     referenceId,
-    note: `First deposit bonus @ ${firstDepositBonusRate}%`
+    note:
+      bonusAmount >= firstDepositBonusUpperTierAmount
+        ? `First deposit bonus slab | Rs ${firstDepositBonusUpperTierMinimum}+ -> Rs ${firstDepositBonusUpperTierAmount}`
+        : `First deposit bonus slab | Rs ${firstDepositBonusMinimum}+ -> Rs ${firstDepositBonusBaseAmount}`
   });
 
   if (isStandalonePostgresEnabled()) {

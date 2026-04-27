@@ -285,8 +285,8 @@ export default function AddFundScreen() {
           key: order.keyId,
           amount: Math.round(order.amount * 100),
           currency: "INR",
-          name: "Real Matka",
-          description: "Wallet Deposit",
+          name: order.displayName || "Wallet Services",
+          description: order.description || "Wallet Top Up",
           order_id: order.gatewayOrderId,
           prefill: currentUser?.phone ? { contact: currentUser.phone } : {},
           notes: {

@@ -58,8 +58,10 @@ function renderHtml(content, status = 200) {
 function buildHostedCheckoutHtml({ serverOrigin, paymentOrder, user, callbackUrl }) {
   const amountPaise = roundToPaise(paymentOrder.amount);
   const prefllPhone = user?.phone ? `+91${user.phone}` : "";
-  const customerName = user?.name || "Real Matka User";
-  const pageTitle = `Real Matka Deposit ${paymentOrder.reference}`;
+  const customerName = user?.name || "Customer";
+  const displayName = standaloneConfig.paymentDisplayName || "Wallet Services";
+  const paymentDescription = standaloneConfig.paymentDescription || "Wallet Top Up";
+  const pageTitle = `${displayName} ${paymentOrder.reference}`;
 
   return `<!doctype html>
 <html lang="en">
@@ -82,9 +84,9 @@ function buildHostedCheckoutHtml({ serverOrigin, paymentOrder, user, callbackUrl
   </head>
   <body>
     <div class="card">
-      <div class="eyebrow">Test Mode Deposit</div>
+      <div class="eyebrow">Deposit</div>
       <h1>Complete Wallet Deposit</h1>
-      <p>You will be redirected to Razorpay secure checkout. Use Razorpay test UPI/card details to complete the payment.</p>
+      <p>You will be redirected to Razorpay secure checkout. Complete the payment to update your wallet.</p>
       <div class="meta">
         <span>Amount</span>
         <strong>Rs. ${escapeHtml(paymentOrder.amount.toFixed(2))}</strong>
@@ -101,8 +103,8 @@ function buildHostedCheckoutHtml({ serverOrigin, paymentOrder, user, callbackUrl
         key: ${JSON.stringify(razorpayKeyId)},
         amount: ${JSON.stringify(String(amountPaise))},
         currency: "INR",
-        name: "Real Matka",
-        description: "Wallet Deposit",
+        name: ${JSON.stringify(displayName)},
+        description: ${JSON.stringify(paymentDescription)},
         order_id: ${JSON.stringify(paymentOrder.gatewayOrderId)},
         callback_url: ${JSON.stringify(callbackUrl)},
         redirect: true,

@@ -102,6 +102,8 @@ export type PaymentOrder = {
   checkoutMode?: "native" | "link";
   gatewayOrderId?: string | null;
   keyId?: string | null;
+  displayName?: string | null;
+  description?: string | null;
 };
 
 export type HealthSnapshot = {

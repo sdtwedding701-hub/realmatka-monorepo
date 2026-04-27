@@ -12,6 +12,8 @@ export const standaloneConfig = {
   appUrl: readEnv("EXPO_PUBLIC_APP_URL", "http://localhost:8081"),
   apiUrl: readEnv("EXPO_PUBLIC_API_BASE_URL", "http://localhost:3000"),
   adminDomain: readEnv("ADMIN_DOMAIN", "http://localhost:5500"),
+  paymentDisplayName: readEnv("PAYMENT_DISPLAY_NAME", "Wallet Services"),
+  paymentDescription: readEnv("PAYMENT_DESCRIPTION", "Wallet Top Up"),
   allowDefaultAdminSeed: readEnv("ALLOW_DEFAULT_ADMIN_SEED", process.env.NODE_ENV === "production" ? "false" : "true") === "true",
   envAdminPhone: readEnv("ADMIN_PHONE"),
   envAdminPassword: readEnv("ADMIN_PASSWORD"),

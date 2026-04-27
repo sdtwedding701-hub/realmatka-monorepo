@@ -11,6 +11,7 @@ import {
   handlePaymentWebhook,
   updateWalletEntryAdmin
 } from "../stores/payment-store.mjs";
+import { standaloneConfig } from "../config.mjs";
 
 function roundToPaise(amount) {
   return Math.round(Number(amount || 0) * 100);
@@ -93,7 +94,9 @@ export async function createNativePaymentOrder({ user, amount, createOrder, getK
       ...order,
       checkoutMode: "native",
       gatewayOrderId: gatewayOrder.id,
-      keyId: getKeyId()
+      keyId: getKeyId(),
+      displayName: standaloneConfig.paymentDisplayName || "Wallet Services",
+      description: standaloneConfig.paymentDescription || "Wallet Top Up"
     }
   };
 }

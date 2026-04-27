@@ -13,6 +13,10 @@ function getRazorpayAuthHeader() {
   return `Basic ${Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64")}`;
 }
 
+function getPaymentDescription() {
+  return standaloneConfig.paymentDescription || "Wallet Top Up";
+}
+
 export function isRazorpayEnabled() {
   return Boolean(razorpayKeyId && razorpayKeySecret);
 }
@@ -68,11 +72,11 @@ export async function createRazorpayPaymentLink({ amount, receipt, paymentOrderI
       currency: "INR",
       upi_link: true,
       reference_id: receipt,
-      description: "Real Matka Wallet Deposit",
+      description: getPaymentDescription(),
       callback_url: callbackUrl,
       callback_method: "get",
       customer: {
-        name: user?.name || "Real Matka User",
+        name: user?.name || "Customer",
         contact: user?.phone ? `+91${user.phone}` : undefined
       },
       notes: {

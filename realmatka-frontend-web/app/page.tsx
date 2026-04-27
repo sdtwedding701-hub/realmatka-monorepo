@@ -30,7 +30,7 @@ const rates = [
 
 const MARKET_TIME_CHANGE_EFFECTIVE_DATE = "2026-04-27";
 const MARKET_TIME_CHANGE_OVERRIDES: Record<string, Pick<MarketCard, "open" | "close">> = {
-  "kalyan": { open: "03:45 PM", close: "05:45 PM" },
+  "kalyan": { open: "03:20 PM", close: "05:20 PM" },
   "time-bazar": { open: "12:55 PM", close: "01:55 PM" },
   "milan-day": { open: "02:55 PM", close: "04:55 PM" },
   "milan-night": { open: "08:55 PM", close: "10:55 PM" }
@@ -63,7 +63,7 @@ function getMarketCatalog(): MarketCard[] {
   { slug: "milan-day", name: "Milan Day", open: "02:55 PM", close: "04:55 PM", tag: "Games" },
   { slug: "rajdhani-day", name: "Rajdhani Day", open: "03:00 PM", close: "05:00 PM", tag: "Games" },
   { slug: "andhra-day", name: "Andhra Day", open: "03:30 PM", close: "05:30 PM", tag: "Games" },
-  { slug: "kalyan", name: "Kalyan", open: "03:45 PM", close: "05:45 PM", tag: "Games" },
+  { slug: "kalyan", name: "Kalyan", open: "03:20 PM", close: "05:20 PM", tag: "Games" },
   { slug: "mahadevi", name: "Mahadevi", open: "04:25 PM", close: "06:25 PM", tag: "Games" },
   { slug: "ntr-day", name: "NTR Day", open: "04:50 PM", close: "06:50 PM", tag: "Games" },
   { slug: "sita-night", name: "Sita Night", open: "06:40 PM", close: "07:40 PM", tag: "Games" },

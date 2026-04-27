@@ -22,7 +22,7 @@ export const chartMarkets: ChartMarketLink[] = [
   { slug: "milan-day", label: "Milan Day", open: "02:55 PM", close: "04:55 PM" },
   { slug: "rajdhani-day", label: "Rajdhani Day", open: "03:00 PM", close: "05:00 PM" },
   { slug: "andhra-day", label: "Andhra Day", open: "03:30 PM", close: "05:30 PM" },
-  { slug: "kalyan", label: "Kalyan", open: "03:45 PM", close: "05:45 PM" },
+  { slug: "kalyan", label: "Kalyan", open: "03:20 PM", close: "05:20 PM" },
   { slug: "mahadevi", label: "Mahadevi", open: "04:25 PM", close: "06:25 PM" },
   { slug: "ntr-day", label: "NTR Day", open: "04:50 PM", close: "06:50 PM" },
   { slug: "sita-night", label: "Sita Night", open: "06:40 PM", close: "07:40 PM" },

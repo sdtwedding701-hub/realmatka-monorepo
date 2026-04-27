@@ -18,11 +18,8 @@ function roundToPaise(amount) {
 }
 
 function validateDepositAmount(amountPaise) {
-  if (amountPaise < 10000) {
-    return "Minimum deposit is Rs. 100";
-  }
-  if (amountPaise % 10000 !== 0) {
-    return "Deposit amount must be a multiple of Rs. 100";
+  if (amountPaise < 100) {
+    return "Minimum deposit is Rs. 1";
   }
   return "";
 }

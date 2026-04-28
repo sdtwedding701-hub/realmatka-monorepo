@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, AppState, AppStateStatus, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import RazorpayCheckout from "react-native-razorpay";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
 import { api, formatApiError, type PaymentOrder } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
@@ -11,14 +10,6 @@ import { colors } from "@/theme/colors";
 
 const MIN_DEPOSIT_AMOUNT = 100;
 const PAYMENT_STATUS_REFRESH_MS = 10_000;
-
-function getRazorpayPrefill(user: { phone?: string; name?: string } | null) {
-  const phone = String(user?.phone || "").replace(/\D/g, "");
-  return {
-    ...(user?.name ? { name: user.name } : {}),
-    ...(phone ? { contact: phone, email: `${phone}@sdtwedding.com` } : {})
-  };
-}
 
 function statusTone(status: string) {
   const normalized = status.trim().toUpperCase();
@@ -32,7 +23,7 @@ function statusTone(status: string) {
 }
 
 export default function AddFundScreen() {
-  const { sessionToken, currentUser, walletBalance, reloadSessionData, loadWalletHistory } = useAppState();
+  const { sessionToken, walletBalance, reloadSessionData } = useAppState();
   const addFundSupported = isSupportedAddFundPlatform();
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -258,60 +249,14 @@ export default function AddFundScreen() {
       setError("");
       setSuccessMessage("");
 
-      const order = await api.createPaymentOrder(sessionToken, numericAmount, Platform.OS === "web" ? "web" : "app");
+      const order = await api.createPaymentOrder(sessionToken, numericAmount, "web");
       setPendingOrder(order);
 
-      if (Platform.OS === "web" || order.checkoutMode !== "native") {
-        if (!order.redirectUrl) {
-          throw new Error("Checkout link unavailable.");
-        }
-        await Linking.openURL(order.redirectUrl);
-        return;
+      if (!order.redirectUrl) {
+        throw new Error("Checkout link unavailable.");
       }
 
-      if (!order.gatewayOrderId || !order.keyId) {
-        throw new Error("Native checkout configuration missing.");
-      }
-
-      try {
-        const result = await RazorpayCheckout.open({
-          key: order.keyId,
-          amount: Math.round(order.amount * 100),
-          currency: "INR",
-          name: order.displayName || "Wallet Services",
-          description: order.description || "Wallet Top Up",
-          order_id: order.gatewayOrderId,
-          prefill: getRazorpayPrefill(currentUser),
-          notes: {
-            reference: order.reference,
-            paymentOrderId: order.id
-          },
-          theme: { color: colors.primary }
-        });
-
-        await api.confirmPaymentOrder(sessionToken, order.reference, {
-          razorpayPaymentId: String(result.razorpay_payment_id || "").trim(),
-          razorpayOrderId: String(result.razorpay_order_id || "").trim(),
-          razorpaySignature: String(result.razorpay_signature || "").trim()
-        });
-        await reloadSessionData({ force: true });
-        await loadWalletHistory({ force: true });
-        setSuccessMessage(`Deposit successful. Reference ${order.reference} wallet history me aa gaya hai.`);
-        router.replace({
-          pathname: "/wallet/history",
-          params: { payment: "success", reference: order.reference }
-        } as never);
-      } catch (checkoutError) {
-        const paymentCancelled =
-          typeof checkoutError === "object" &&
-          checkoutError != null &&
-          String((checkoutError as { code?: string | number }).code ?? "").toUpperCase() === "PAYMENT_CANCELLED";
-        if (paymentCancelled) {
-          setError("Payment cancel ho gaya. Dobara try kar sakte ho.");
-          return;
-        }
-        throw checkoutError;
-      }
+      await Linking.openURL(order.redirectUrl);
     } catch (startError) {
       setError(formatApiError(startError, "Payment start nahi hua."));
     } finally {

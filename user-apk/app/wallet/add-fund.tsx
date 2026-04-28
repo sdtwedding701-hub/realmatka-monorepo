@@ -12,6 +12,14 @@ import { colors } from "@/theme/colors";
 const MIN_DEPOSIT_AMOUNT = 100;
 const PAYMENT_STATUS_REFRESH_MS = 10_000;
 
+function getRazorpayPrefill(user: { phone?: string; name?: string } | null) {
+  const phone = String(user?.phone || "").replace(/\D/g, "");
+  return {
+    ...(user?.name ? { name: user.name } : {}),
+    ...(phone ? { contact: phone } : {})
+  };
+}
+
 function statusTone(status: string) {
   const normalized = status.trim().toUpperCase();
   if (normalized === "SUCCESS" || normalized === "PAID") {
@@ -273,7 +281,7 @@ export default function AddFundScreen() {
           name: order.displayName || "Wallet Services",
           description: order.description || "Wallet Top Up",
           order_id: order.gatewayOrderId,
-          prefill: currentUser?.phone ? { contact: currentUser.phone } : {},
+          prefill: getRazorpayPrefill(currentUser),
           notes: {
             reference: order.reference,
             paymentOrderId: order.id

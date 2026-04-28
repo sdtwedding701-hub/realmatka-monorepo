@@ -9,6 +9,11 @@ function roundToPaise(amount) {
   return Math.round(Number(amount || 0) * 100);
 }
 
+function buildCustomerEmail(user) {
+  const phone = String(user?.phone || "").replace(/\D/g, "");
+  return phone ? `${phone}@sdtwedding.com` : "customer@sdtwedding.com";
+}
+
 function getRazorpayAuthHeader() {
   return `Basic ${Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64")}`;
 }
@@ -77,7 +82,8 @@ export async function createRazorpayPaymentLink({ amount, receipt, paymentOrderI
       callback_method: "get",
       customer: {
         name: user?.name || "Customer",
-        contact: user?.phone ? `+91${user.phone}` : undefined
+        contact: user?.phone ? `+91${user.phone}` : undefined,
+        email: buildCustomerEmail(user)
       },
       notes: {
         paymentOrderId,

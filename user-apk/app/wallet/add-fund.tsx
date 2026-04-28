@@ -16,7 +16,7 @@ function getRazorpayPrefill(user: { phone?: string; name?: string } | null) {
   const phone = String(user?.phone || "").replace(/\D/g, "");
   return {
     ...(user?.name ? { name: user.name } : {}),
-    ...(phone ? { contact: phone } : {})
+    ...(phone ? { contact: phone, email: `${phone}@sdtwedding.com` } : {})
   };
 }
 

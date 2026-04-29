@@ -1,15 +1,17 @@
 :root {
-  --bg: #eef4ff;
+  --bg: #edf3fb;
   --surface: #ffffff;
   --ink: #0f172a;
   --muted: #64748b;
-  --primary: #0f62fe;
-  --primary-dark: #123067;
-  --border: #d9e5fb;
+  --primary: #1166f1;
+  --primary-dark: #0f2857;
+  --border: #d8e2f0;
   --success: #0f9f6e;
   --danger: #d14343;
-  --accent: #8b5cf6;
+  --accent: #f97316;
   --surface-soft: #f6f9ff;
+  --shadow-soft: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --shadow-lift: 0 16px 30px rgba(15, 23, 42, 0.1);
 }
 
 * {
@@ -18,10 +20,11 @@
 
 body {
   margin: 0;
-  font-family: "Segoe UI", sans-serif;
+  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
   background:
-    radial-gradient(circle at top right, rgba(15, 98, 254, 0.12), transparent 24%),
-    linear-gradient(180deg, #f9fbff 0%, var(--bg) 100%);
+    radial-gradient(circle at top left, rgba(249, 115, 22, 0.14), transparent 24%),
+    radial-gradient(circle at top right, rgba(17, 102, 241, 0.12), transparent 28%),
+    linear-gradient(180deg, #fbfdff 0%, var(--bg) 100%);
   color: var(--ink);
 }
 
@@ -53,7 +56,7 @@ body {
 .shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 292px 1fr;
 }
 
 .sidebar {
@@ -61,18 +64,21 @@ body {
   top: 0;
   height: 100vh;
   overflow-y: auto;
-  background: linear-gradient(180deg, #07162f 0%, #0b244e 52%, #102f6f 100%);
+  background:
+    radial-gradient(circle at 16% 0%, rgba(249, 115, 22, 0.24), transparent 30%),
+    linear-gradient(180deg, #081527 0%, #0c2342 52%, #0f315f 100%);
   color: #fff;
-  padding: 24px 18px;
+  padding: 22px 16px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
 }
 
 .brand h1 {
-  margin: 10px 0 4px;
-  font-size: 28px;
+  margin: 12px 0 5px;
+  font-size: 30px;
+  letter-spacing: -0.04em;
 }
 
 .brand p,
@@ -85,9 +91,9 @@ body {
 .brand-badge {
   display: inline-flex;
   padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(191, 219, 254, 0.16);
-  color: #dbeafe;
+  border-radius: 10px;
+  background: rgba(249, 115, 22, 0.18);
+  color: #ffedd5;
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
@@ -96,9 +102,11 @@ body {
 .operator-card {
   display: grid;
   gap: 4px;
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.08);
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.14);
 }
 
 .operator-card strong {
@@ -119,22 +127,23 @@ body {
 
 .nav {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .nav-link {
   border: 0;
   border-radius: 14px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   text-align: left;
-  background: rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.065);
   color: #fff;
   font-weight: 700;
   cursor: pointer;
   text-decoration: none;
   display: grid;
   gap: 4px;
-  transition: transform 120ms ease, background-color 120ms ease;
+  border: 1px solid transparent;
+  transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease;
 }
 
 .nav-link-title {
@@ -152,17 +161,19 @@ body {
 .nav-link:hover {
   transform: translateX(2px);
   background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .nav-link.active {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  background: linear-gradient(135deg, #f97316 0%, #1166f1 100%);
+  box-shadow: 0 14px 24px rgba(17, 102, 241, 0.24);
 }
 
 .main {
   min-height: 100vh;
-  padding: 24px;
+  padding: 28px;
   display: grid;
-  gap: 20px;
+  gap: 22px;
   align-content: start;
 }
 
@@ -171,8 +182,15 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
-  padding: 6px 4px 2px;
+  padding: 22px;
   flex-wrap: wrap;
+  border: 1px solid rgba(216, 226, 240, 0.9);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 26%),
+    rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(14px);
 }
 
 .topbar-copy {
@@ -183,9 +201,10 @@ body {
 
 .topbar-copy h2 {
   margin: 0;
-  font-size: 34px;
+  font-size: 36px;
   line-height: 1.05;
   color: var(--primary-dark);
+  letter-spacing: -0.045em;
 }
 
 .topbar-copy p {
@@ -198,9 +217,9 @@ body {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  padding: 7px 11px;
-  border-radius: 999px;
-  background: rgba(15, 98, 254, 0.08);
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: rgba(249, 115, 22, 0.11);
   color: var(--primary-dark);
   font-size: 11px;
   font-weight: 800;
@@ -221,10 +240,10 @@ body {
   display: grid;
   gap: 4px;
   padding: 12px 14px;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.04);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.05);
 }
 
 .topbar-chip span {
@@ -252,9 +271,9 @@ body {
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 24px;
+  border-radius: 22px;
   padding: 22px;
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.07);
+  box-shadow: var(--shadow-soft);
 }
 
 .hero-panel {
@@ -577,7 +596,9 @@ a.secondary {
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 16px;
-  background: linear-gradient(180deg, #fbfdff 0%, var(--surface-soft) 100%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, var(--surface-soft) 100%);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
 }
 
 .subpanel.wide {
@@ -680,7 +701,9 @@ a.secondary {
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
+  background:
+    radial-gradient(circle at top right, rgba(17, 102, 241, 0.08), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
   box-shadow: 0 10px 18px rgba(15, 23, 42, 0.04);
 }
 
@@ -693,6 +716,7 @@ a.secondary {
 
 .stat-card strong {
   font-size: 28px;
+  letter-spacing: -0.035em;
 }
 
 .audit-list {
@@ -791,16 +815,18 @@ a.secondary {
   display: grid;
   grid-template-columns: 1.1fr 1fr auto;
   gap: 12px;
-  padding: 0 6px 10px;
+  padding: 10px 14px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   position: sticky;
   top: 0;
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.94);
   z-index: 2;
   border-bottom: 1px solid var(--border);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
 }
 
 .data-row,
@@ -808,7 +834,7 @@ a.secondary {
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 16px;
-  background: linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
 .data-row {
@@ -816,12 +842,13 @@ a.secondary {
   gap: 18px;
   align-items: center;
   justify-content: space-between;
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
 }
 
 .data-row:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.06);
+  border-color: rgba(17, 102, 241, 0.28);
+  box-shadow: var(--shadow-lift);
 }
 
 .payout-row.urgent {
@@ -843,6 +870,7 @@ a.secondary {
   padding: 16px;
   display: grid;
   gap: 8px;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);
 }
 
 .request-highlight-card.deposit {
@@ -863,7 +891,7 @@ a.secondary {
 .request-highlight-type {
   width: fit-content;
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: 10px;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -909,11 +937,17 @@ a.secondary {
 .row-main {
   display: grid;
   gap: 6px;
+  min-width: 0;
+}
+
+.row-main strong {
+  letter-spacing: -0.01em;
 }
 
 .row-main span {
   color: var(--muted);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .row-actions {
@@ -978,6 +1012,7 @@ a.secondary {
   display: grid;
   gap: 6px;
   min-width: 0;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
 }
 
 .bid-metric-card span {

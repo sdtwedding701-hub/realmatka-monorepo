@@ -15,7 +15,7 @@ export async function getUserBalance(userId) {
       `SELECT after_balance
        FROM wallet_entries
        WHERE user_id = $1
-       ORDER BY created_at DESC
+       ORDER BY created_at DESC, id DESC
        LIMIT 1`,
       [userId]
     );
@@ -27,7 +27,7 @@ export async function getUserBalance(userId) {
       `SELECT after_balance
        FROM wallet_entries
        WHERE user_id = ?
-       ORDER BY created_at DESC
+       ORDER BY created_at DESC, id DESC
        LIMIT 1`
     )
     .get(userId);
@@ -75,8 +75,8 @@ function getWalletEntryBalanceDelta(entry) {
   return 0;
 }
 
-async function rebalanceWalletEntriesForUser(userId) {
-  const entries = await getWalletEntriesForUser(userId);
+export async function rebalanceWalletEntriesForUser(userId) {
+  const entries = await getWalletEntriesForUser(userId, 5000);
   const orderedEntries = [...entries].sort((left, right) => {
     const timeDiff = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
     if (timeDiff !== 0) return timeDiff;
@@ -518,8 +518,9 @@ export async function resolveWalletApprovalRequest(entryId, action) {
       depositAmount: request.amount,
       depositEntryId: entryId
     });
+    await rebalanceWalletEntriesForUser(request.userId);
     return {
-      request: approvedRequest,
+      request: (await findWalletEntryById(entryId)) ?? approvedRequest,
       settlementEntry: bonusEntry
     };
   }
@@ -552,7 +553,8 @@ export async function completeWalletRequest(entryId) {
     });
   }
 
-  return completedRequest;
+  await rebalanceWalletEntriesForUser(request.userId);
+  return (await findWalletEntryById(entryId)) ?? completedRequest;
 }
 
 export async function rejectWalletRequest(entryId) {

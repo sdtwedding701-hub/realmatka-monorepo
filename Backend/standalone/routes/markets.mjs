@@ -84,6 +84,57 @@ function filterEmptyChartRows(rows) {
   );
 }
 
+function sortChartRowsChronologically(rows) {
+  return [...(Array.isArray(rows) ? rows : [])].sort((left, right) => {
+    const leftDate = parseWeekLabelStartDate(left?.[0]);
+    const rightDate = parseWeekLabelStartDate(right?.[0]);
+    const leftTime = leftDate ? leftDate.getTime() : Number.MAX_SAFE_INTEGER;
+    const rightTime = rightDate ? rightDate.getTime() : Number.MAX_SAFE_INTEGER;
+    if (leftTime !== rightTime) {
+      return leftTime - rightTime;
+    }
+    return String(left?.[0] ?? "").localeCompare(String(right?.[0] ?? ""));
+  });
+}
+
+function parseWeekLabelStartDate(label) {
+  const value = String(label || "").trim();
+  let match = value.match(/^(\d{4})\s+([A-Za-z]{3})\s+(\d{2})\s+to\s+([A-Za-z]{3})\s+(\d{2})$/);
+  if (match) {
+    const [, year, month, day] = match;
+    const parsed = new Date(`${month} ${day}, ${year} 00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  match = value.match(/^(\d{4})\s+(\d{2})\s+([A-Za-z]{3})\s+to\s+(\d{2})\s+([A-Za-z]{3})$/);
+  if (match) {
+    const [, year, day, month] = match;
+    const parsed = new Date(`${month} ${day}, ${year} 00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+}
+
+function ensureCurrentWeekChartRow(chartType, rows, date = new Date()) {
+  const currentWeekLabel = normalizeWeekLabel(getWeekChartLabel(date));
+  const rowSize = chartType === "panna" ? 15 : 8;
+  const placeholder = chartType === "panna" ? "---" : "--";
+  const normalizedRows = (Array.isArray(rows) ? rows : []).map((row) => {
+    const nextRow = Array.isArray(row) ? row.slice(0, rowSize).map((cell) => String(cell ?? "").trim()) : [];
+    const label = normalizeWeekLabel(nextRow[0] || "");
+    const normalized = [label || currentWeekLabel, ...nextRow.slice(1)];
+    while (normalized.length < rowSize) {
+      normalized.push(placeholder);
+    }
+    return normalized;
+  });
+
+  if (!normalizedRows.some((row) => normalizeWeekLabel(row?.[0]) === currentWeekLabel)) {
+    normalizedRows.push([currentWeekLabel, ...Array.from({ length: rowSize - 1 }, () => placeholder)]);
+  }
+
+  return sortChartRowsChronologically(normalizedRows);
+}
+
 function getNonEmptyRows(rows) {
   return (Array.isArray(rows) ? rows : []).filter((row) =>
     Array.isArray(row) && row.length > 1 && String(row[0] ?? "").trim()
@@ -157,8 +208,9 @@ function formatPannaRowsForResponse(rows, market) {
   const parsed = parseResult(market?.result);
   const currentWeekLabel = normalizeWeekLabel(getWeekChartLabel(new Date()));
   const currentDayIndex = getWeekdayIndex(new Date());
+  const sourceRows = ensureCurrentWeekChartRow("panna", rows);
 
-  const formattedRows = (Array.isArray(rows) ? rows : []).map((row, rowIndex) => {
+  const formattedRows = sourceRows.map((row, rowIndex) => {
     const label = String(row?.[0] ?? `Week ${rowIndex + 1}`).trim();
     const normalizedRow = Array.isArray(row) ? row.map((cell) => String(cell ?? "").trim()) : [];
 
@@ -189,10 +241,6 @@ function formatPannaRowsForResponse(rows, market) {
     return nextRow;
   });
 
-  const meaningfulRows = filterEmptyChartRows(formattedRows);
-  if (meaningfulRows.length > 0) {
-    return meaningfulRows;
-  }
   const usableRows = getNonEmptyRows(formattedRows);
   return usableRows.length > 0 ? usableRows : buildEmptyChartRows("panna");
 }
@@ -286,7 +334,7 @@ export async function chartBatch(request) {
       const preferredRows = getPreferredChartRows("jodi", chart.rows);
       items.push({
         ...chart,
-        rows: preferredRows.length ? preferredRows : buildEmptyChartRows("jodi")
+        rows: ensureCurrentWeekChartRow("jodi", preferredRows.length ? preferredRows : buildEmptyChartRows("jodi"))
       });
     }
   }
@@ -336,7 +384,7 @@ export async function chart(request, params) {
   return ok(
     {
       ...chart,
-      rows: preferredRows.length ? preferredRows : buildEmptyChartRows("jodi")
+      rows: ensureCurrentWeekChartRow("jodi", preferredRows.length ? preferredRows : buildEmptyChartRows("jodi"))
     },
     request
   );

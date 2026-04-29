@@ -232,12 +232,7 @@ function normalizeJodiRows(rows: string[][]) {
 }
 
 function hasRenderableChartRows(rows: string[][] | undefined | null) {
-  return Array.isArray(rows) && rows.some((row) => Array.isArray(row) && row.slice(1).some((cell) => !isPlaceholderChartCell(cell)));
-}
-
-function isPlaceholderChartCell(value: string | undefined) {
-  const cleaned = String(value ?? "").trim();
-  return !cleaned || cleaned === "--" || cleaned === "---" || cleaned === "**" || cleaned === "***";
+  return Array.isArray(rows) && rows.some((row) => Array.isArray(row) && row.length > 1 && String(row[0] ?? "").trim());
 }
 
 function normalizePannaRows(rows: string[][]): PannaRow[] {

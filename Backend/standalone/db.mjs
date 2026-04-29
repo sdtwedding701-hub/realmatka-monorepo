@@ -1697,44 +1697,8 @@ function getWalletEntryBalanceDelta(entry) {
 }
 
 export async function rebalanceWalletEntriesForUser(userId) {
-  const entries = await getWalletEntriesForUser(userId);
-  const orderedEntries = [...entries].sort((left, right) => {
-    const timeDiff = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
-    if (timeDiff !== 0) return timeDiff;
-    return String(left.id).localeCompare(String(right.id));
-  });
-
-  let runningBalance = 0;
-
-  if (isStandalonePostgresEnabled()) {
-    const pool = await getReadyPgPool();
-    for (const entry of orderedEntries) {
-      const beforeBalance = runningBalance;
-      const afterBalance = beforeBalance + getWalletEntryBalanceDelta(entry);
-      await pool.query(
-        `UPDATE wallet_entries
-         SET before_balance = $2, after_balance = $3
-         WHERE id = $1`,
-        [entry.id, beforeBalance, afterBalance]
-      );
-      runningBalance = afterBalance;
-    }
-    return runningBalance;
-  }
-
-  const db = getSqlite();
-  const update = db.prepare(
-    `UPDATE wallet_entries
-     SET before_balance = ?, after_balance = ?
-     WHERE id = ?`
-  );
-  for (const entry of orderedEntries) {
-    const beforeBalance = runningBalance;
-    const afterBalance = beforeBalance + getWalletEntryBalanceDelta(entry);
-    update.run(beforeBalance, afterBalance, entry.id);
-    runningBalance = afterBalance;
-  }
-  return runningBalance;
+  const { rebalanceWalletEntriesForUser: rebalanceWalletEntriesForUserFromWalletDb } = await import("./db/wallet-db.mjs");
+  return rebalanceWalletEntriesForUserFromWalletDb(userId);
 }
 
 export async function clearWalletEntriesForUser(userId, types = []) {

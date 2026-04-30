@@ -7,7 +7,14 @@ export const metadata = buildMetadata({
   description:
     "Satta Matka live market timing, game rate, result access, jodi chart aur panna chart ek dedicated Real Matka page par dekho.",
   path: "/satta-matka",
-  keywords: ["satta matka", "satta matka live", "satta matka game rate", "matka live market"]
+  keywords: [
+    "satta matka",
+    "satta matka live",
+    "satta matka game rate",
+    "matka live market",
+    "ai matka guessing",
+    "ai jodi guessing"
+  ]
 });
 
 const sections = [
@@ -80,6 +87,9 @@ export default function SattaMatkaPage() {
             </Link>
             <Link href="/matka-chart" className="action-secondary">
               Matka Chart Page
+            </Link>
+            <Link href="/ai-matka-guessing" className="action-secondary">
+              AI Guessing Page
             </Link>
           </div>
         </section>

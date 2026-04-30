@@ -8,7 +8,15 @@ export const metadata = buildMetadata({
   description:
     "Matka Chart page par jodi chart, panna chart, old chart access aur market-wise chart usage details clearly dekho.",
   path: "/matka-chart",
-  keywords: ["matka chart", "jodi chart", "panna chart", "old matka chart"]
+  keywords: [
+    "matka chart",
+    "jodi chart",
+    "panna chart",
+    "old matka chart",
+    "ai jodi chart",
+    "matka guessing chart",
+    "final ank guessing"
+  ]
 });
 
 const chartBlocks = [
@@ -78,6 +86,9 @@ export default function MatkaChartPage() {
             </Link>
             <Link href="/online-play-satta-matka" className="action-secondary">
               Online Play Page
+            </Link>
+            <Link href="/ai-matka-guessing" className="action-secondary">
+              AI Guessing Page
             </Link>
           </div>
         </section>

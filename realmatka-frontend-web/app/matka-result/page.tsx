@@ -8,7 +8,15 @@ export const metadata = buildMetadata({
   description:
     "Matka Result today page par major markets ke result, open close update aur chart access ke links ek place par dekho.",
   path: "/matka-result",
-  keywords: ["matka result", "matka result today", "kalyan result", "main bazar result", "rajdhani result"]
+  keywords: [
+    "matka result",
+    "matka result today",
+    "kalyan result",
+    "main bazar result",
+    "rajdhani result",
+    "matka guessing today",
+    "open close guessing"
+  ]
 });
 
 const resultTopics = [
@@ -107,6 +115,9 @@ export default function MatkaResultPage() {
             </Link>
             <Link href="/satta-matka" className="action-secondary">
               Satta Matka Overview
+            </Link>
+            <Link href="/ai-matka-guessing" className="action-secondary">
+              AI Guessing Page
             </Link>
           </div>
         </section>

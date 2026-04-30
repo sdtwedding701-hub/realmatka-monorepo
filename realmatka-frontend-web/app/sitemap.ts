@@ -44,6 +44,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/matka-result", changeFrequency: "daily" as const, priority: 0.88 },
     { path: "/online-play-satta-matka", changeFrequency: "weekly" as const, priority: 0.8 },
     { path: "/matka-chart", changeFrequency: "weekly" as const, priority: 0.82 },
+    { path: "/ai-matka-guessing", changeFrequency: "weekly" as const, priority: 0.8 },
     { path: "/jodi-chart", changeFrequency: "weekly" as const, priority: 0.78 },
     { path: "/panna-chart", changeFrequency: "weekly" as const, priority: 0.78 },
     { path: "/kalyan-matka-result", changeFrequency: "daily" as const, priority: 0.84 },

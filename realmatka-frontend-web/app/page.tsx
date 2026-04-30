@@ -131,6 +131,11 @@ const seoPageLinks = [
     body: "Jodi chart, panna chart, old chart aur market-wise chart usage details ek jagah pao."
   },
   {
+    href: "/ai-matka-guessing",
+    title: "AI Matka Guessing",
+    body: "AI jodi guessing, final ank guessing aur open close chart analysis ko simple format me samjho."
+  },
+  {
     href: "/jodi-chart",
     title: "Jodi Chart",
     body: "Daily jodi records aur market-wise jodi movement ko clear chart page par dekho."

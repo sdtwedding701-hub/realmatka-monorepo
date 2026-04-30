@@ -8,9 +8,18 @@ export const revalidate = 60;
 export const metadata = buildMetadata({
   title: "Real Matka - Game Rates, Market Results, Jodi & Panna Charts",
   description:
-    "Check Real Matka game rates, live market results, market timings, available games, jodi charts, panna charts, and direct access to the Real Matka web app.",
+    "Check Real Matka game rates, live market results, online play matka app access, APK download, market timings, jodi charts, and panna charts.",
   path: "/",
-  keywords: ["real matka live", "real matka market", "game rate", "live result"]
+  keywords: [
+    "real matka live",
+    "real matka market",
+    "game rate",
+    "live result",
+    "online play matka app",
+    "online satta matka",
+    "matka app download",
+    "satta matka apk"
+  ]
 });
 
 const webAppBaseUrl = "https://play.realmatka.in";
@@ -197,6 +206,10 @@ const homeFaqItems = [
     answer: "Haan, aap play web app use kar sakte ho aur download page se latest APK bhi le sakte ho."
   },
   {
+    question: "Online satta matka kaise khele?",
+    answer: "Online play ke liye register karo, login karo, market timing aur game rate check karo, phir web app ya Android APK se play access lo."
+  },
+  {
     question: "Game rate list kis section me hai?",
     answer: "Homepage ke Game Rate section me Single Digit se Full Sangam tak saare popular game rates diye gaye hain."
   }
@@ -217,14 +230,15 @@ export default function HomePage() {
           <div className="relative max-w-4xl">
             <div className="metric-pill">Full Game Rate - All Markets - Charts</div>
             <h1 className="mt-4 max-w-4xl text-3xl font-extrabold leading-tight sm:text-5xl">
-              Real Matka game rates, market results, jodi charts aur panna charts ek jagah.
+              Real Matka online play app, game rates, market results, jodi charts aur panna charts.
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-lg sm:leading-8">
-              Real Matka par daily market timing, live result, full game rate, available games, jodi chart aur panna chart clear format me dekho. Login karke direct live web app access karo.
+              Real Matka par online play satta matka app access, APK download, daily market timing, live result, full game rate, available games, jodi chart aur panna chart clear format me dekho.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a href="#rates" className="action-primary">Check Game Rate</a>
               <a href="/download" className="action-secondary">Download APK</a>
+              <a href="/online-play-satta-matka" className="action-secondary">How To Play Online</a>
             </div>
           </div>
         </section>

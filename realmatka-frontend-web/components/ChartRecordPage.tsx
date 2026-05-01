@@ -374,9 +374,28 @@ function normalizePannaRows(rows: string[][]) {
     .map((row, index) => {
       const label = String(row[0] ?? `Week ${index + 1}`).trim();
       const rawCells = row.slice(1).map((value) => String(value ?? "").trim());
+      const hasPackedCells = rawCells.length >= 7 && rawCells.slice(0, 7).some((value) =>
+        value.includes("/") || /^[0-9]{3}[-\s/][0-9]{2}[-\s/][0-9]{3}$/.test(value)
+      );
       const cells: PannaCell[] = [];
+
+      if (hasPackedCells) {
+        for (let cellIndex = 0; cellIndex < 7; cellIndex += 1) {
+          cells.push(parsePannaCellValue(rawCells[cellIndex]));
+        }
+        return { label, cells };
+      }
+
+      const values = rawCells.filter(Boolean);
       for (let cellIndex = 0; cellIndex < 7; cellIndex += 1) {
-        cells.push(parsePannaCellValue(rawCells[cellIndex]));
+        const open = normalizePannaValue(values[cellIndex * 2]);
+        const rawClose = String(values[cellIndex * 2 + 1] ?? "").trim();
+        const close = normalizePannaValue(rawClose);
+        cells.push({
+          open,
+          jodi: deriveJodi(open, rawClose || close),
+          close: /^[0-9]\*\*$/.test(rawClose) ? "***" : close
+        });
       }
       return { label, cells };
     });
@@ -402,7 +421,45 @@ function parsePannaCellValue(value: string | undefined): PannaCell {
   if (full) {
     return { open: full[1], jodi: full[2], close: full[3] };
   }
-  return { open: "---", jodi: normalizeJodiValue(cleaned), close: "---" };
+
+  const pair = cleaned.match(/^([0-9]{3})[\/\s-]([0-9]{3})$/);
+  if (pair) {
+    const open = normalizePannaValue(pair[1]);
+    const close = normalizePannaValue(pair[2]);
+    return { open, jodi: deriveJodi(open, close), close };
+  }
+
+  const partial = cleaned.match(/^([0-9]{3})[\/\s-]([0-9])\*\*$/);
+  if (partial) {
+    return { open: partial[1], jodi: `${partial[2]}*`, close: "***" };
+  }
+
+  if (cleaned === "***") {
+    return { open: "---", jodi: "--", close: "---" };
+  }
+
+  const single = normalizePannaValue(cleaned);
+  return { open: single, jodi: normalizeJodiValue(cleaned), close: "---" };
+}
+
+function normalizePannaValue(value: string | undefined) {
+  const cleaned = String(value ?? "").trim();
+  return /^[0-9]{3}$/.test(cleaned) ? cleaned : "---";
+}
+
+function deriveOpenStageJodi(close: string) {
+  return /^[0-9]\*\*$/.test(close) ? `${close[0]}*` : "--";
+}
+
+function deriveJodi(open: string, close: string) {
+  if (!/^[0-9]{3}$/.test(open) || !/^[0-9]{3}$/.test(close)) {
+    return deriveOpenStageJodi(close);
+  }
+  return `${sumDigits(open) % 10}${sumDigits(close) % 10}`;
+}
+
+function sumDigits(value: string) {
+  return value.split("").reduce((total, digit) => total + Number(digit), 0);
 }
 
 function compactWeekLabel(label: string) {

@@ -1,11 +1,9 @@
 import { notFound } from "next/navigation";
 import { ChartRecordPage, getChartMarket, getChartMarketLabel } from "@/components/ChartRecordPage";
-import { chartMarkets } from "@/lib/market-links";
 import { buildMetadata } from "@/lib/seo";
 
-export function generateStaticParams() {
-  return chartMarkets.map((market) => ({ slug: market.slug }));
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

@@ -46,7 +46,6 @@ export async function ChartRecordPage({ slug, chartType }: { slug: string; chart
   const rows = chartType === "panna" ? normalizePannaRows(chart?.rows ?? []) : normalizeJodiRows(chart?.rows ?? []);
   const hasRows = rows.length > 0;
   const currentResult = String(market?.result || "***-**-***").trim() || "***-**-***";
-  const marketTiming = `${String(market?.open || getChartMarket(slug)?.open || "--:--").trim()} - ${String(market?.close || getChartMarket(slug)?.close || "--:--").trim()}`;
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#07101d_0%,#08111f_36%,#060a14_100%)] text-white">
@@ -70,7 +69,7 @@ export async function ChartRecordPage({ slug, chartType }: { slug: string; chart
                 {keywordText}
               </p>
               <div className="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-orange-200 sm:text-sm">
-                Result {currentResult} | Time {marketTiming}
+                Result {currentResult}
               </div>
             </div>
             <div className="flex flex-wrap justify-center gap-3">
@@ -88,6 +87,21 @@ export async function ChartRecordPage({ slug, chartType }: { slug: string; chart
         </section>
 
         <section className="overflow-hidden px-1 py-2 sm:px-2 sm:py-3">
+          <div className="mb-5 flex justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <a href="#chart-record-bottom" className="action-secondary">
+                Go to Bottom
+              </a>
+              <div className="rounded-[16px] border border-white/10 bg-white/[0.04] px-4 py-2 text-center">
+                <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">{upperLabel}</div>
+                <div className="mt-1 text-lg font-extrabold text-orange-200">{currentResult}</div>
+              </div>
+              <Link href={`/charts/${slug}?type=${chartType}&label=${encodeURIComponent(marketLabel)}`} className="action-secondary">
+                Refresh Result
+              </Link>
+            </div>
+          </div>
+
           {!hasRows ? (
             <div className="py-12 text-center text-slate-300">Chart data abhi available nahi hai. Thoda baad retry karo.</div>
           ) : null}
@@ -160,10 +174,22 @@ export async function ChartRecordPage({ slug, chartType }: { slug: string; chart
             </div>
           ) : null}
 
-          <div className="mt-5 flex flex-wrap justify-center gap-3">
-            <Link href="/matka-chart" className="action-secondary">All Matka Charts</Link>
-            <Link href="/jodi-chart" className="action-secondary">Jodi Chart</Link>
-            <Link href="/panna-chart" className="action-secondary">Panna Chart</Link>
+          <div id="chart-record-bottom" className="mt-5 flex flex-col items-center gap-4">
+            <div className="w-full rounded-[16px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center">
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">{upperLabel}</div>
+              <div className="mt-1 text-lg font-extrabold text-orange-200">{currentResult}</div>
+            </div>
+            <Link href={`/charts/${slug}?type=${chartType}&label=${encodeURIComponent(marketLabel)}`} className="action-secondary">
+              Refresh Result
+            </Link>
+            <a href="#" className="action-secondary">
+              Go to Top
+            </a>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link href="/matka-chart" className="action-secondary">All Matka Charts</Link>
+              <Link href="/jodi-chart" className="action-secondary">Jodi Chart</Link>
+              <Link href="/panna-chart" className="action-secondary">Panna Chart</Link>
+            </div>
           </div>
 
           <section className="mx-auto mt-6 max-w-5xl border border-white/10 bg-white/[0.03] px-5 py-6 text-left sm:px-7">

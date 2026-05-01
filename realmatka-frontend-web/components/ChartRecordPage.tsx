@@ -68,9 +68,6 @@ export async function ChartRecordPage({ slug, chartType }: { slug: string; chart
               <p className="mx-auto mt-4 max-w-5xl text-xs leading-6 text-slate-400 sm:text-sm sm:leading-7">
                 {keywordText}
               </p>
-              <div className="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-orange-200 sm:text-sm">
-                Result {currentResult}
-              </div>
             </div>
             <div className="flex flex-wrap justify-center gap-3">
               <Link href={`/jodi-chart-record/${slug}`} className={chartType === "jodi" ? "action-primary" : "action-secondary"}>

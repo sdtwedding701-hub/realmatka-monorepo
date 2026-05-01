@@ -106,11 +106,14 @@ export default function MatkaChartPage() {
                   {market.open} - {market.close}
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
-                  <Link href={`/charts/${market.slug}?type=jodi&label=${encodeURIComponent(market.label)}`} className="action-primary">
-                    Jodi Chart
+                  <Link href={`/jodi-chart-record/${market.slug}`} className="action-primary">
+                    Jodi Record
                   </Link>
-                  <Link href={`/charts/${market.slug}?type=panna&label=${encodeURIComponent(market.label)}`} className="action-secondary">
-                    Panna Chart
+                  <Link href={`/panel-chart-record/${market.slug}`} className="action-secondary">
+                    Panel Record
+                  </Link>
+                  <Link href={`/charts/${market.slug}?type=jodi&label=${encodeURIComponent(market.label)}`} className="action-secondary">
+                    Live Chart
                   </Link>
                 </div>
               </article>

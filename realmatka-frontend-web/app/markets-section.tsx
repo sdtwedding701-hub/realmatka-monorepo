@@ -121,8 +121,8 @@ export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: Market
                 <h3 className="market-name-text font-extrabold uppercase text-white">{market.name}</h3>
                 <p className="market-result-text mt-3 font-extrabold text-orange-200">{market.result || "***-**-***"}</p>
                 <div className="market-links-stack mt-4">
-                  <a href={`/charts/${slugifyMarket(market.name)}?type=jodi&label=${encodeURIComponent(market.name)}`} className="market-chart-text-link">Jodi Chart</a>
-                  <a href={`/charts/${slugifyMarket(market.name)}?type=panna&label=${encodeURIComponent(market.name)}`} className="market-chart-text-link">Panna Chart</a>
+                  <a href={`/jodi-chart-record/${slugifyMarket(market.name)}`} className="market-chart-text-link">Jodi Chart</a>
+                  <a href={`/panel-chart-record/${slugifyMarket(market.name)}`} className="market-chart-text-link">Panel Chart</a>
                 </div>
               </div>
               <div className="market-play-wrap">

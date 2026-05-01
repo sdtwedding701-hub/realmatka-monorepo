@@ -61,8 +61,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: "weekly" as const,
     priority: 0.72
   }));
+  const jodiRecordRoutes = marketChartSlugs.map((slug) => ({
+    path: `/jodi-chart-record/${slug}`,
+    changeFrequency: "weekly" as const,
+    priority: 0.74
+  }));
+  const panelRecordRoutes = marketChartSlugs.map((slug) => ({
+    path: `/panel-chart-record/${slug}`,
+    changeFrequency: "weekly" as const,
+    priority: 0.74
+  }));
 
-  return [...staticRoutes, ...chartRoutes].map((route) => ({
+  return [...staticRoutes, ...chartRoutes, ...jodiRecordRoutes, ...panelRecordRoutes].map((route) => ({
     url: `${SEO.siteUrl}${route.path}`,
     lastModified: now,
     changeFrequency: route.changeFrequency,

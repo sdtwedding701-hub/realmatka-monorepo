@@ -8,9 +8,11 @@ export function options(request) {
 
 function parseResult(result) {
   const parts = String(result ?? "").trim().split("-");
+  const middle = String(parts[1] ?? "");
   return {
     openPanna: /^[0-9]{3}$/.test(parts[0] ?? "") ? parts[0] : "",
     jodi: /^[0-9]{2}$/.test(parts[1] ?? "") ? parts[1] : "",
+    openAnk: /^[0-9]/.test(middle) ? middle[0] : "",
     closePanna: /^[0-9]{3}$/.test(parts[2] ?? "") ? parts[2] : ""
   };
 }
@@ -143,7 +145,7 @@ function getNonEmptyRows(rows) {
 
 function isValidJodiCell(value) {
   const normalized = String(value ?? "").trim();
-  return /^[0-9]{2}$/.test(normalized) || normalized === "--" || normalized === "**";
+  return /^[0-9]{2}$/.test(normalized) || /^[0-9]\*$/.test(normalized) || normalized === "--" || normalized === "**";
 }
 
 function isValidPannaCell(value) {
@@ -176,7 +178,7 @@ function isStructurallyValidChartRow(chartType, row) {
     return true;
   }
 
-  return cells.length >= 14 && cells.slice(0, 14).every((value) => /^[0-9]{3}$/.test(value) || value === "---");
+  return cells.length >= 14 && cells.slice(0, 14).every((value) => /^[0-9]{3}$/.test(value) || /^[0-9]\*\*$/.test(value) || value === "---" || value === "***");
 }
 
 function getStructuredChartRows(chartType, rows) {
@@ -234,6 +236,8 @@ function formatPannaRowsForResponse(rows, market) {
       const isCurrentMarketCell = normalizeWeekLabel(label) === currentWeekLabel && dayIndex === currentDayIndex;
       if (isCurrentMarketCell && parsed.openPanna && parsed.jodi && parsed.closePanna) {
         nextRow.push(`${parsed.openPanna}-${parsed.jodi}-${parsed.closePanna}`);
+      } else if (isCurrentMarketCell && parsed.openPanna && parsed.openAnk && !parsed.closePanna) {
+        nextRow.push(packPannaCell(parsed.openPanna, `${parsed.openAnk}**`));
       } else {
         nextRow.push(packPannaCell(open, close));
       }

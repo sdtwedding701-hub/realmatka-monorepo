@@ -313,7 +313,7 @@ export async function syncChartsFromMarketResult(market) {
   } else {
     if (parsed.openPanna) pannaContainer.rows[pannaContainer.rowIndex][openIndex] = parsed.openPanna;
     if (parsed.closePanna) pannaContainer.rows[pannaContainer.rowIndex][closeIndex] = parsed.closePanna;
-    else if (parsed.openAnk && !parsed.jodi) pannaContainer.rows[pannaContainer.rowIndex][closeIndex] = `${parsed.openAnk}**`;
+    else if (parsed.openAnk && !parsed.jodi) pannaContainer.rows[pannaContainer.rowIndex][closeIndex] = "***";
   }
   await upsertChartRecord(market.slug, "panna", sortChartRowsChronologically(pannaContainer.rows));
 }

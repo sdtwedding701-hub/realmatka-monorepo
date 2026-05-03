@@ -5,7 +5,7 @@ import { LoginScreen } from "./LoginScreen.jsx";
 import { AdminShell } from "./AdminShell.jsx";
 import { AuditPage } from "./AuditPage.jsx";
 import { NotificationsPage } from "./NotificationsPage.jsx";
-import { AdminMarketPublishList, AllChartPage, ChartEditorPreviewSection, ResultEnginePage, ResultPublishSettlementSection, buildNextResultFromSlotChange, getAdminCurrentMinutes, getBracketMarkEditorValues, getClearedEditorValues, getEditorValuesFromSelectedCell, getResultSlotNavigationTarget, publishMarketResult, saveMarketChart } from "./ResultEnginePage.jsx";
+import { AdminMarketPublishList, AllChartPage, ChartEditorPreviewSection, ResultEnginePage, ResultPublishSettlementSection, buildNextResultFromSlotChange, getAdminCurrentMinutes, getBracketMarkEditorValues, getClearedEditorValues, getEditorValuesFromSelectedCell, getResultSlotNavigationTarget, publishMarketResult, saveMarketChart, sortAdminMarketsByTime } from "./ResultEnginePage.jsx";
 import { SettingsPage } from "./SettingsPage.jsx";
 import { SupportChatPage } from "./SupportChatPage.jsx";
 
@@ -858,6 +858,8 @@ function RequestsPage({
   }, [initialRequestType]);
 
   const effectiveRequestType = lockedRequestType || requestType;
+  const isDepositOnly = effectiveRequestType === "DEPOSIT";
+  const isWithdrawOnly = effectiveRequestType === "WITHDRAW";
   const historyItems = effectiveRequestType === "all" ? state.items : state.items.filter((item) => item.type === effectiveRequestType);
   const pendingItems = effectiveRequestType === "all" ? state.pending : state.pending.filter((item) => item.type === effectiveRequestType);
 
@@ -883,12 +885,54 @@ function RequestsPage({
   );
   const pendingWithdraws = state.pending.filter((item) => item.type === "WITHDRAW").length;
   const pendingDeposits = state.pending.filter((item) => item.type === "DEPOSIT").length;
+  const successfulDeposits = state.items.filter((item) => item.type === "DEPOSIT" && item.status === "SUCCESS").length;
+  const rejectedDeposits = state.items.filter((item) => item.type === "DEPOSIT" && ["FAILED", "CANCELLED", "REJECTED"].includes(item.status)).length;
+  const pendingDepositAmount = prioritizedPending.filter((item) => item.type === "DEPOSIT").reduce((total, item) => total + Number(item.amount || 0), 0);
   const processingWithdraws = state.items.filter((item) => item.type === "WITHDRAW" && item.status === "BACKOFFICE").length;
   const rejectedWithdraws = state.items.filter((item) => item.type === "WITHDRAW" && item.status === "REJECTED").length;
   const paidWithdraws = state.items.filter((item) => item.type === "WITHDRAW" && item.status === "SUCCESS").length;
   const staleWithdraws = prioritizedPending.filter((item) => isOlderThanMinutes(item.createdAt, 24 * 60)).length;
   const urgentPendingCount = prioritizedPending.filter((item) => getWalletQueuePriority(item) >= 3).length;
   const oldestPending = prioritizedPending[0] || null;
+  const metricStats = isDepositOnly
+    ? [
+        miniStat("Pending Deposits", pendingDeposits),
+        miniStat("Credited Deposits", successfulDeposits),
+        miniStat("Failed Deposits", rejectedDeposits),
+        miniStat("Stale Pending", staleWithdraws),
+        miniStat("Pending Amount", formatCurrency(pendingDepositAmount)),
+        miniStat("Total Credited", formatCurrency(state.reconciliation?.summary?.depositSuccessAmount ?? 0))
+      ]
+    : isWithdrawOnly
+      ? [
+          miniStat("Pending Withdraws", pendingWithdraws),
+          miniStat("Processing Withdraws", processingWithdraws),
+          miniStat("Stale Pending", staleWithdraws),
+          miniStat("Urgent Queue", urgentPendingCount),
+          miniStat("Rejected", rejectedWithdraws),
+          miniStat("Paid", paidWithdraws),
+          miniStat("Withdraw Paid", formatCurrency(state.reconciliation?.summary?.withdrawSuccessAmount ?? 0))
+        ]
+      : [
+          miniStat("Pending Deposits", pendingDeposits),
+          miniStat("Pending Withdraws", pendingWithdraws),
+          miniStat("Processing Withdraws", processingWithdraws),
+          miniStat("Stale Pending", staleWithdraws),
+          miniStat("Urgent Queue", urgentPendingCount),
+          miniStat("Rejected", rejectedWithdraws),
+          miniStat("Paid", paidWithdraws),
+          miniStat("Withdraw Paid", formatCurrency(state.reconciliation?.summary?.withdrawSuccessAmount ?? 0))
+        ];
+  const pendingEmptyCopy = isDepositOnly
+    ? "No pending deposit requests right now."
+    : isWithdrawOnly
+      ? "No pending withdraw requests right now."
+      : "No pending wallet requests right now.";
+  const historyEmptyCopy = isDepositOnly
+    ? "No deposit requests match current filters."
+    : isWithdrawOnly
+      ? "No withdraw requests match current filters."
+      : "No wallet requests match current filters.";
 
   if (state.loading) return <PageState title={pageTitle} subtitle={pageSubtitle} />;
   if (state.error) return <PageState title={pageTitle} subtitle={state.error} tone="error" />;
@@ -897,16 +941,7 @@ function RequestsPage({
     <>
       <section className="panel hero-panel">
         <div className="compact-metric-strip">
-          {[
-            miniStat("Pending Deposits", pendingDeposits),
-            miniStat("Pending Withdraws", pendingWithdraws),
-            miniStat("Processing Withdraws", processingWithdraws),
-            miniStat("Stale Pending", staleWithdraws),
-            miniStat("Urgent Queue", urgentPendingCount),
-            miniStat("Rejected", rejectedWithdraws),
-            miniStat("Paid", paidWithdraws),
-            miniStat("Withdraw Paid", formatCurrency(state.reconciliation?.summary?.withdrawSuccessAmount ?? 0))
-          ]}
+          {metricStats}
         </div>
       </section>
       <section className="panel">
@@ -931,7 +966,7 @@ function RequestsPage({
               <option value="all">All</option>
               <option value="INITIATED">Pending</option>
               <option value="BACKOFFICE">Processing</option>
-              <option value="SUCCESS">Paid</option>
+              <option value="SUCCESS">{isDepositOnly ? "Credited" : "Paid"}</option>
               <option value="FAILED">Failed</option>
               <option value="CANCELLED">Cancelled</option>
               <option value="REJECTED">Rejected</option>
@@ -968,7 +1003,7 @@ function RequestsPage({
                 <strong>{item.type} - {formatCurrency(item.amount)}</strong>
                 <span>{item.user?.name} ({item.user?.phone})</span>
                 <span>{formatDate(item.createdAt)}</span>
-                <span>Balance {formatCurrency(item.liveBalance)} Â· Age {formatRelativeAge(item.createdAt)}</span>
+                <span>Before {formatCurrency(item.beforeBalance)} / Live {formatCurrency(item.liveBalance)} / Age {formatRelativeAge(item.createdAt)}</span>
               </div>
               <div className="row-main">
                 <strong>{getWalletRequestMetaTitle(item)}</strong>
@@ -977,7 +1012,7 @@ function RequestsPage({
                 {item.proofUrl ? <button className="secondary" onClick={() => setProof(item)}>Open Proof</button> : <span>No proof URL</span>}
               </div>
               <div className="row-main">
-                <strong>{getPayoutStatusLabel(item.status)}</strong>
+                <strong>{getPayoutStatusLabel(item.status, item.type)}</strong>
                 <span>{getWalletRequestStatusHint(item)}</span>
                 {getWalletRequestNoteLine(item) ? <span>{getWalletRequestNoteLine(item)}</span> : null}
               </div>
@@ -989,7 +1024,7 @@ function RequestsPage({
                     <button className="secondary danger" disabled={busyId === item.id} type="button" onClick={() => openAction(item, "reject")}>Reject</button>
                   </>
                 ) : null}
-                {item.status === "BACKOFFICE" ? (
+                {canCompleteWalletRequest(item) ? (
                   <>
                     <button className="primary" disabled={busyId === item.id} type="button" onClick={() => openAction(item, "complete")}>{getWalletCompleteLabel(item)}</button>
                     <button className="secondary danger" disabled={busyId === item.id} type="button" onClick={() => openAction(item, "reject")}>Reject</button>
@@ -997,11 +1032,11 @@ function RequestsPage({
                 ) : null}
               </div>
             </div>
-          )) : <div className="empty-card">No pending payout requests right now.</div>}
+          )) : <div className="empty-card">{pendingEmptyCopy}</div>}
         </div>
       </section>
       <section className="panel">
-        <div className="table-head"><span>Request</span><span>Bank / Proof</span><span>Status</span></div>
+        <div className="table-head"><span>Request</span><span>{isDepositOnly ? "Payment / Proof" : "Bank / Proof"}</span><span>Status</span></div>
         <div className="table-list">
           {filteredItems.length ? filteredItems.map((item) => (
             <div className="data-row" key={item.id}>
@@ -1017,13 +1052,14 @@ function RequestsPage({
                 {item.proofUrl ? <button className="secondary" onClick={() => setProof(item)}>Open Proof</button> : <span>No proof URL</span>}
               </div>
               <div className="row-main">
-                <strong>{getPayoutStatusLabel(item.status)}</strong>
-                <span>Balance {formatCurrency(item.liveBalance)}</span>
+                <strong>{getPayoutStatusLabel(item.status, item.type)}</strong>
+                <span>After Balance {formatCurrency(item.afterBalance)}</span>
+                <span>Live Balance {formatCurrency(item.liveBalance)}</span>
                 {getWalletRequestNoteLine(item) ? <span>{getWalletRequestNoteLine(item)}</span> : null}
               </div>
               <div className="row-actions">
                 <button className="secondary" type="button" onClick={() => openAction(item, "annotate")}>Add Note</button>
-                {item.status === "BACKOFFICE" ? (
+                {canCompleteWalletRequest(item) ? (
                   <>
                     <button className="primary" disabled={busyId === item.id} type="button" onClick={() => openAction(item, "complete")}>{getWalletCompleteLabel(item)}</button>
                     <button className="secondary danger" disabled={busyId === item.id} type="button" onClick={() => openAction(item, "reject")}>Reject</button>
@@ -1037,14 +1073,14 @@ function RequestsPage({
                 ) : null}
               </div>
             </div>
-          )) : <div className="empty-card">No wallet requests match current filters.</div>}
+          )) : <div className="empty-card">{historyEmptyCopy}</div>}
         </div>
       </section>
       {actionDraft ? (
         <div className="modal-shell" onClick={(event) => { if (event.target === event.currentTarget) setActionDraft(null); }}>
           <div className="modal-card modal-card-narrow">
             <div className="modal-head">
-              <h3>{getPayoutActionTitle(actionDraft.action)}</h3>
+              <h3>{getPayoutActionTitle(actionDraft.action, actionDraft.item.type)}</h3>
               <button className="secondary" onClick={() => setActionDraft(null)}>Close</button>
             </div>
             <div className="form-grid">
@@ -1052,7 +1088,7 @@ function RequestsPage({
               <label><span>Type</span><input readOnly value={actionDraft.item.type} /></label>
               <label><span>Amount</span><input readOnly value={formatCurrency(actionDraft.item.amount)} /></label>
               <div className="inline-note wide">
-                <strong>{getPayoutActionTitle(actionDraft.action)}</strong>
+                <strong>{getPayoutActionTitle(actionDraft.action, actionDraft.item.type)}</strong>
                 <span>{getWalletActionChecklist(actionDraft.item, actionDraft.action)}</span>
               </div>
               <label><span>Reference ID</span><input value={actionDraft.referenceId} onChange={(event) => setActionDraft((current) => ({ ...current, referenceId: event.target.value }))} placeholder="UTR / bank ref / cash note" /></label>
@@ -1060,7 +1096,7 @@ function RequestsPage({
               <label className="wide"><span>Operator Note</span><textarea rows={4} value={actionDraft.note} onChange={(event) => setActionDraft((current) => ({ ...current, note: event.target.value }))} placeholder="Manual payout note, rejection reason, or processing remark" /></label>
             </div>
             <div className="actions">
-              <button className="primary" disabled={busyId === actionDraft.item.id} onClick={() => void submitAction()}>{busyId === actionDraft.item.id ? "Saving..." : getPayoutActionButton(actionDraft.action)}</button>
+              <button className="primary" disabled={busyId === actionDraft.item.id} onClick={() => void submitAction()}>{busyId === actionDraft.item.id ? "Saving..." : getPayoutActionButton(actionDraft.action, actionDraft.item.type)}</button>
             </div>
           </div>
         </div>
@@ -1106,9 +1142,9 @@ function RequestsPage({
       });
       setActionDraft(null);
       await load();
-      setMessage(getPayoutSuccessMessage(actionDraft.action));
+      setMessage(getPayoutSuccessMessage(actionDraft.action, actionDraft.item.type));
     } catch (error) {
-      setMessage(formatApiError(error, "Payout action failed."));
+      setMessage(formatApiError(error, `${actionDraft.item.type === "DEPOSIT" ? "Deposit" : "Payout"} action failed.`));
     } finally {
       setBusyId("");
     }
@@ -1262,6 +1298,7 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
   const diff = diffRows(comparableSavedRows, rowsForSave);
   const history = state.auditLogs.filter((item) => item.action === "CHART_UPDATE" && item.entityId === `${selectedSlug}:${chartType}`).slice(0, 6);
   const selectedMarket = state.markets.find((item) => item.slug === selectedSlug);
+  const sortedMarketsForResultEngine = isChartsMode ? state.markets : sortAdminMarketsByTime(state.markets, currentMinutes);
   const resultSlots = toResultSlots(marketForm.result);
   const resultStage = getResultStage(marketForm.result);
   const chartHeaders = getChartPreviewHeaders(chartType);
@@ -1295,7 +1332,7 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
         currentMinutes={currentMinutes}
         marketResultDrafts={marketResultDrafts}
         marketResultInputRefs={marketResultInputRefs}
-        markets={state.markets}
+        markets={sortedMarketsForResultEngine}
         onDraftChange={handleQuickResultSlotChange}
         onDraftKeyDown={handleQuickResultSlotKeyDown}
         onQuickPublish={quickPublishMarket}
@@ -1313,7 +1350,7 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
         lastSettlement={lastSettlement}
         marketForm={marketForm}
         marketTiming={marketTiming}
-        markets={state.markets}
+        markets={sortedMarketsForResultEngine}
         message={message}
         preview={preview}
         publishResult={publishResult}
@@ -2286,31 +2323,49 @@ function formatWalletEntryStatus(status) {
   return "PENDING";
 }
 
-function getPayoutActionTitle(action) {
+function getPayoutActionTitle(action, requestType = "WITHDRAW") {
+  if (requestType === "DEPOSIT") {
+    if (action === "approve") return "Approve & Credit Deposit";
+    if (action === "complete") return "Close Deposit Review";
+    if (action === "reject") return "Reject Deposit";
+    return "Update Deposit Note";
+  }
   if (action === "approve") return "Move To Processing";
   if (action === "complete") return "Mark Manual Payout Complete";
   if (action === "reject") return "Reject / Mark Failed";
   return "Update Request Note";
 }
 
-function getPayoutActionButton(action) {
+function getPayoutActionButton(action, requestType = "WITHDRAW") {
+  if (requestType === "DEPOSIT") {
+    if (action === "approve") return "Credit Deposit";
+    if (action === "complete") return "Close Review";
+    if (action === "reject") return "Reject Deposit";
+    return "Save Note";
+  }
   if (action === "approve") return "Move To Processing";
   if (action === "complete") return "Mark Paid";
   if (action === "reject") return "Reject Request";
   return "Save Note";
 }
 
-function getPayoutSuccessMessage(action) {
+function getPayoutSuccessMessage(action, requestType = "WITHDRAW") {
+  if (requestType === "DEPOSIT") {
+    if (action === "approve") return "Deposit credited successfully.";
+    if (action === "complete") return "Deposit review closed successfully.";
+    if (action === "reject") return "Deposit rejected successfully.";
+    return "Deposit note updated successfully.";
+  }
   if (action === "approve") return "Request moved to manual processing.";
   if (action === "complete") return "Request marked paid successfully.";
   if (action === "reject") return "Request rejected successfully.";
   return "Request note updated successfully.";
 }
 
-function getPayoutStatusLabel(status) {
+function getPayoutStatusLabel(status, requestType = "WITHDRAW") {
   if (status === "INITIATED") return "Pending";
   if (status === "BACKOFFICE") return "Processing";
-  if (status === "SUCCESS") return "Paid";
+  if (status === "SUCCESS") return requestType === "DEPOSIT" ? "Credited" : "Paid";
   if (status === "FAILED") return "Failed";
   if (status === "CANCELLED") return "Cancelled";
   if (status === "REJECTED") return "Rejected";
@@ -2365,7 +2420,9 @@ function getWalletRequestReferenceLine(item) {
 
 function getWalletRequestStatusHint(item) {
   if (item.type === "DEPOSIT") {
-    return item.status === "BACKOFFICE" ? "Wallet already credited, close request after review." : "Review UPI payment details before crediting wallet.";
+    return item.status === "BACKOFFICE"
+      ? "Legacy deposit review only. Credit action is disabled to prevent duplicate wallet credit."
+      : "Review UPI payment details before crediting wallet.";
   }
   return "Verify bank transfer state before closing request.";
 }
@@ -2381,6 +2438,10 @@ function getWalletApproveLabel(item) {
 
 function getWalletCompleteLabel(item) {
   return item.type === "DEPOSIT" ? "Close Deposit" : "Mark Paid";
+}
+
+function canCompleteWalletRequest(item) {
+  return item?.status === "BACKOFFICE" && item?.type !== "DEPOSIT";
 }
 
 async function exportAdminData(apiBase, token, type) {

@@ -533,6 +533,10 @@ export async function completeWalletRequest(entryId) {
   if (!request || !["DEPOSIT", "WITHDRAW"].includes(request.type)) return null;
   if (request.status === "SUCCESS") return request;
 
+  if (request.type === "DEPOSIT" && request.status !== "INITIATED") {
+    throw new Error("Deposit completion skipped: only pending deposits can be credited safely");
+  }
+
   const beforeBalance = await getUserBalance(request.userId);
   if (request.type === "WITHDRAW" && request.amount > beforeBalance) {
     throw new Error("User has insufficient live balance for withdraw completion");

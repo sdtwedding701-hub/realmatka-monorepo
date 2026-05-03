@@ -41,6 +41,13 @@ export function getAdminCurrentMinutes() {
 }
 
 function getMarketPhaseMeta(market, currentMinutes) {
+  const status = String(market.status || "").toLowerCase();
+  const action = String(market.action || "").toLowerCase();
+  const isForcedClosed = status.includes("weekly off") || status.includes("closed for today") || action === "closed";
+  if (isForcedClosed) {
+    return { label: status.includes("weekly off") ? "Weekly Off" : "Betting is Closed for Today", sortBucket: 3, anchor: Number.MAX_SAFE_INTEGER };
+  }
+
   const openMinutes = parseClockTimeToMinutes(market.open);
   const closeMinutes = parseClockTimeToMinutes(market.close);
 
@@ -416,9 +423,13 @@ export function ChartEditorPreviewSection({
   state,
   weekOptions
 }) {
+  if (!isChartsMode) {
+    return null;
+  }
+
   return (
     <>
-      {isChartsMode ? <section className="panel">
+      <section className="panel">
         <div className="panel-head">
           <h2>Chart Preview</h2>
           <p>Admin preview and edit controls use the same chart data shown in app and web.</p>
@@ -546,7 +557,7 @@ export function ChartEditorPreviewSection({
             </tbody>
           </table>
         </div>
-      </section> : null}
+      </section>
       <section className="panel">
         <div className="dashboard-grid">
           <div className="subpanel">

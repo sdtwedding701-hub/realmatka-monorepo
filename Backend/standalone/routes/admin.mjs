@@ -2,6 +2,7 @@ import { corsPreflight } from "../http.mjs";
 import {
   adminDashboardSummaryController,
   adminExportDataController,
+  adminLiveEventsController,
   adminMonitoringSummaryController,
   adminReconciliationSummaryController,
   adminReportsSummaryController,
@@ -174,6 +175,10 @@ export async function reconciliationSummary(request) {
 
 export async function monitoringSummary(request) {
   return adminMonitoringSummaryController(request);
+}
+
+export async function liveEvents(request) {
+  return adminLiveEventsController(request);
 }
 
 export async function exportData(request) {

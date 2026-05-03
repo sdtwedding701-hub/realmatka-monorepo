@@ -133,6 +133,7 @@ export function App() {
         clearSession();
         setToken("");
       }}
+      fetchApi={fetchApi}
       pageFactory={(refreshKey, refresh) => {
         const shared = { apiBase, token, me, refresh };
         if (route === "users") return <UsersPage {...shared} key={`users-${refreshKey}`} />;
@@ -228,6 +229,7 @@ export function App() {
       route={route}
       routeMeta={routeMeta}
       setRoute={setRoute}
+      token={token}
     />
   );
 }

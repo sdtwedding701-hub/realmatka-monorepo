@@ -268,6 +268,132 @@ body {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.live-event-stack {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 90;
+  display: grid;
+  width: min(420px, calc(100vw - 28px));
+  gap: 12px;
+  pointer-events: none;
+}
+
+.live-event-toast {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 42px 14px 14px;
+  border: 1px solid rgba(216, 226, 240, 0.92);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(249, 115, 22, 0.16), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 255, 0.94));
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.18);
+  color: var(--ink);
+  cursor: pointer;
+  pointer-events: auto;
+  text-align: left;
+  animation: live-event-in 220ms ease both;
+}
+
+.live-event-toast.bid {
+  border-left: 5px solid #1166f1;
+}
+
+.live-event-toast.deposit {
+  border-left: 5px solid #0f9f6e;
+}
+
+.live-event-toast.withdraw {
+  border-left: 5px solid #f97316;
+}
+
+.live-event-toast.user {
+  border-left: 5px solid #7c3aed;
+}
+
+.live-event-toast:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 24px 54px rgba(15, 23, 42, 0.22);
+}
+
+.live-event-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 8px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0f2857, #1166f1);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.live-event-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.live-event-copy strong {
+  color: var(--primary-dark);
+  font-size: 14px;
+}
+
+.live-event-copy span {
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.live-event-copy small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.live-event-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.live-event-close:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--ink);
+}
+
+@keyframes live-event-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -2122,5 +2248,11 @@ button.secondary.danger {
 
   .support-thread {
     min-height: auto;
+  }
+
+  .live-event-stack {
+    right: 14px;
+    bottom: 14px;
+    width: calc(100vw - 28px);
   }
 }

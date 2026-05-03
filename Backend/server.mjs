@@ -204,6 +204,7 @@ const standaloneRoutes = new Map([
   ["/api/admin/market-exposure", { loader: "admin", methods: { OPTIONS: "options", GET: "marketExposure" } }],
   ["/api/admin/reconciliation-summary", { loader: "admin", methods: { OPTIONS: "options", GET: "reconciliationSummary" } }],
   ["/api/admin/monitoring-summary", { loader: "admin", methods: { OPTIONS: "options", GET: "monitoringSummary" } }],
+  ["/api/admin/live-events", { loader: "admin", methods: { OPTIONS: "options", GET: "liveEvents" } }],
   ["/api/admin/export", { loader: "admin", methods: { OPTIONS: "options", GET: "exportData" } }],
   ["/api/admin/snapshot-items", { loader: "admin", methods: { OPTIONS: "options", GET: "snapshotItems" } }],
   ["/api/admin/backup-snapshot", { loader: "admin", methods: { OPTIONS: "options", GET: "backupSnapshot", POST: "restoreSnapshot" } }],

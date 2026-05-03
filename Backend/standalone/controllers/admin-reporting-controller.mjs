@@ -8,6 +8,7 @@ import {
   getReportsSummary,
   getSnapshotSection
 } from "../services/admin-reporting-service.mjs";
+import { getAdminLiveEvents } from "../db/admin-live-events-db.mjs";
 import { addAuditLog } from "../stores/admin-store.mjs";
 
 export async function adminDashboardSummaryController(request) {
@@ -35,6 +36,14 @@ export async function adminMonitoringSummaryController(request) {
   const admin = await requireAdminUser(request);
   if (admin.response) return admin.response;
   return ok(await getMonitoringSummary(), request);
+}
+
+export async function adminLiveEventsController(request) {
+  const admin = await requireAdminUser(request);
+  if (admin.response) return admin.response;
+  const url = new URL(request.url);
+  const limit = Number(url.searchParams.get("limit") || 30);
+  return ok({ events: await getAdminLiveEvents({ limit }) }, request);
 }
 
 export async function adminReconciliationSummaryController(request) {

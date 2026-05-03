@@ -1808,7 +1808,7 @@ function BidsPage({ apiBase, token }) {
                   </div>
                   <div className="bid-row-meta">
                     <span>Game: {bid.gameType || bid.boardLabel || "-"}</span>
-                    <span>Session: {bid.sessionType || "-"}</span>
+                    <span>Session: {getBidDisplaySession(bid)}</span>
                     <span>Digit: {bid.digit || "-"}</span>
                   </div>
                   <div className="bid-row-meta muted">
@@ -2424,6 +2424,12 @@ function formatCurrency(value) {
 function formatDate(value) {
   if (!value) return "-";
   return new Date(value).toLocaleString("en-IN", { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function getBidDisplaySession(bid) {
+  const session = String(bid?.sessionType || "").trim();
+  if (bid?.boardLabel === "SP DP TP" && (!session || session === "NA")) return "Open";
+  return session || "-";
 }
 
 function formatRelativeAge(value) {

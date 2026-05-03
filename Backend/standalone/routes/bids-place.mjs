@@ -20,7 +20,6 @@ const sessionlessBoards = new Set([
   "Group Jodi",
   "Red Bracket",
   "Digit Based Jodi",
-  "SP DP TP",
   "Half Sangam",
   "Full Sangam"
 ]);
@@ -63,7 +62,7 @@ export async function place(request) {
   if (marketMeta.phase === "closed") {
     return fail("Betting is closed for today", 400, request);
   }
-  if (marketMeta.phase === "close-running" && openCutoffOnlyBoards.has(boardLabel)) {
+  if (marketMeta.phase === "close-running" && openCutoffOnlyBoards.has(boardLabel) && sessionType === "Open") {
     return fail("Open session betting is closed for this board", 400, request);
   }
 

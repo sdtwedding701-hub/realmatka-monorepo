@@ -117,8 +117,18 @@ export async function sendMarketResultBroadcast(market, result) {
 }
 
 export function getBidPotentialPayout(bid) {
-  const rate = Number(payoutRates[bid.boardLabel] || 0);
+  const rate = getBidPayoutRate(bid);
   return roundAmount(Number(bid.points || 0) * rate);
+}
+
+function getBidPayoutRate(bid) {
+  if (bid?.boardLabel === "SP DP TP") {
+    const gameType = String(bid.gameType ?? "").trim().toUpperCase();
+    if (gameType === "SP" || getPannaType(bid.digit) === "single") return payoutRates["Single Pana"];
+    if (gameType === "DP" || getPannaType(bid.digit) === "double") return payoutRates["Double Pana"];
+    if (gameType === "TP" || getPannaType(bid.digit) === "triple") return payoutRates["Triple Pana"];
+  }
+  return Number(payoutRates[bid?.boardLabel] || 0);
 }
 
 export function isValidMarketResultString(result) {
@@ -315,17 +325,31 @@ export function canSettleMarketResult(result) {
 
 function canEvaluateBidAgainstMarket(bid, parsed) {
   const board = bid.boardLabel;
-  const sessionType = usesSession(board) ? bid.sessionType : "NA";
+  const sessionType = getEffectiveSessionType(bid);
   if (["Single Digit", "Single Digit Bulk", "Odd Even"].includes(board)) return sessionType === "Open" ? Boolean(parsed.openAnk) : Boolean(parsed.closeAnk);
   if (["Single Pana", "Single Pana Bulk", "SP Motor", "Double Pana", "Double Pana Bulk", "DP Motor", "Triple Pana"].includes(board)) return sessionType === "Open" ? Boolean(parsed.openPanna) : Boolean(parsed.closePanna);
+  if (board === "SP DP TP") {
+    if (sessionType === "Open") return Boolean(parsed.openPanna);
+    if (sessionType === "Close") return Boolean(parsed.closePanna);
+    return Boolean(parsed.openPanna);
+  }
   if (["Jodi Digit", "Jodi Digit Bulk", "Group Jodi", "Red Bracket", "Digit Based Jodi"].includes(board)) return Boolean(parsed.jodi);
   if (board === "Half Sangam") return Boolean(parsed.openPanna && parsed.closeAnk);
-  if (["SP DP TP", "Full Sangam"].includes(board)) return Boolean(parsed.openPanna && parsed.jodi && parsed.closePanna);
+  if (board === "Full Sangam") return Boolean(parsed.openPanna && parsed.jodi && parsed.closePanna);
   return Boolean(parsed.openPanna && parsed.jodi && parsed.closePanna);
 }
 
 function usesSession(board) {
-  return !["Jodi Digit", "Jodi Digit Bulk", "Group Jodi", "Red Bracket", "Digit Based Jodi", "SP DP TP", "Half Sangam", "Full Sangam"].includes(board);
+  return !["Jodi Digit", "Jodi Digit Bulk", "Group Jodi", "Red Bracket", "Digit Based Jodi", "Half Sangam", "Full Sangam"].includes(board);
+}
+
+function getEffectiveSessionType(bid) {
+  const board = bid.boardLabel;
+  if (!usesSession(board)) return "NA";
+  const sessionType = String(bid.sessionType || "").trim();
+  if (sessionType === "Open" || sessionType === "Close") return sessionType;
+  if (board === "SP DP TP") return "Open";
+  return "Close";
 }
 
 function isSingleDigitWin(board, digit, parsed, sessionType) {
@@ -352,10 +376,11 @@ function isPanaWin(board, digit, parsed, sessionType) {
   return false;
 }
 
-function isSpDpTpWin(board, gameType, digit, parsed) {
+function isSpDpTpWin(board, gameType, digit, parsed, sessionType) {
   if (board !== "SP DP TP") return false;
   const expectedType = gameType === "SP" ? "single" : gameType === "DP" ? "double" : gameType === "TP" ? "triple" : getPannaType(digit);
-  return [parsed.openPanna, parsed.closePanna].some((panel) => panel === digit && getPannaType(panel ?? "") === expectedType);
+  const panel = sessionType === "Close" ? parsed.closePanna : parsed.openPanna;
+  return Boolean(panel === digit && getPannaType(panel ?? "") === expectedType);
 }
 
 function isOddEvenWin(board, digit, parsed, sessionType) {
@@ -387,19 +412,19 @@ export function evaluateBidAgainstMarket(bid, market) {
   const digit = String(bid.digit ?? "").trim();
   const board = bid.boardLabel;
   const gameType = String(bid.gameType ?? bid.boardLabel ?? "").trim();
-  const sessionType = usesSession(board) ? bid.sessionType : "NA";
+  const sessionType = getEffectiveSessionType(bid);
   if (!canEvaluateBidAgainstMarket(bid, parsed)) return null;
 
   const isWin =
     isSingleDigitWin(board, digit, parsed, sessionType) ||
     isJodiWin(board, digit, parsed) ||
     isPanaWin(board, digit, parsed, sessionType) ||
-    isSpDpTpWin(board, gameType, digit, parsed) ||
+    isSpDpTpWin(board, gameType, digit, parsed, sessionType) ||
     isOddEvenWin(board, digit, parsed, sessionType) ||
     isPanelGroupWin(board, digit, parsed) ||
     isSangamWin(board, digit, parsed, sessionType);
 
-  return { status: isWin ? "Won" : "Lost", payout: isWin ? roundAmount(Number(bid.points ?? 0) * Number(payoutRates[board] ?? 0)) : 0 };
+  return { status: isWin ? "Won" : "Lost", payout: isWin ? getBidPotentialPayout(bid) : 0 };
 }
 
 export async function settlePendingBidsForMarket(market) {
@@ -417,7 +442,7 @@ export async function settlePendingBidsForMarket(market) {
   const impactedUsers = new Map();
 
   for (const bid of bids) {
-    if (!payoutRates[bid.boardLabel]) {
+    if (!getBidPayoutRate(bid)) {
       skipped += 1;
       continue;
     }

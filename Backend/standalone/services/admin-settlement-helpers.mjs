@@ -374,6 +374,16 @@ function isFullResultDependentBid(bid) {
   return getEffectiveSessionType(bid) === "Close";
 }
 
+function shouldResettleForCurrentResultStage(bid, marketResult) {
+  if (isOpenResultFormat(marketResult)) {
+    return isOpenResultDependentBid(bid);
+  }
+  if (isFullResultFormat(marketResult)) {
+    return isFullResultDependentBid(bid);
+  }
+  return false;
+}
+
 function isSingleDigitWin(board, digit, parsed, sessionType) {
   if (!["Single Digit", "Single Digit Bulk"].includes(board)) return false;
   return digit === (sessionType === "Open" ? parsed.openAnk : parsed.closeAnk);
@@ -551,15 +561,12 @@ export async function resettleChangedMarket(market, previousResult) {
   const previous = String(previousResult || "").trim();
   const next = String(market.result || "").trim();
   const cycle = await getMarketCycleBids(market);
-
-  let affectedSettled = [];
-  if (isOpenResultFormat(previous) && isOpenResultFormat(next) && previous !== next) {
-    affectedSettled = cycle.matched.filter((bid) => bid.status !== "Pending" && isOpenResultDependentBid(bid));
-  } else if (isFullResultFormat(previous) && isFullResultFormat(next) && previous !== next) {
-    affectedSettled = cycle.matched.filter((bid) => bid.status !== "Pending" && isFullResultDependentBid(bid));
-  } else {
-    return settlePendingBidsForMarket(market);
-  }
+  const affectedSettled = cycle.matched.filter(
+    (bid) =>
+      bid.status !== "Pending" &&
+      shouldResettleForCurrentResultStage(bid, next) &&
+      String(bid.settledResult || "").trim() !== next
+  );
 
   for (const bid of affectedSettled) {
     if (bid.status === "Won" && bid.payout > 0) {

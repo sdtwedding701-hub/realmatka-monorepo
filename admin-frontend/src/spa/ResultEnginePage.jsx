@@ -310,7 +310,7 @@ export async function publishMarketResult({
   const didCorrectFullResult = previousIsFullResult && isFullResult && previous !== nextResult;
   const shouldReset = isPlaceholder;
   const shouldSettle = !isPlaceholder && (isOpenResult || isFullResult);
-  const settlementMode = shouldReset ? "reset" : didCorrectOpenResult || didCorrectFullResult ? "resettle-changed" : "settle";
+  const settlementMode = shouldReset ? "reset" : "resettle-changed";
   const settled = shouldReset || shouldSettle
     ? await fetchApi(apiBase, "/api/admin/settle-market", token, {
         method: "POST",

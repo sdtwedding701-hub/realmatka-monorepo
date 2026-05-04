@@ -1,5 +1,5 @@
 import { issueOtp, verifyOtp } from "../routes/auth-otp.mjs";
-import { addWalletEntry, getBankAccountsForUser, getUserBalance, getWalletEntriesForUser } from "../stores/wallet-store.mjs";
+import { addWalletEntry, getBankAccountsForUser, getUserBalance, getWalletEntriesForUser, rebalanceWalletEntriesForUser } from "../stores/wallet-store.mjs";
 
 export const MIN_WITHDRAW_AMOUNT = 500;
 const WITHDRAW_WEEKEND_CLOSED_MESSAGE = "Saturday aur Sunday ko withdraw service band rahegi.";
@@ -45,6 +45,7 @@ async function ensureWithdrawAllowed(userId, amount) {
     return { ok: false, status: 400, error: "Add bank details before requesting a withdrawal" };
   }
 
+  await rebalanceWalletEntriesForUser(userId);
   const beforeBalance = await getUserBalance(userId);
   if (amount > beforeBalance) {
     return { ok: false, status: 400, error: "Insufficient balance" };
@@ -75,6 +76,7 @@ export async function createDepositRequest(userId, amountInput) {
     return { ok: false, status: 400, error: "Amount must be greater than 0" };
   }
 
+  await rebalanceWalletEntriesForUser(userId);
   const beforeBalance = await getUserBalance(userId);
   const entry = await addWalletEntry({
     userId,

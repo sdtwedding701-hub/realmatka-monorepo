@@ -171,6 +171,7 @@ export default function RegisterScreen() {
                 style={styles.input}
                 value={password}
               />
+              <Text style={styles.helperText}>Minimum 8 characters or more required.</Text>
             </View>
 
             <View style={styles.fieldWrap}>
@@ -333,6 +334,11 @@ const styles = StyleSheet.create({
   label: {
     color: "#0f172a",
     fontWeight: "700"
+  },
+  helperText: {
+    color: "#64748b",
+    fontSize: 12,
+    lineHeight: 18
   },
   input: {
     minHeight: 50,

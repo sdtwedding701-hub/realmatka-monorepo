@@ -501,6 +501,7 @@ export async function resolveWalletApprovalRequest(entryId, action) {
     return { request: await updateWalletEntryStatus(entryId, "REJECTED"), settlementEntry: null };
   }
 
+  await rebalanceWalletEntriesForUser(request.userId);
   const beforeBalance = await getUserBalance(request.userId);
   if (request.type === "WITHDRAW" && request.amount > beforeBalance) {
     throw new Error("User has insufficient live balance for withdraw approval");
@@ -537,6 +538,7 @@ export async function completeWalletRequest(entryId) {
     throw new Error("Deposit completion skipped: only pending deposits can be credited safely");
   }
 
+  await rebalanceWalletEntriesForUser(request.userId);
   const beforeBalance = await getUserBalance(request.userId);
   if (request.type === "WITHDRAW" && request.amount > beforeBalance) {
     throw new Error("User has insufficient live balance for withdraw completion");

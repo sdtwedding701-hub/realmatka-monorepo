@@ -11,6 +11,7 @@ import {
   addWalletEntry as addWalletEntryRecord,
   findWalletEntryByReferenceId as findWalletEntryByReferenceIdRecord,
   getUserBalance as getUserBalanceRecord,
+  rebalanceWalletEntriesForUser as rebalanceWalletEntriesForUserRecord,
   updateWalletEntryAdmin as updateWalletEntryAdminRecord
 } from "../db/wallet-db.mjs";
 
@@ -23,5 +24,6 @@ export const findPaymentOrderForCheckout = findPaymentOrderForCheckoutRecord;
 export const findUserById = findUserByIdRecord;
 export const findWalletEntryByReferenceId = findWalletEntryByReferenceIdRecord;
 export const getUserBalance = getUserBalanceRecord;
+export const rebalanceWalletEntriesForUser = rebalanceWalletEntriesForUserRecord;
 export const handlePaymentWebhook = handlePaymentWebhookRecord;
 export const updateWalletEntryAdmin = updateWalletEntryAdminRecord;

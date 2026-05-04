@@ -29,6 +29,7 @@ export default function ResetPasswordScreen() {
           <TextInput onChangeText={setPassword} placeholder="Enter password" placeholderTextColor="#98a2b3" secureTextEntry style={styles.input} value={password} />
           <Ionicons color="#6366f1" name="eye-outline" size={18} />
         </View>
+        <Text style={styles.helperText}>Minimum 8 characters or more required.</Text>
         <View style={styles.inputRow}>
           <TextInput onChangeText={setConfirmPassword} placeholder="Enter confirm password" placeholderTextColor="#98a2b3" secureTextEntry style={styles.input} value={confirmPassword} />
           <Ionicons color="#6366f1" name="eye-outline" size={18} />
@@ -88,6 +89,11 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     color: "#111827"
+  },
+  helperText: {
+    color: "#64748b",
+    fontSize: 12,
+    lineHeight: 18
   },
   primary: {
     minHeight: 50,

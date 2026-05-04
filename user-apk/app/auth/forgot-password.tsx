@@ -89,6 +89,7 @@ export default function ForgotPasswordScreen() {
 
             <Text style={styles.label}>New Password</Text>
             <TextInput secureTextEntry onChangeText={setPassword} style={styles.input} value={password} placeholder="Enter new password" placeholderTextColor="#94a3b8" />
+            <Text style={styles.helperText}>Minimum 8 characters or more required.</Text>
 
             <Text style={styles.label}>Confirm Password</Text>
             <TextInput secureTextEntry onChangeText={setConfirmPassword} style={styles.input} value={confirmPassword} placeholder="Confirm new password" placeholderTextColor="#94a3b8" />
@@ -154,6 +155,7 @@ const styles = StyleSheet.create({
   title: { color: "#111827", fontSize: 24, fontWeight: "800" },
   subtitle: { color: "#64748b", lineHeight: 20 },
   label: { color: "#0f172a", fontWeight: "700" },
+  helperText: { color: "#64748b", fontSize: 12, lineHeight: 18 },
   input: { minHeight: 50, borderRadius: 14, borderWidth: 1, borderColor: "#dbe1ea", paddingHorizontal: 14, color: "#111827", backgroundColor: "#f8fafc" },
   primaryButton: { minHeight: 48, borderRadius: 999, backgroundColor: "#111827", alignItems: "center", justifyContent: "center" },
   secondaryButton: { minHeight: 46, borderRadius: 14, backgroundColor: "#f8fafc", borderWidth: 1, borderColor: "#dbe1ea", alignItems: "center", justifyContent: "center" },

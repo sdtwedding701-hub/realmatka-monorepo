@@ -3,6 +3,7 @@ import {
   __internalGetSqlite,
   __internalNowIso
 } from "../db.mjs";
+import { rebalanceWalletEntriesForUser } from "./wallet-db.mjs";
 
 function mapPaymentOrderRow(row) {
   return row
@@ -427,6 +428,8 @@ export async function completePaymentLinkOrder({ reference, gatewayOrderId, gate
   if (!existingOrder) {
     return null;
   }
+
+  await rebalanceWalletEntriesForUser(existingOrder.userId);
 
   return completePaymentOrder({
     paymentOrderId: existingOrder.id,

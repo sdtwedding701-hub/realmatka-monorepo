@@ -335,7 +335,7 @@ function canEvaluateBidAgainstMarket(bid, parsed) {
   }
   if (["Jodi Digit", "Jodi Digit Bulk", "Group Jodi", "Red Bracket", "Digit Based Jodi"].includes(board)) return Boolean(parsed.jodi);
   if (board === "Half Sangam") return Boolean(parsed.openPanna && parsed.closeAnk);
-  if (board === "Full Sangam") return Boolean(parsed.openPanna && parsed.jodi && parsed.closePanna);
+  if (board === "Full Sangam") return Boolean(parsed.openPanna && parsed.closePanna);
   return Boolean(parsed.openPanna && parsed.jodi && parsed.closePanna);
 }
 

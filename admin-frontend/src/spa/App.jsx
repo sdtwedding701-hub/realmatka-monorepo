@@ -1442,11 +1442,11 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
         })
         .catch(() => {});
       if (result.didPublishOpenResult) {
-        setMessage(result.previousResult && /^[0-9]{3}-[0-9]{2}-[0-9]{3}$/.test(result.previousResult) ? "Half result restore ho gaya. Close-side settlements reverse ho gayi." : "Open result publish ho gaya. Open-side settlements refresh ho gayi.");
+        setMessage(result.previousResult && /^[0-9]{3}-[0-9]{2}-[0-9]{3}$/.test(result.previousResult) ? "Half result restore ho gaya. Ab sirf pending close-side bets full result tak wait karengi." : "Open result publish ho gaya. Open-side eligible bets settle ho gayi.");
       } else if (!result.didSettle) {
         setMessage("Placeholder result reset ho gaya. Settled bids pending me wapas aa gayi.");
       } else {
-        setMessage("Result published, market updated, and charts refreshed.");
+        setMessage("Final result publish ho gaya. Pending close/full-game bets settle ho gayi.");
       }
     } catch (error) {
       setMessage(formatApiError(error, "Result publish failed."));
@@ -1504,7 +1504,7 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
       } else if (!result.didSettle) {
         setMessage(`${market.name}: placeholder reset ho gaya, settled bids pending me aa gayi.`);
       } else {
-        setMessage(`${market.name}: final result publish aur resettle ho gaya.`);
+        setMessage(`${market.name}: final result publish ho gaya aur pending bets settle ho gayi.`);
       }
     } catch (error) {
       setMessage(formatApiError(error, `${market.name}: publish failed.`));

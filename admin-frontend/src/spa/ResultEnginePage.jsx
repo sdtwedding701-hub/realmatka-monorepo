@@ -305,9 +305,9 @@ export async function publishMarketResult({
   const isFullResult = /^[0-9]{3}-[0-9]{2}-[0-9]{3}$/.test(nextResult);
   const isOpenResult = /^[0-9]{3}-[0-9\*]{2}-\*{3}$/.test(nextResult);
   const shouldReset = isPlaceholder;
-  const shouldResettle = !isPlaceholder && (isOpenResult || isFullResult);
-  const settlementMode = shouldReset ? "reset" : shouldResettle ? "resettle" : "settle";
-  const settled = shouldReset || shouldResettle
+  const shouldSettle = !isPlaceholder && (isOpenResult || isFullResult);
+  const settlementMode = shouldReset ? "reset" : "settle";
+  const settled = shouldReset || shouldSettle
     ? await fetchApi(apiBase, "/api/admin/settle-market", token, {
         method: "POST",
         body: { slug: selectedSlug, mode: settlementMode }
@@ -323,7 +323,7 @@ export async function publishMarketResult({
   const normalizedRows = chart ? normalizeChartEditorRows(chartType, rows) : [];
 
   return {
-    didSettle: shouldResettle,
+    didSettle: shouldSettle,
     didPublishOpenResult: isOpenResult,
     didResetPlaceholder: isPlaceholder,
     previousResult: previous,

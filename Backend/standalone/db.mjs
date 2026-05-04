@@ -174,6 +174,9 @@ function roundMoney(value) {
 
 const referralLossCommissionRate = Number(process.env.REFERRAL_LOSS_COMMISSION_RATE || "0.2");
 const referralCommissionThreshold = Math.max(0.01, Number(process.env.REFERRAL_COMMISSION_THRESHOLD || "10"));
+const referralDepositBonusRate = Math.max(0, Number(process.env.REFERRAL_DEPOSIT_BONUS_RATE || "10"));
+const referralDepositBonusMaxTimesPerUser = Math.max(0, Math.floor(Number(process.env.REFERRAL_DEPOSIT_BONUS_MAX_TIMES_PER_USER || "5")));
+const referralDepositBonusMaxPerDeposit = Math.max(0, Number(process.env.REFERRAL_DEPOSIT_BONUS_MAX_PER_DEPOSIT || "100"));
 
 function toIso(value) {
   if (!value) {
@@ -783,10 +786,12 @@ async function ensurePostgresBootstrap(pool) {
         CREATE TABLE IF NOT EXISTS referral_commission_refs (
           reference_id TEXT PRIMARY KEY,
           referrer_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          referred_user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
           amount NUMERIC(12,2) NOT NULL,
           created_at TIMESTAMPTZ NOT NULL
         )
       `);
+      await client.query(`ALTER TABLE referral_commission_refs ADD COLUMN IF NOT EXISTS referred_user_id TEXT REFERENCES users(id) ON DELETE CASCADE`);
       await client.query(`
         CREATE TABLE IF NOT EXISTS admins (
           id TEXT PRIMARY KEY,
@@ -1086,6 +1091,7 @@ function getSqlite() {
     CREATE TABLE IF NOT EXISTS referral_commission_refs (
       reference_id TEXT PRIMARY KEY,
       referrer_user_id TEXT NOT NULL,
+      referred_user_id TEXT,
       amount REAL NOT NULL,
       created_at TEXT NOT NULL
     );
@@ -1171,6 +1177,7 @@ function getSqlite() {
   ensureSqliteColumn(sqlite, "users", "first_deposit_bonus_granted", "INTEGER NOT NULL DEFAULT 0");
   ensureSqliteColumn(sqlite, "users", "referred_by_user_id", "TEXT");
   ensureSqliteColumn(sqlite, "users", "referral_commission_carry", "REAL NOT NULL DEFAULT 0");
+  ensureSqliteColumn(sqlite, "referral_commission_refs", "referred_user_id", "TEXT");
   ensureSqliteColumn(sqlite, "bids", "market_day", "TEXT");
   ensureSqliteColumn(sqlite, "bids", "game_type", "TEXT");
   ensureSqliteColumn(sqlite, "markets", "result_locked_at", "TEXT");
@@ -1979,26 +1986,26 @@ async function setReferralCommissionCarry(userId, amount) {
   return nextCarry;
 }
 
-async function recordReferralCommissionReference(referrerUserId, referenceId, amount) {
+async function recordReferralCommissionReference(referrerUserId, referenceId, amount, referredUserId = null) {
   const createdAt = nowIso();
 
   if (isStandalonePostgresEnabled()) {
     const pool = await getReadyPgPool();
     const result = await pool.query(
-      `INSERT INTO referral_commission_refs (reference_id, referrer_user_id, amount, created_at)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO referral_commission_refs (reference_id, referrer_user_id, referred_user_id, amount, created_at)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (reference_id) DO NOTHING`,
-      [referenceId, referrerUserId, roundMoney(amount), createdAt]
+      [referenceId, referrerUserId, referredUserId || null, roundMoney(amount), createdAt]
     );
     return Number(result.rowCount || 0) > 0;
   }
 
   const insertResult = getSqlite()
     .prepare(
-      `INSERT OR IGNORE INTO referral_commission_refs (reference_id, referrer_user_id, amount, created_at)
-       VALUES (?, ?, ?, ?)`
+      `INSERT OR IGNORE INTO referral_commission_refs (reference_id, referrer_user_id, referred_user_id, amount, created_at)
+       VALUES (?, ?, ?, ?, ?)`
     )
-    .run(referenceId, referrerUserId, roundMoney(amount), createdAt);
+    .run(referenceId, referrerUserId, referredUserId || null, roundMoney(amount), createdAt);
 
   return Number(insertResult.changes || 0) > 0;
 }
@@ -2020,7 +2027,7 @@ export async function applyReferralLossCommission({ userId, lostAmount, bidId, m
   }
 
   const referralReferenceId = `referral-loss:${bidId}`;
-  const wasRecorded = await recordReferralCommissionReference(referrer.id, referralReferenceId, commissionAmount);
+  const wasRecorded = await recordReferralCommissionReference(referrer.id, referralReferenceId, commissionAmount, player.id);
   if (!wasRecorded) {
     return null;
   }
@@ -2057,6 +2064,202 @@ export async function applyReferralLossCommission({ userId, lostAmount, bidId, m
     channel: "wallet"
   });
 
+  return entry;
+}
+
+export async function applyReferralDepositBonusIfEligible({ userId, depositAmount, depositEntryId }) {
+  const normalizedUserId = String(userId || "").trim();
+  const normalizedDepositEntryId = String(depositEntryId || "").trim();
+  const normalizedAmount = roundMoney(Number(depositAmount || 0));
+  if (!normalizedUserId || !normalizedDepositEntryId || normalizedAmount <= 0 || referralDepositBonusRate <= 0 || referralDepositBonusMaxTimesPerUser <= 0) {
+    return null;
+  }
+
+  const player = await findUserById(normalizedUserId);
+  if (!player?.referredByUserId) {
+    return null;
+  }
+
+  const referrer = await findUserById(player.referredByUserId);
+  if (!referrer) {
+    return null;
+  }
+
+  const bonusAmount = roundMoney(Math.min(normalizedAmount * (referralDepositBonusRate / 100), referralDepositBonusMaxPerDeposit));
+  if (bonusAmount <= 0) {
+    return null;
+  }
+
+  const referenceId = `referral-deposit:${normalizedDepositEntryId}`;
+  const playerLabel = String(player.name || player.phone || "Referred user").trim();
+  const noteBase = `Referral deposit bonus | ${playerLabel} | Deposit Rs ${normalizedAmount.toFixed(2)}`;
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await getReadyPgPool();
+    const client = await pool.connect();
+    let created = false;
+    try {
+      await client.query("BEGIN");
+      const existingRef = await client.query(
+        `SELECT reference_id
+         FROM referral_commission_refs
+         WHERE reference_id = $1
+         LIMIT 1`,
+        [referenceId]
+      );
+
+      if (!existingRef.rows[0]?.reference_id) {
+        const countResult = await client.query(
+          `SELECT COUNT(*)::int AS count
+           FROM referral_commission_refs
+           WHERE referrer_user_id = $1
+             AND referred_user_id = $2
+             AND reference_id LIKE 'referral-deposit:%'`,
+          [referrer.id, player.id]
+        );
+        const awardedCount = Math.max(0, Number(countResult.rows[0]?.count ?? 0) || 0);
+        if (awardedCount < referralDepositBonusMaxTimesPerUser) {
+          const sequence = awardedCount + 1;
+          const balanceResult = await client.query(
+            `SELECT COALESCE(SUM(
+              CASE
+                WHEN status = 'SUCCESS' AND type IN ('DEPOSIT', 'REFERRAL_COMMISSION', 'BID_WIN', 'SIGNUP_BONUS', 'FIRST_DEPOSIT_BONUS', 'ADMIN_CREDIT') THEN COALESCE(amount, 0)
+                WHEN status = 'SUCCESS' AND type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT') THEN -COALESCE(amount, 0)
+                ELSE 0
+              END
+            ), 0) AS balance
+             FROM wallet_entries
+             WHERE user_id = $1`,
+            [referrer.id]
+          );
+          const beforeBalance = roundMoney(Number(balanceResult.rows[0]?.balance ?? 0));
+          const afterBalance = roundMoney(beforeBalance + bonusAmount);
+
+          await client.query(
+            `INSERT INTO referral_commission_refs (reference_id, referrer_user_id, referred_user_id, amount, created_at)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [referenceId, referrer.id, player.id, bonusAmount, nowIso()]
+          );
+          await client.query(
+            `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at)
+             VALUES ($1, $2, 'REFERRAL_COMMISSION', 'SUCCESS', $3, $4, $5, $6, NULL, $7, $8)`,
+            [
+              `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+              referrer.id,
+              bonusAmount,
+              beforeBalance,
+              afterBalance,
+              referenceId,
+              `${noteBase} | ${sequence}/${referralDepositBonusMaxTimesPerUser}`,
+              nowIso()
+            ]
+          );
+          created = true;
+        }
+      }
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    const entry = await findWalletEntryByReferenceId(referrer.id, referenceId);
+    if (created && entry) {
+      await createNotification({
+        userId: referrer.id,
+        title: "Referral deposit bonus credited",
+        body: `Rs ${bonusAmount.toFixed(2)} referral deposit bonus credit hua.`,
+        channel: "wallet"
+      });
+    }
+    return entry;
+  }
+
+  const sqlite = getSqlite();
+  let created = false;
+  sqlite.exec("BEGIN");
+  try {
+    const existingRef = sqlite
+      .prepare(
+        `SELECT reference_id
+         FROM referral_commission_refs
+         WHERE reference_id = ?
+         LIMIT 1`
+      )
+      .get(referenceId);
+
+    if (!existingRef?.reference_id) {
+      const countRow = sqlite
+        .prepare(
+          `SELECT COUNT(*) AS count
+           FROM referral_commission_refs
+           WHERE referrer_user_id = ?
+             AND referred_user_id = ?
+             AND reference_id LIKE 'referral-deposit:%'`
+        )
+        .get(referrer.id, player.id);
+      const awardedCount = Math.max(0, Number(countRow?.count ?? 0) || 0);
+      if (awardedCount < referralDepositBonusMaxTimesPerUser) {
+        const sequence = awardedCount + 1;
+        const balanceRow = sqlite
+          .prepare(
+            `SELECT COALESCE(SUM(
+              CASE
+                WHEN status = 'SUCCESS' AND type IN ('DEPOSIT', 'REFERRAL_COMMISSION', 'BID_WIN', 'SIGNUP_BONUS', 'FIRST_DEPOSIT_BONUS', 'ADMIN_CREDIT') THEN COALESCE(amount, 0)
+                WHEN status = 'SUCCESS' AND type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT') THEN -COALESCE(amount, 0)
+                ELSE 0
+              END
+            ), 0) AS balance
+             FROM wallet_entries
+             WHERE user_id = ?`
+          )
+          .get(referrer.id);
+        const beforeBalance = roundMoney(Number(balanceRow?.balance ?? 0));
+        const afterBalance = roundMoney(beforeBalance + bonusAmount);
+
+        sqlite
+          .prepare(
+            `INSERT INTO referral_commission_refs (reference_id, referrer_user_id, referred_user_id, amount, created_at)
+             VALUES (?, ?, ?, ?, ?)`
+          )
+          .run(referenceId, referrer.id, player.id, bonusAmount, nowIso());
+        sqlite
+          .prepare(
+            `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at)
+             VALUES (?, ?, 'REFERRAL_COMMISSION', 'SUCCESS', ?, ?, ?, ?, NULL, ?, ?)`
+          )
+          .run(
+            `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            referrer.id,
+            bonusAmount,
+            beforeBalance,
+            afterBalance,
+            referenceId,
+            `${noteBase} | ${sequence}/${referralDepositBonusMaxTimesPerUser}`,
+            nowIso()
+          );
+        created = true;
+      }
+    }
+
+    sqlite.exec("COMMIT");
+  } catch (error) {
+    sqlite.exec("ROLLBACK");
+    throw error;
+  }
+
+  const entry = await findWalletEntryByReferenceId(referrer.id, referenceId);
+  if (created && entry) {
+    await createNotification({
+      userId: referrer.id,
+      title: "Referral deposit bonus credited",
+      body: `Rs ${bonusAmount.toFixed(2)} referral deposit bonus credit hua.`,
+      channel: "wallet"
+    });
+  }
   return entry;
 }
 

@@ -8,30 +8,59 @@ import {
   __internalToIso
 } from "../db.mjs";
 
+const CREDIT_WALLET_ENTRY_TYPES = [
+  "DEPOSIT",
+  "REFERRAL_COMMISSION",
+  "BID_WIN",
+  "SIGNUP_BONUS",
+  "FIRST_DEPOSIT_BONUS",
+  "ADMIN_CREDIT"
+];
+const DEBIT_WALLET_ENTRY_TYPES = ["WITHDRAW", "BID_PLACED", "BID_WIN_REVERSAL", "ADMIN_DEBIT"];
+
+function toSqlStringList(values) {
+  return values.map((value) => `'${String(value).replace(/'/g, "''")}'`).join(", ");
+}
+
+const CREDIT_WALLET_ENTRY_TYPES_SQL = toSqlStringList(CREDIT_WALLET_ENTRY_TYPES);
+const DEBIT_WALLET_ENTRY_TYPES_SQL = toSqlStringList(DEBIT_WALLET_ENTRY_TYPES);
+
+function getWalletBalanceDeltaSql(columnPrefix = "") {
+  return `CASE
+    WHEN ${columnPrefix}status = 'SUCCESS' AND ${columnPrefix}type IN (${CREDIT_WALLET_ENTRY_TYPES_SQL}) THEN COALESCE(${columnPrefix}amount, 0)
+    WHEN ${columnPrefix}status = 'SUCCESS' AND ${columnPrefix}type IN (${DEBIT_WALLET_ENTRY_TYPES_SQL}) THEN -COALESCE(${columnPrefix}amount, 0)
+    ELSE 0
+  END`;
+}
+
+async function getAccurateUserBalanceFromPg(executor, userId) {
+  const result = await executor.query(
+    `SELECT COALESCE(SUM(${getWalletBalanceDeltaSql()}), 0) AS balance
+     FROM wallet_entries
+     WHERE user_id = $1`,
+    [userId]
+  );
+  return Number(result.rows[0]?.balance ?? 0);
+}
+
+function getAccurateUserBalanceFromSqlite(db, userId) {
+  const row = db
+    .prepare(
+      `SELECT COALESCE(SUM(${getWalletBalanceDeltaSql()}), 0) AS balance
+       FROM wallet_entries
+       WHERE user_id = ?`
+    )
+    .get(userId);
+  return Number(row?.balance ?? 0);
+}
+
 export async function getUserBalance(userId) {
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
-    const result = await pool.query(
-      `SELECT after_balance
-       FROM wallet_entries
-       WHERE user_id = $1
-       ORDER BY created_at DESC, id DESC
-       LIMIT 1`,
-      [userId]
-    );
-    return Number(result.rows[0]?.after_balance ?? 0);
+    return getAccurateUserBalanceFromPg(pool, userId);
   }
 
-  const row = __internalGetSqlite()
-    .prepare(
-      `SELECT after_balance
-       FROM wallet_entries
-       WHERE user_id = ?
-       ORDER BY created_at DESC, id DESC
-       LIMIT 1`
-    )
-    .get(userId);
-  return Number(row?.after_balance ?? 0);
+  return getAccurateUserBalanceFromSqlite(__internalGetSqlite(), userId);
 }
 
 export async function getWalletEntriesForUser(userId, limit = 50) {
@@ -68,10 +97,8 @@ function getWalletEntryBalanceDelta(entry) {
   }
   const amount = Number(entry.amount ?? 0);
   const type = String(entry.type || "").toUpperCase();
-  const creditTypes = new Set(["DEPOSIT", "REFERRAL_COMMISSION", "BID_WIN", "SIGNUP_BONUS", "FIRST_DEPOSIT_BONUS", "ADMIN_CREDIT"]);
-  const debitTypes = new Set(["WITHDRAW", "BID_PLACED", "BID_WIN_REVERSAL", "ADMIN_DEBIT"]);
-  if (creditTypes.has(type)) return amount;
-  if (debitTypes.has(type)) return -amount;
+  if (CREDIT_WALLET_ENTRY_TYPES.includes(type)) return amount;
+  if (DEBIT_WALLET_ENTRY_TYPES.includes(type)) return -amount;
   return 0;
 }
 
@@ -420,21 +447,29 @@ export async function getWalletAdminRequestItems({ history = false } = {}) {
     const query = history
       ? `SELECT we.id, we.user_id, we.type, we.status, we.amount, we.before_balance, we.after_balance, we.reference_id, we.proof_url, we.note, we.created_at,
            u.phone AS user_phone, u.name AS user_name, u.approval_status AS user_approval_status,
-           COALESCE(balance.after_balance, 0) AS live_balance,
+           COALESCE(balance.balance, 0) AS live_balance,
            bank.id AS bank_id, bank.account_number AS bank_account_number, bank.holder_name AS bank_holder_name, bank.ifsc AS bank_ifsc, bank.created_at AS bank_created_at
          FROM wallet_entries we
          LEFT JOIN users u ON u.id = we.user_id
-         LEFT JOIN LATERAL (SELECT after_balance FROM wallet_entries WHERE user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1) balance ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT COALESCE(SUM(${getWalletBalanceDeltaSql("latest.")}), 0) AS balance
+           FROM wallet_entries latest
+           WHERE latest.user_id = we.user_id
+         ) balance ON TRUE
          LEFT JOIN LATERAL (SELECT id, account_number, holder_name, ifsc, created_at FROM bank_accounts WHERE user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1) bank ON TRUE
          WHERE we.type = ANY($1::text[])
          ORDER BY we.created_at DESC, we.id DESC`
       : `SELECT we.id, we.user_id, we.type, we.status, we.amount, we.before_balance, we.after_balance, we.reference_id, we.proof_url, we.note, we.created_at,
            u.phone AS user_phone, u.name AS user_name, u.approval_status AS user_approval_status,
-           COALESCE(balance.after_balance, 0) AS live_balance,
+           COALESCE(balance.balance, 0) AS live_balance,
            bank.id AS bank_id, bank.account_number AS bank_account_number, bank.holder_name AS bank_holder_name, bank.ifsc AS bank_ifsc, bank.created_at AS bank_created_at
          FROM wallet_entries we
          LEFT JOIN users u ON u.id = we.user_id
-         LEFT JOIN LATERAL (SELECT after_balance FROM wallet_entries WHERE user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1) balance ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT COALESCE(SUM(${getWalletBalanceDeltaSql("latest.")}), 0) AS balance
+           FROM wallet_entries latest
+           WHERE latest.user_id = we.user_id
+         ) balance ON TRUE
          LEFT JOIN LATERAL (SELECT id, account_number, holder_name, ifsc, created_at FROM bank_accounts WHERE user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1) bank ON TRUE
          WHERE (we.type = 'DEPOSIT' AND we.status = 'INITIATED')
             OR (we.type = 'WITHDRAW' AND we.status = ANY($1::text[]))
@@ -455,7 +490,7 @@ export async function getWalletAdminRequestItems({ history = false } = {}) {
   const query = history
     ? `SELECT we.id, we.user_id, we.type, we.status, we.amount, we.before_balance, we.after_balance, we.reference_id, we.proof_url, we.note, we.created_at,
          u.phone AS user_phone, u.name AS user_name, u.approval_status AS user_approval_status,
-         COALESCE((SELECT after_balance FROM wallet_entries latest WHERE latest.user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1), 0) AS live_balance,
+         COALESCE((SELECT SUM(${getWalletBalanceDeltaSql("latest.")}) FROM wallet_entries latest WHERE latest.user_id = we.user_id), 0) AS live_balance,
          (SELECT id FROM bank_accounts bank WHERE bank.user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1) AS bank_id,
          (SELECT account_number FROM bank_accounts bank WHERE bank.user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1) AS bank_account_number,
          (SELECT holder_name FROM bank_accounts bank WHERE bank.user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1) AS bank_holder_name,
@@ -467,7 +502,7 @@ export async function getWalletAdminRequestItems({ history = false } = {}) {
        ORDER BY we.created_at DESC, we.id DESC`
     : `SELECT we.id, we.user_id, we.type, we.status, we.amount, we.before_balance, we.after_balance, we.reference_id, we.proof_url, we.note, we.created_at,
          u.phone AS user_phone, u.name AS user_name, u.approval_status AS user_approval_status,
-         COALESCE((SELECT after_balance FROM wallet_entries latest WHERE latest.user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1), 0) AS live_balance,
+         COALESCE((SELECT SUM(${getWalletBalanceDeltaSql("latest.")}) FROM wallet_entries latest WHERE latest.user_id = we.user_id), 0) AS live_balance,
          (SELECT id FROM bank_accounts bank WHERE bank.user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1) AS bank_id,
          (SELECT account_number FROM bank_accounts bank WHERE bank.user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1) AS bank_account_number,
          (SELECT holder_name FROM bank_accounts bank WHERE bank.user_id = we.user_id ORDER BY created_at DESC, id DESC LIMIT 1) AS bank_holder_name,

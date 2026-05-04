@@ -9,7 +9,6 @@ import {
   findWalletEntryByReferenceId,
   getUserBalance,
   handlePaymentWebhook,
-  rebalanceWalletEntriesForUser,
   updateWalletEntryAdmin
 } from "../stores/payment-store.mjs";
 import { standaloneConfig } from "../config.mjs";
@@ -49,8 +48,6 @@ export async function createHostedPaymentOrder({ user, amount, createPaymentLink
     return { ok: false, status: 400, error: validationError };
   }
 
-  await rebalanceWalletEntriesForUser(user.id);
-
   const paymentOrderId = `payment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const reference = `RM${Date.now()}${Math.random().toString(36).slice(2, 4).toUpperCase()}`.slice(0, 40);
   const checkoutToken = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID().replace(/-/g, "") : `${Date.now()}${Math.random().toString(16).slice(2)}`;
@@ -81,8 +78,6 @@ export async function createNativePaymentOrder({ user, amount, createOrder, getK
   if (validationError) {
     return { ok: false, status: 400, error: validationError };
   }
-
-  await rebalanceWalletEntriesForUser(user.id);
 
   const paymentOrderId = `payment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const reference = `RM${Date.now()}${Math.random().toString(36).slice(2, 4).toUpperCase()}`.slice(0, 40);
@@ -133,7 +128,6 @@ export async function getPaymentOrderStatusSnapshot({ userId, referenceId, isPro
     const remoteStatus = String(paymentLink?.status || "").trim().toLowerCase();
 
     if (remoteStatus === "paid") {
-      await rebalanceWalletEntriesForUser(order.userId);
       order = await completePaymentLinkOrder({
         reference: order.reference,
         gatewayOrderId: String(order.gatewayOrderId || paymentLink.id || "").trim(),
@@ -167,7 +161,6 @@ export async function confirmNativePaymentOrder({ userId, referenceId, payload }
     return { ok: false, status: 404, error: "Payment order not found" };
   }
 
-  await rebalanceWalletEntriesForUser(order.userId);
   const updatedOrder = await completePaymentOrder({
     paymentOrderId: order.id,
     gatewayOrderId: payload.razorpayOrderId,
@@ -191,7 +184,6 @@ export async function startUpiDepositEntry({ userId, amount, appName, referenceI
     return { ok: true, data: existing };
   }
 
-  await rebalanceWalletEntriesForUser(userId);
   const beforeBalance = await getUserBalance(userId);
   const entry = await addWalletEntry({
     userId,
@@ -276,7 +268,6 @@ export async function completeCheckoutSession({ paymentOrderId, checkoutToken, p
     return { ok: false, status: 400, error: "Payment confirmation payload is incomplete", data: { paymentOrder } };
   }
 
-  await rebalanceWalletEntriesForUser(paymentOrder.userId);
   const updatedOrder = await completePaymentOrder({
     paymentOrderId: paymentOrder.id,
     gatewayOrderId: payload.razorpayOrderId,

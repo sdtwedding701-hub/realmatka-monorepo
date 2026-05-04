@@ -1,6 +1,5 @@
 import { addBid, addWalletEntry, getUserBalance } from "../db.mjs";
 import { requireAuthenticatedUser } from "../middleware/auth-middleware.mjs";
-import { rebalanceWalletEntriesForUser } from "../stores/wallet-store.mjs";
 import { getMarketListSnapshot, getMarketRuntimeMeta } from "../services/market-snapshot-service.mjs";
 import {
   allDoublePannas,
@@ -68,7 +67,6 @@ export async function place(request) {
   }
 
   const totalPoints = items.reduce((sum, item) => sum + Number(item?.points ?? 0), 0);
-  await rebalanceWalletEntriesForUser(user.id);
   const beforeBalance = await getUserBalance(user.id);
 
   if (totalPoints <= 0) {

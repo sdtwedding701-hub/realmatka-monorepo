@@ -3,7 +3,38 @@ import {
   __internalGetSqlite,
   __internalNowIso
 } from "../db.mjs";
-import { rebalanceWalletEntriesForUser } from "./wallet-db.mjs";
+
+const CREDIT_WALLET_ENTRY_TYPES_SQL = "'DEPOSIT', 'REFERRAL_COMMISSION', 'BID_WIN', 'SIGNUP_BONUS', 'FIRST_DEPOSIT_BONUS', 'ADMIN_CREDIT'";
+const DEBIT_WALLET_ENTRY_TYPES_SQL = "'WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT'";
+
+function getWalletBalanceDeltaSql(columnPrefix = "") {
+  return `CASE
+    WHEN ${columnPrefix}status = 'SUCCESS' AND ${columnPrefix}type IN (${CREDIT_WALLET_ENTRY_TYPES_SQL}) THEN COALESCE(${columnPrefix}amount, 0)
+    WHEN ${columnPrefix}status = 'SUCCESS' AND ${columnPrefix}type IN (${DEBIT_WALLET_ENTRY_TYPES_SQL}) THEN -COALESCE(${columnPrefix}amount, 0)
+    ELSE 0
+  END`;
+}
+
+async function getAccurateUserBalanceFromPg(executor, userId) {
+  const result = await executor.query(
+    `SELECT COALESCE(SUM(${getWalletBalanceDeltaSql()}), 0) AS balance
+     FROM wallet_entries
+     WHERE user_id = $1`,
+    [userId]
+  );
+  return Number(result.rows[0]?.balance ?? 0);
+}
+
+function getAccurateUserBalanceFromSqlite(db, userId) {
+  const row = db
+    .prepare(
+      `SELECT COALESCE(SUM(${getWalletBalanceDeltaSql()}), 0) AS balance
+       FROM wallet_entries
+       WHERE user_id = ?`
+    )
+    .get(userId);
+  return Number(row?.balance ?? 0);
+}
 
 function mapPaymentOrderRow(row) {
   return row
@@ -114,26 +145,12 @@ export async function createPaymentOrder({
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      const currentBalance = await getAccurateUserBalanceFromPg(client, userId);
       await client.query(
         `INSERT INTO payment_orders (id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, redirect_url, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
         [id, userId, provider, amount, status, reference, checkoutToken, gatewayOrderId, redirectUrl, createdAt]
       );
-
-      const balanceResult = await client.query(
-        `SELECT COALESCE(
-           (
-             SELECT after_balance
-             FROM wallet_entries
-             WHERE user_id = $1
-             ORDER BY created_at DESC, id DESC
-             LIMIT 1
-           ),
-           0
-         ) AS balance`,
-        [userId]
-      );
-      const currentBalance = Number(balanceResult.rows[0]?.balance ?? 0);
 
       await client.query(
         `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, note, created_at)
@@ -159,27 +176,11 @@ export async function createPaymentOrder({
     const db = __internalGetSqlite();
     db.exec("BEGIN");
     try {
+      const currentBalance = getAccurateUserBalanceFromSqlite(db, userId);
       db.prepare(
         `INSERT INTO payment_orders (id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, redirect_url, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(id, userId, provider, amount, status, reference, checkoutToken, gatewayOrderId, redirectUrl, createdAt, createdAt);
-
-      const currentBalance = Number(
-        db
-          .prepare(
-            `SELECT COALESCE(
-               (
-                 SELECT after_balance
-                 FROM wallet_entries
-                 WHERE user_id = ?
-                 ORDER BY created_at DESC, id DESC
-                 LIMIT 1
-               ),
-               0
-             ) AS balance`
-          )
-          .get(userId)?.balance ?? 0
-      );
 
       db.prepare(
         `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, note, created_at)
@@ -229,23 +230,7 @@ export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gat
         throw new Error("Gateway order mismatch");
       }
       if (existing.status !== "SUCCESS") {
-        const currentBalance = Number(
-          (
-            await client.query(
-              `SELECT COALESCE(
-                 (
-                   SELECT after_balance
-                   FROM wallet_entries
-                   WHERE user_id = $1
-                   ORDER BY created_at DESC, id DESC
-                   LIMIT 1
-                 ),
-                 0
-               ) AS balance`,
-              [existing.user_id]
-            )
-          ).rows[0]?.balance ?? 0
-        );
+        const currentBalance = await getAccurateUserBalanceFromPg(client, existing.user_id);
         const nextBalance = currentBalance + Number(existing.amount);
         await client.query(
           `UPDATE payment_orders
@@ -337,22 +322,7 @@ export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gat
       throw new Error("Gateway order mismatch");
     }
     if (existing.status !== "SUCCESS") {
-      const currentBalance = Number(
-        db
-          .prepare(
-            `SELECT COALESCE(
-               (
-                 SELECT after_balance
-                 FROM wallet_entries
-                 WHERE user_id = ?
-                 ORDER BY created_at DESC, id DESC
-                 LIMIT 1
-               ),
-               0
-             ) AS balance`
-          )
-          .get(existing.user_id)?.balance ?? 0
-      );
+      const currentBalance = getAccurateUserBalanceFromSqlite(db, existing.user_id);
       const nextBalance = currentBalance + Number(existing.amount);
       db.prepare(
         `UPDATE payment_orders
@@ -428,8 +398,6 @@ export async function completePaymentLinkOrder({ reference, gatewayOrderId, gate
   if (!existingOrder) {
     return null;
   }
-
-  await rebalanceWalletEntriesForUser(existingOrder.userId);
 
   return completePaymentOrder({
     paymentOrderId: existingOrder.id,

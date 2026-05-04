@@ -480,6 +480,14 @@ export const api = {
     return request<WalletEntry[]>("/api/wallet/history", { token });
   },
 
+  deposit(token: string, amount: number, referenceId = "", proofUrl = "", note = "") {
+    return request<WalletEntry>("/api/wallet/deposit", {
+      method: "POST",
+      token,
+      body: { amount, referenceId, proofUrl, note }
+    });
+  },
+
   withdraw(token: string, amount: number, referenceId = "", proofUrl = "", note = "") {
     return request<WalletEntry>("/api/wallet/withdraw", {
       method: "POST",

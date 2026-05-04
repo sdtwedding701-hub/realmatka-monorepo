@@ -10,6 +10,8 @@ import { colors } from "@/theme/colors";
 
 const MIN_DEPOSIT_AMOUNT = 100;
 const PAYMENT_STATUS_REFRESH_MS = 10_000;
+const DIRECT_UPI_ID = "9309782081@okbizaxis";
+const DIRECT_UPI_PAYEE_NAME = "Real Matka";
 
 function statusTone(status: string) {
   const normalized = status.trim().toUpperCase();
@@ -215,6 +217,12 @@ export default function AddFundScreen() {
           </View>
         </SurfaceCard>
 
+        <SurfaceCard style={styles.directUpiCard}>
+          <Text style={styles.sectionTitle}>Direct UPI Fallback</Text>
+          <Text style={styles.statusHint}>Razorpay ke niche direct UPI test option. Payment request wallet history me pending entry ke saath save hogi.</Text>
+          <Text style={styles.directUpiId}>{DIRECT_UPI_ID}</Text>
+        </SurfaceCard>
+
         <View style={styles.footerActions}>
           <Pressable
             disabled={!hasValidAmount || !isMultipleOfHundred || submitting || !sessionToken}
@@ -222,6 +230,14 @@ export default function AddFundScreen() {
             style={[styles.primaryButton, (!hasValidAmount || !isMultipleOfHundred || submitting || !sessionToken) && styles.disabledButton]}
           >
             {submitting ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.primaryButtonText}>Pay Now</Text>}
+          </Pressable>
+
+          <Pressable
+            disabled={!hasValidAmount || !isMultipleOfHundred || submitting || !sessionToken}
+            onPress={() => void startDirectUpiDeposit()}
+            style={[styles.secondaryButton, (!hasValidAmount || !isMultipleOfHundred || submitting || !sessionToken) && styles.disabledButton]}
+          >
+            <Text style={styles.secondaryButtonText}>Pay in Direct UPI ID</Text>
           </Pressable>
 
           <Pressable onPress={() => router.push("/wallet/history")} style={styles.historyButton}>
@@ -263,6 +279,46 @@ export default function AddFundScreen() {
       await Linking.openURL(order.redirectUrl);
     } catch (startError) {
       setError(formatApiError(startError, "Payment start nahi hua."));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function startDirectUpiDeposit() {
+    if (!sessionToken) {
+      setError("Login required");
+      return;
+    }
+
+    if (!Number.isFinite(numericAmount) || numericAmount < MIN_DEPOSIT_AMOUNT) {
+      setError(`Minimum deposit is Rs ${MIN_DEPOSIT_AMOUNT}.`);
+      return;
+    }
+    if (!isMultipleOfHundred) {
+      setError("Deposit amount Rs 100 ke multiple me hona chahiye.");
+      return;
+    }
+
+    const referenceId = `RMUPI${Date.now()}`;
+    const note = `Direct UPI Deposit via ${DIRECT_UPI_ID}`;
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(DIRECT_UPI_ID)}&pn=${encodeURIComponent(DIRECT_UPI_PAYEE_NAME)}&am=${encodeURIComponent(
+      numericAmount.toFixed(2)
+    )}&cu=INR&tn=${encodeURIComponent(referenceId)}`;
+
+    try {
+      setSubmitting(true);
+      setError("");
+      setSuccessMessage("");
+
+      await api.deposit(sessionToken, numericAmount, referenceId, "", note);
+      await Linking.openURL(upiUrl);
+      setSuccessMessage(`Direct UPI request create ho gayi. Payment complete karke wallet history me Ref ${referenceId} verify karo.`);
+      router.replace({
+        pathname: "/wallet/history",
+        params: { payment: "pending", reference: referenceId, amount: String(numericAmount) }
+      } as never);
+    } catch (startError) {
+      setError(formatApiError(startError, "Direct UPI start nahi hua."));
     } finally {
       setSubmitting(false);
     }
@@ -392,6 +448,14 @@ const styles = StyleSheet.create({
   statusActions: {
     flexDirection: "row",
     gap: 10
+  },
+  directUpiCard: {
+    gap: 8
+  },
+  directUpiId: {
+    color: colors.primaryDark,
+    fontSize: 15,
+    fontWeight: "900"
   },
   primaryButton: {
     flex: 1,

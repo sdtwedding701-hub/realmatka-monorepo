@@ -44,20 +44,19 @@ function getMarketPhaseMeta(market, currentMinutes) {
   const status = String(market.status || "").toLowerCase();
   const action = String(market.action || "").toLowerCase();
   const isForcedClosed = status.includes("weekly off") || status.includes("closed for today") || action === "closed";
-  if (isForcedClosed) {
-    return { label: status.includes("weekly off") ? "Weekly Off" : "Betting is Closed for Today", sortBucket: 3, anchor: Number.MAX_SAFE_INTEGER };
-  }
-
   const openMinutes = parseClockTimeToMinutes(market.open);
   const closeMinutes = parseClockTimeToMinutes(market.close);
+  if (isForcedClosed) {
+    return { label: status.includes("weekly off") ? "Weekly Off" : "Betting is Closed for Today", sortBucket: 1, anchor: openMinutes, closeAnchor: closeMinutes };
+  }
 
   if (currentMinutes < openMinutes) {
-    return { label: "Betting Running Now", sortBucket: 1, anchor: openMinutes };
+    return { label: "Betting Running Now", sortBucket: 0, anchor: openMinutes, closeAnchor: closeMinutes };
   }
   if (currentMinutes < closeMinutes) {
-    return { label: "Betting is Running for Close", sortBucket: 0, anchor: closeMinutes };
+    return { label: "Betting is Running for Close", sortBucket: 0, anchor: openMinutes, closeAnchor: closeMinutes };
   }
-  return { label: "Betting is Closed for Today", sortBucket: 2, anchor: closeMinutes };
+  return { label: "Betting is Closed for Today", sortBucket: 1, anchor: openMinutes, closeAnchor: closeMinutes };
 }
 
 export function sortAdminMarketsByTime(markets, currentMinutes) {
@@ -67,14 +66,10 @@ export function sortAdminMarketsByTime(markets, currentMinutes) {
     if (leftMeta.sortBucket !== rightMeta.sortBucket) {
       return leftMeta.sortBucket - rightMeta.sortBucket;
     }
-    if (leftMeta.sortBucket === 0 || leftMeta.sortBucket === 1) {
-      const diff = leftMeta.anchor - rightMeta.anchor;
-      if (diff !== 0) return diff;
-    }
-    if (leftMeta.sortBucket === 2) {
-      const diff = leftMeta.anchor - rightMeta.anchor;
-      if (diff !== 0) return diff;
-    }
+    const diff = leftMeta.anchor - rightMeta.anchor;
+    if (diff !== 0) return diff;
+    const closeDiff = leftMeta.closeAnchor - rightMeta.closeAnchor;
+    if (closeDiff !== 0) return closeDiff;
     return String(left.name || "").localeCompare(String(right.name || ""));
   });
 }

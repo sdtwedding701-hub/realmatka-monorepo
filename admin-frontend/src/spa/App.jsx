@@ -861,9 +861,13 @@ function RequestsPage({
   const isDepositOnly = effectiveRequestType === "DEPOSIT";
   const isWithdrawOnly = effectiveRequestType === "WITHDRAW";
   const historyItems = effectiveRequestType === "all" ? state.items : state.items.filter((item) => item.type === effectiveRequestType);
+  const sortedHistoryItems = useMemo(
+    () => [...historyItems].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()),
+    [historyItems]
+  );
   const pendingItems = effectiveRequestType === "all" ? state.pending : state.pending.filter((item) => item.type === effectiveRequestType);
 
-  const filteredItems = historyItems.filter((item) => {
+  const filteredItems = sortedHistoryItems.filter((item) => {
     const matchesQuery =
       !query ||
       item.user?.name?.toLowerCase().includes(query.toLowerCase()) ||
@@ -986,7 +990,7 @@ function RequestsPage({
           </div>
         </div>
         {message ? <p className={`message ${message.toLowerCase().includes("fail") || message.toLowerCase().includes("error") ? "error" : "success"}`}>{message}</p> : null}
-        <div className="request-highlight-grid">
+        {!isDepositOnly ? <div className="request-highlight-grid">
           {prioritizedPending.length ? prioritizedPending.slice(0, 3).map((item) => (
             <div className={`request-highlight-card ${item.type === "WITHDRAW" ? "withdraw" : "deposit"}`} key={`highlight-${item.id}`}>
               <span className="request-highlight-type">{item.type}</span>
@@ -995,8 +999,8 @@ function RequestsPage({
               <small>{getWalletQueueSummary(item)}</small>
             </div>
           )) : <div className="empty-card">No highlighted pending requests right now.</div>}
-        </div>
-        <div className="table-list">
+        </div> : null}
+        {!isDepositOnly ? <div className="table-list">
           {prioritizedPending.length ? prioritizedPending.map((item) => (
             <div className={`data-row payout-row${getWalletQueuePriority(item) >= 3 ? " urgent" : ""}`} key={item.id}>
               <div className="row-main">
@@ -1033,7 +1037,7 @@ function RequestsPage({
               </div>
             </div>
           )) : <div className="empty-card">{pendingEmptyCopy}</div>}
-        </div>
+        </div> : null}
       </section>
       <section className="panel">
         <div className="table-head"><span>Request</span><span>{isDepositOnly ? "Payment / Proof" : "Bank / Proof"}</span><span>Status</span></div>

@@ -34,7 +34,7 @@ type MarketItem = {
   category: "starline" | "games" | "jackpot";
 };
 
-const HOME_SOFT_REFRESH_INTERVAL_MS = 120_000;
+const HOME_SOFT_REFRESH_INTERVAL_MS = 60_000;
 const DEFAULT_NOTICE_TEXT =
   "Abhi market aur betting running hai. Aap app me bet place kar sakte ho. First deposit bonus: Rs 1000 par 50 points aur Rs 2000 par 100 points milenge. Bonus sirf first deposit par milega.";
 const FALLBACK_MARKETS: MarketItem[] = marketCatalog.map((fallback) => ({
@@ -137,11 +137,25 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (Date.now() - lastSoftRefreshAtRef.current < HOME_SOFT_REFRESH_INTERVAL_MS) {
-        return;
+      let active = true;
+
+      if (Date.now() - lastSoftRefreshAtRef.current >= HOME_SOFT_REFRESH_INTERVAL_MS) {
+        lastSoftRefreshAtRef.current = Date.now();
+        void refreshScreen(false);
       }
-      lastSoftRefreshAtRef.current = Date.now();
-      void refreshScreen(false);
+
+      const interval = setInterval(() => {
+        if (!active) {
+          return;
+        }
+        lastSoftRefreshAtRef.current = Date.now();
+        void refreshScreen(false);
+      }, HOME_SOFT_REFRESH_INTERVAL_MS);
+
+      return () => {
+        active = false;
+        clearInterval(interval);
+      };
     }, [])
   );
 

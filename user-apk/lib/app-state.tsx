@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { AppState, AppStateStatus, Platform } from "react-native";
 import { ApiError, api, setAuthFailureListener, type BankAccount, type BidEntry, type SessionUser, type WalletEntry } from "@/lib/api";
 import { readStoredMpinConfigured, writeStoredMpinValue, writeStoredMpinConfigured } from "@/lib/security-storage";
 import {
@@ -56,9 +57,14 @@ type AppStateValue = {
 const AppStateContext = createContext<AppStateValue | null>(null);
 const SESSION_REFRESH_STALE_MS = 60_000;
 const COLLECTION_REFRESH_STALE_MS = 120_000;
+const LIVE_WALLET_SYNC_INTERVAL_MS = 60_000;
 
 function ensureMessage(value: unknown, fallback: string) {
   return value instanceof Error ? value.message : fallback;
+}
+
+function createBidRequestId() {
+  return `bidreq_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function mergeUser(baseUser: SessionUser | null, nextUser: SessionUser | null, walletBalance: number) {
@@ -432,6 +438,84 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return bidReloadPromiseRef.current;
   }, [clearSession, sessionToken]);
 
+  const refreshLiveUserState = useCallback(async (options?: { force?: boolean; includeHistory?: boolean }) => {
+    if (!sessionToken) {
+      return;
+    }
+
+    await reloadSessionData({ force: options?.force });
+
+    if (!options?.includeHistory) {
+      return;
+    }
+
+    await Promise.allSettled([
+      loadWalletHistory({ force: true }),
+      loadBidHistory({ force: true })
+    ]);
+  }, [loadBidHistory, loadWalletHistory, reloadSessionData, sessionToken]);
+
+  useEffect(() => {
+    if (!sessionToken) {
+      return;
+    }
+
+    let active = true;
+    let appState = AppState.currentState;
+
+    const triggerRefresh = (force = false) => {
+      if (!active || appState !== "active") {
+        return;
+      }
+
+      void refreshLiveUserState({ force, includeHistory: false });
+    };
+
+    const appStateSubscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      const wasBackgrounded = appState !== "active" && nextState === "active";
+      appState = nextState;
+      if (wasBackgrounded) {
+        triggerRefresh(true);
+      }
+    });
+
+    let webFocusHandler: (() => void) | null = null;
+    let webVisibilityHandler: (() => void) | null = null;
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      webFocusHandler = () => triggerRefresh(true);
+      webVisibilityHandler = () => {
+        if (document.visibilityState === "visible") {
+          triggerRefresh(true);
+        }
+      };
+
+      window.addEventListener("focus", webFocusHandler);
+      document.addEventListener("visibilitychange", webVisibilityHandler);
+    }
+
+    const interval = setInterval(() => {
+      if (Platform.OS === "web" && typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
+      triggerRefresh(true);
+    }, LIVE_WALLET_SYNC_INTERVAL_MS);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      appStateSubscription.remove();
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        if (webFocusHandler) {
+          window.removeEventListener("focus", webFocusHandler);
+        }
+        if (webVisibilityHandler) {
+          document.removeEventListener("visibilitychange", webVisibilityHandler);
+        }
+      }
+    };
+  }, [refreshLiveUserState, sessionToken]);
+
   const loadBankAccounts = useCallback(async (options?: { force?: boolean }) => {
     if (!sessionToken) {
       return;
@@ -576,9 +660,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
 
     const totalPoints = draftBid.items.reduce((sum, item) => sum + Number(item.points || 0), 0);
+    const requestId = createBidRequestId();
     let createdBids: BidEntry[];
     try {
-      createdBids = await api.placeBids(sessionToken, draftBid);
+      createdBids = await api.placeBids(sessionToken, {
+        ...draftBid,
+        requestId
+      });
     } catch (error) {
       if (isAuthFailure(error)) {
         await clearSession();

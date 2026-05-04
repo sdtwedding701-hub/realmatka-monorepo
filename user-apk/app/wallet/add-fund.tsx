@@ -23,7 +23,7 @@ function statusTone(status: string) {
 }
 
 export default function AddFundScreen() {
-  const { sessionToken, walletBalance, reloadSessionData } = useAppState();
+  const { sessionToken, walletBalance, reloadSessionData, loadWalletHistory, loadBidHistory } = useAppState();
   const addFundSupported = isSupportedAddFundPlatform();
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -55,7 +55,11 @@ export default function AddFundScreen() {
           .toUpperCase();
 
         if (normalized === "SUCCESS" || normalized === "PAID") {
-          await reloadSessionData();
+          await reloadSessionData({ force: true });
+          await Promise.allSettled([
+            loadWalletHistory({ force: true }),
+            loadBidHistory({ force: true })
+          ]);
           setSuccessMessage(`Deposit successful. Reference ${next.reference} wallet history me aa gaya hai.`);
           router.replace({
             pathname: "/wallet/history",
@@ -75,7 +79,7 @@ export default function AddFundScreen() {
         }
       }
     },
-    [reloadSessionData, sessionToken]
+    [loadBidHistory, loadWalletHistory, reloadSessionData, sessionToken]
   );
 
   useFocusEffect(

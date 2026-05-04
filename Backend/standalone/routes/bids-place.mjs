@@ -1,4 +1,13 @@
-import { addBid, addWalletEntry, getUserBalance } from "../db.mjs";
+import {
+  __internalGetReadyPgPool,
+  __internalGetSqlite,
+  __internalMapBidRow,
+  __internalNowIso,
+  addBid,
+  addWalletEntry,
+  getUserBalance
+} from "../db.mjs";
+import { isStandalonePostgresEnabled } from "../config.mjs";
 import { requireAuthenticatedUser } from "../middleware/auth-middleware.mjs";
 import { getMarketListSnapshot, getMarketRuntimeMeta } from "../services/market-snapshot-service.mjs";
 import {
@@ -13,6 +22,7 @@ import { getMarketDayKey } from "../services/admin-settlement-helpers.mjs";
 
 const MIN_BID_POINTS = 5;
 const MAX_BID_POINTS = 99999;
+const DUPLICATE_BID_WINDOW_SECONDS = 5;
 const emptySangam = { valid: false, value: "", message: "" };
 const sessionlessBoards = new Set([
   "Jodi Digit",
@@ -23,15 +33,6 @@ const sessionlessBoards = new Set([
   "Half Sangam",
   "Full Sangam"
 ]);
-const openCutoffOnlyBoards = new Set([
-  "Jodi Digit",
-  "Jodi Digit Bulk",
-  "Red Bracket",
-  "Digit Based Jodi",
-  "Half Sangam",
-  "Full Sangam"
-]);
-
 export function options(request) {
   return corsPreflight(request);
 }
@@ -47,6 +48,7 @@ export async function place(request) {
   const requestedSessionType = String(body.sessionType ?? "Close");
   const sessionType = normalizeSessionType(boardLabel, requestedSessionType);
   const items = Array.isArray(body.items) ? body.items : [];
+  const requestId = String(body.requestId ?? "").trim();
 
   if (!market || !boardLabel || items.length === 0) {
     return fail("Market, boardLabel, and items are required", 400, request);
@@ -62,18 +64,14 @@ export async function place(request) {
   if (marketMeta.phase === "closed") {
     return fail("Betting is closed for today", 400, request);
   }
-  if (marketMeta.phase === "close-running" && openCutoffOnlyBoards.has(boardLabel) && sessionType === "Open") {
+  if (marketMeta.phase === "close-running" && sessionType === "Open") {
     return fail("Open session betting is closed for this board", 400, request);
   }
 
   const totalPoints = items.reduce((sum, item) => sum + Number(item?.points ?? 0), 0);
-  const beforeBalance = await getUserBalance(user.id);
 
   if (totalPoints <= 0) {
     return fail("Total points must be greater than 0", 400, request);
-  }
-  if (totalPoints > beforeBalance) {
-    return fail("Insufficient balance", 400, request);
   }
 
   for (const item of items) {
@@ -87,35 +85,343 @@ export async function place(request) {
     }
   }
 
-  const created = await Promise.all(
-    items.map((item) =>
-      addBid({
-        userId: user.id,
-        market,
-        marketDay: getMarketDayKey(new Date()),
-        boardLabel,
-        gameType: String(item?.gameType ?? boardLabel),
-        sessionType,
-        digit: String(item?.digit ?? ""),
-        points: Number(item?.points ?? 0),
-        status: "Pending",
-        payout: 0,
-        settledAt: null,
-        settledResult: null
-      })
-    )
+  const marketDay = getMarketDayKey(new Date());
+  const normalizedItems = normalizeBidRequestItems(items, boardLabel);
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await __internalGetReadyPgPool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [user.id]);
+
+      const duplicateRows =
+        requestId
+          ? await findProcessedBidBatchByRequestIdPostgres(client, {
+              userId: user.id,
+              market,
+              marketDay,
+              boardLabel,
+              sessionType,
+              requestId,
+              normalizedItems
+            })
+          : await findRecentDuplicateBidBatchPostgres(client, {
+              userId: user.id,
+              market,
+              marketDay,
+              boardLabel,
+              sessionType,
+              normalizedItems
+            });
+      if (duplicateRows.length > 0) {
+        await client.query("COMMIT");
+        return ok(duplicateRows, request);
+      }
+
+      const beforeBalance = await getAccurateUserBalancePostgres(client, user.id);
+      if (totalPoints > beforeBalance) {
+        await client.query("ROLLBACK");
+        return fail("Insufficient balance", 400, request);
+      }
+
+      const createdAt = __internalNowIso();
+      const created = [];
+      for (const item of normalizedItems) {
+        const id = `bid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        await client.query(
+          `INSERT INTO bids (id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Pending', 0, NULL, NULL, $10)`,
+          [id, user.id, market, marketDay, boardLabel, item.gameType, sessionType, item.digit, item.points, createdAt]
+        );
+        created.push({
+          id,
+          userId: user.id,
+          market,
+          marketDay,
+          boardLabel,
+          gameType: item.gameType,
+          sessionType,
+          digit: item.digit,
+          points: item.points,
+          status: "Pending",
+          payout: 0,
+          settledAt: null,
+          settledResult: null,
+          createdAt
+        });
+      }
+
+      const walletEntryId = `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      await client.query(
+        `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at)
+         VALUES ($1, $2, 'BID_PLACED', 'SUCCESS', $3, $4, $5, $6, NULL, NULL, $7)`,
+        [walletEntryId, user.id, totalPoints, beforeBalance, beforeBalance - totalPoints, requestId || null, createdAt]
+      );
+
+      await client.query("COMMIT");
+      return ok(created, request);
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  const sqlite = __internalGetSqlite();
+  sqlite.exec("BEGIN IMMEDIATE");
+  try {
+    const duplicateRows = requestId
+      ? findProcessedBidBatchByRequestIdSqlite(sqlite, {
+          userId: user.id,
+          market,
+          marketDay,
+          boardLabel,
+          sessionType,
+          requestId,
+          normalizedItems
+        })
+      : findRecentDuplicateBidBatchSqlite(sqlite, {
+          userId: user.id,
+          market,
+          marketDay,
+          boardLabel,
+          sessionType,
+          normalizedItems
+        });
+    if (duplicateRows.length > 0) {
+      sqlite.exec("COMMIT");
+      return ok(duplicateRows, request);
+    }
+
+    const beforeBalance = await getUserBalance(user.id);
+    if (totalPoints > beforeBalance) {
+      sqlite.exec("ROLLBACK");
+      return fail("Insufficient balance", 400, request);
+    }
+
+    const created = await Promise.all(
+      normalizedItems.map((item) =>
+        addBid({
+          userId: user.id,
+          market,
+          marketDay,
+          boardLabel,
+          gameType: item.gameType,
+          sessionType,
+          digit: item.digit,
+          points: item.points,
+          status: "Pending",
+          payout: 0,
+          settledAt: null,
+          settledResult: null
+        })
+      )
+    );
+
+    await addWalletEntry({
+      userId: user.id,
+      type: "BID_PLACED",
+      status: "SUCCESS",
+      amount: totalPoints,
+      beforeBalance,
+      afterBalance: beforeBalance - totalPoints,
+      referenceId: requestId || null
+    });
+
+    sqlite.exec("COMMIT");
+    return ok(created, request);
+  } catch (error) {
+    try {
+      sqlite.exec("ROLLBACK");
+    } catch {}
+    throw error;
+  }
+}
+
+function normalizeBidRequestItems(items, boardLabel) {
+  return items.map((item) => ({
+    gameType: String(item?.gameType ?? boardLabel),
+    digit: String(item?.digit ?? ""),
+    points: Number(item?.points ?? 0)
+  }));
+}
+
+function buildBidSignatureMap(items) {
+  const counts = new Map();
+  for (const item of items) {
+    const signature = [item.gameType, item.digit, item.points.toFixed(2)].join("|");
+    counts.set(signature, (counts.get(signature) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function isDuplicateBatch(items, rows) {
+  if (rows.length !== items.length) {
+    return false;
+  }
+  const expected = buildBidSignatureMap(items);
+  const actual = buildBidSignatureMap(
+    rows.map((row) => ({
+      gameType: String(row.game_type ?? row.gameType ?? ""),
+      digit: String(row.digit ?? ""),
+      points: Number(row.points ?? 0)
+    }))
   );
+  if (expected.size !== actual.size) {
+    return false;
+  }
+  for (const [signature, count] of expected.entries()) {
+    if (actual.get(signature) !== count) {
+      return false;
+    }
+  }
+  return true;
+}
 
-  await addWalletEntry({
-    userId: user.id,
-    type: "BID_PLACED",
-    status: "SUCCESS",
-    amount: totalPoints,
-    beforeBalance,
-    afterBalance: beforeBalance - totalPoints
-  });
+async function findRecentDuplicateBidBatchPostgres(
+  client,
+  { userId, market, marketDay, boardLabel, sessionType, normalizedItems }
+) {
+  const result = await client.query(
+    `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+     FROM bids
+     WHERE user_id = $1
+       AND market = $2
+       AND market_day = $3
+       AND board_label = $4
+       AND session_type = $5
+       AND created_at >= NOW() - ($6::text || ' seconds')::interval
+     ORDER BY created_at ASC, id ASC`,
+    [userId, market, marketDay, boardLabel, sessionType, String(DUPLICATE_BID_WINDOW_SECONDS)]
+  );
+  if (!isDuplicateBatch(normalizedItems, result.rows)) {
+    return [];
+  }
+  return result.rows.map((row) => __internalMapBidRow(row));
+}
 
-  return ok(created, request);
+async function findProcessedBidBatchByRequestIdPostgres(
+  client,
+  { userId, market, marketDay, boardLabel, sessionType, requestId, normalizedItems }
+) {
+  const walletResult = await client.query(
+    `SELECT created_at
+     FROM wallet_entries
+     WHERE user_id = $1
+       AND type = 'BID_PLACED'
+       AND status = 'SUCCESS'
+       AND reference_id = $2
+     ORDER BY created_at DESC, id DESC
+     LIMIT 1`,
+    [userId, requestId]
+  );
+  const createdAt = walletResult.rows[0]?.created_at;
+  if (!createdAt) {
+    return [];
+  }
+
+  const bidsResult = await client.query(
+    `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+     FROM bids
+     WHERE user_id = $1
+       AND market = $2
+       AND market_day = $3
+       AND board_label = $4
+       AND session_type = $5
+       AND created_at BETWEEN ($6::timestamptz - INTERVAL '10 seconds') AND ($6::timestamptz + INTERVAL '10 seconds')
+     ORDER BY created_at ASC, id ASC`,
+    [userId, market, marketDay, boardLabel, sessionType, createdAt]
+  );
+  if (!isDuplicateBatch(normalizedItems, bidsResult.rows)) {
+    return [];
+  }
+  return bidsResult.rows.map((row) => __internalMapBidRow(row));
+}
+
+function findRecentDuplicateBidBatchSqlite(
+  sqlite,
+  { userId, market, marketDay, boardLabel, sessionType, normalizedItems }
+) {
+  const windowStart = new Date(Date.now() - DUPLICATE_BID_WINDOW_SECONDS * 1000).toISOString();
+  const rows = sqlite
+    .prepare(
+      `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+       FROM bids
+       WHERE user_id = ?
+         AND market = ?
+         AND market_day = ?
+         AND board_label = ?
+         AND session_type = ?
+         AND created_at >= ?
+       ORDER BY created_at ASC, id ASC`
+    )
+    .all(userId, market, marketDay, boardLabel, sessionType, windowStart);
+  if (!isDuplicateBatch(normalizedItems, rows)) {
+    return [];
+  }
+  return rows.map((row) => __internalMapBidRow(row));
+}
+
+function findProcessedBidBatchByRequestIdSqlite(
+  sqlite,
+  { userId, market, marketDay, boardLabel, sessionType, requestId, normalizedItems }
+) {
+  const walletRow = sqlite
+    .prepare(
+      `SELECT created_at
+       FROM wallet_entries
+       WHERE user_id = ?
+         AND type = 'BID_PLACED'
+         AND status = 'SUCCESS'
+         AND reference_id = ?
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`
+    )
+    .get(userId, requestId);
+  if (!walletRow?.created_at) {
+    return [];
+  }
+
+  const windowCenter = new Date(walletRow.created_at).getTime();
+  const windowStart = new Date(windowCenter - 10_000).toISOString();
+  const windowEnd = new Date(windowCenter + 10_000).toISOString();
+  const rows = sqlite
+    .prepare(
+      `SELECT id, user_id, market, market_day, board_label, game_type, session_type, digit, points, status, payout, settled_at, settled_result, created_at
+       FROM bids
+       WHERE user_id = ?
+         AND market = ?
+         AND market_day = ?
+         AND board_label = ?
+         AND session_type = ?
+         AND created_at BETWEEN ? AND ?
+       ORDER BY created_at ASC, id ASC`
+    )
+    .all(userId, market, marketDay, boardLabel, sessionType, windowStart, windowEnd);
+  if (!isDuplicateBatch(normalizedItems, rows)) {
+    return [];
+  }
+  return rows.map((row) => __internalMapBidRow(row));
+}
+
+async function getAccurateUserBalancePostgres(client, userId) {
+  const result = await client.query(
+    `SELECT COALESCE(SUM(
+      CASE
+        WHEN status = 'SUCCESS' AND type IN ('DEPOSIT','BID_WIN','ADMIN_CREDIT','REFERRAL_COMMISSION','SIGNUP_BONUS','FIRST_DEPOSIT_BONUS') THEN amount
+        WHEN status = 'SUCCESS' AND type IN ('WITHDRAW','BID_PLACED','ADMIN_DEBIT','BID_WIN_REVERSAL') THEN -amount
+        ELSE 0
+      END
+    ), 0) AS live_balance
+    FROM wallet_entries
+    WHERE user_id = $1`,
+    [userId]
+  );
+  return Number(result.rows[0]?.live_balance ?? 0);
 }
 
 export async function boardHelper(request) {

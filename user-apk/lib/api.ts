@@ -458,6 +458,7 @@ export const api = {
   placeBids(
     token: string,
     payload: {
+      requestId: string;
       market: string;
       boardLabel: string;
       sessionType: "Open" | "Close" | "NA";

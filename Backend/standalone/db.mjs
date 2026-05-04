@@ -22,6 +22,9 @@ const sessionTtlMs = standaloneConfig.sessionTtlHours * 60 * 60 * 1000;
 const authSessionCache = new Map();
 const AUTH_SESSION_CACHE_TTL_MS = 15_000;
 const signupBonusAmount = 25;
+const signupBonusPromoAmount = 50;
+const signupBonusPromoUserLimit = 50;
+const signupBonusPromoAwardedCountSettingKey = "signup_bonus_promo_awarded_count";
 const firstDepositBonusMinimum = 1000;
 const firstDepositBonusUpperTierMinimum = 2000;
 const firstDepositBonusBaseAmount = 50;
@@ -1393,19 +1396,126 @@ export async function createUserAccount({ phone, passwordHash, referenceCode, fi
   const name = `${normalizedFirstName} ${normalizedLastName}`.trim();
 
   if (isStandalonePostgresEnabled()) {
-      const pool = await getReadyPgPool();
-    await pool.query(
-      `INSERT INTO users (id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id)
-       VALUES ($1, $2, $3, $4, FALSE, $5, $6, $7, 'user', 'Approved', $6, FALSE, FALSE, $8)`,
-      [userId, phone, passwordHash, hashSecret("1234"), name, joinedAt, referralCode, referrer?.id ?? null]
-    );
-  } else {
-    getSqlite()
-      .prepare(
+    const pool = await getReadyPgPool();
+    const client = await pool.connect();
+    let grantedSignupBonusAmount = 0;
+    try {
+      await client.query("BEGIN");
+      await client.query(
         `INSERT INTO users (id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id)
-         VALUES (?, ?, ?, ?, 0, ?, ?, ?, 'user', 'Approved', ?, 0, 0, ?)`
-      )
-      .run(userId, phone, passwordHash, hashSecret("1234"), name, joinedAt, referralCode, joinedAt, referrer?.id ?? null);
+         VALUES ($1, $2, $3, $4, FALSE, $5, $6, $7, 'user', 'Approved', $6, FALSE, FALSE, $8)`,
+        [userId, phone, passwordHash, hashSecret("1234"), name, joinedAt, referralCode, referrer?.id ?? null]
+      );
+
+      const promoCountResult = await client.query(
+        `SELECT setting_value
+         FROM app_settings
+         WHERE setting_key = $1
+         FOR UPDATE`,
+        [signupBonusPromoAwardedCountSettingKey]
+      );
+      const awardedPromoCount = Math.max(0, Number(promoCountResult.rows[0]?.setting_value ?? 0) || 0);
+      const qualifiesForPromo = awardedPromoCount < signupBonusPromoUserLimit;
+      grantedSignupBonusAmount = qualifiesForPromo ? signupBonusPromoAmount : signupBonusAmount;
+
+      if (qualifiesForPromo) {
+        const nextPromoCount = String(awardedPromoCount + 1);
+        await client.query(
+          `INSERT INTO app_settings (setting_key, setting_value, updated_at)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (setting_key) DO UPDATE
+           SET setting_value = EXCLUDED.setting_value, updated_at = EXCLUDED.updated_at`,
+          [signupBonusPromoAwardedCountSettingKey, nextPromoCount, joinedAt]
+        );
+      }
+
+      await client.query(
+        `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at)
+         VALUES ($1, $2, 'SIGNUP_BONUS', 'SUCCESS', $3, 0, $3, NULL, NULL, $4, $5)`,
+        [
+          `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          userId,
+          grantedSignupBonusAmount,
+          qualifiesForPromo ? "Signup bonus 50 point campaign for next 50 users." : "Signup bonus credited.",
+          joinedAt
+        ]
+      );
+
+      await client.query(
+        `UPDATE users
+         SET signup_bonus_granted = TRUE
+         WHERE id = $1`,
+        [userId]
+      );
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } else {
+    const sqlite = getSqlite();
+    let grantedSignupBonusAmount = 0;
+    sqlite.exec("BEGIN");
+    try {
+      sqlite
+        .prepare(
+          `INSERT INTO users (id, phone, password_hash, mpin_hash, mpin_configured, name, joined_at, referral_code, role, approval_status, approved_at, signup_bonus_granted, first_deposit_bonus_granted, referred_by_user_id)
+           VALUES (?, ?, ?, ?, 0, ?, ?, ?, 'user', 'Approved', ?, 0, 0, ?)`
+        )
+        .run(userId, phone, passwordHash, hashSecret("1234"), name, joinedAt, referralCode, joinedAt, referrer?.id ?? null);
+
+      const promoCountRow = sqlite
+        .prepare(
+          `SELECT setting_value
+           FROM app_settings
+           WHERE setting_key = ?
+           LIMIT 1`
+        )
+        .get(signupBonusPromoAwardedCountSettingKey);
+      const awardedPromoCount = Math.max(0, Number(promoCountRow?.setting_value ?? 0) || 0);
+      const qualifiesForPromo = awardedPromoCount < signupBonusPromoUserLimit;
+      grantedSignupBonusAmount = qualifiesForPromo ? signupBonusPromoAmount : signupBonusAmount;
+
+      if (qualifiesForPromo) {
+        sqlite
+          .prepare(
+            `INSERT INTO app_settings (setting_key, setting_value, updated_at)
+             VALUES (?, ?, ?)
+             ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = excluded.updated_at`
+          )
+          .run(signupBonusPromoAwardedCountSettingKey, String(awardedPromoCount + 1), joinedAt);
+      }
+
+      sqlite
+        .prepare(
+          `INSERT INTO wallet_entries (id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at)
+           VALUES (?, ?, 'SIGNUP_BONUS', 'SUCCESS', ?, 0, ?, NULL, NULL, ?, ?)`
+        )
+        .run(
+          `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          userId,
+          grantedSignupBonusAmount,
+          grantedSignupBonusAmount,
+          qualifiesForPromo ? "Signup bonus 50 point campaign for next 50 users." : "Signup bonus credited.",
+          joinedAt
+        );
+
+      sqlite
+        .prepare(
+          `UPDATE users
+           SET signup_bonus_granted = 1
+           WHERE id = ?`
+        )
+        .run(userId);
+
+      sqlite.exec("COMMIT");
+    } catch (error) {
+      sqlite.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   return {
@@ -1420,7 +1530,7 @@ export async function createUserAccount({ phone, passwordHash, referenceCode, fi
       hasMpin: false,
       approvedAt: joinedAt,
       rejectedAt: null,
-      signupBonusGranted: false,
+      signupBonusGranted: true,
       referredByUserId: referrer?.id ?? null
     },
     error: null

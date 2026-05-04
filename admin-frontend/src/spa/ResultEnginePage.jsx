@@ -304,13 +304,17 @@ export async function publishMarketResult({
   const isPlaceholder = nextResult === "***-**-***";
   const isFullResult = /^[0-9]{3}-[0-9]{2}-[0-9]{3}$/.test(nextResult);
   const isOpenResult = /^[0-9]{3}-[0-9\*]{2}-\*{3}$/.test(nextResult);
+  const previousIsOpenResult = /^[0-9]{3}-[0-9\*]{2}-\*{3}$/.test(previous);
+  const previousIsFullResult = /^[0-9]{3}-[0-9]{2}-[0-9]{3}$/.test(previous);
+  const didCorrectOpenResult = previousIsOpenResult && isOpenResult && previous !== nextResult;
+  const didCorrectFullResult = previousIsFullResult && isFullResult && previous !== nextResult;
   const shouldReset = isPlaceholder;
   const shouldSettle = !isPlaceholder && (isOpenResult || isFullResult);
-  const settlementMode = shouldReset ? "reset" : "settle";
+  const settlementMode = shouldReset ? "reset" : didCorrectOpenResult || didCorrectFullResult ? "resettle-changed" : "settle";
   const settled = shouldReset || shouldSettle
     ? await fetchApi(apiBase, "/api/admin/settle-market", token, {
         method: "POST",
-        body: { slug: selectedSlug, mode: settlementMode }
+        body: { slug: selectedSlug, mode: settlementMode, previousResult: previous }
       })
     : { settlement: null };
 
@@ -325,6 +329,8 @@ export async function publishMarketResult({
   return {
     didSettle: shouldSettle,
     didPublishOpenResult: isOpenResult,
+    didCorrectOpenResult,
+    didCorrectFullResult,
     didResetPlaceholder: isPlaceholder,
     previousResult: previous,
     lastSettlement: settled.settlement || null,

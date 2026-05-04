@@ -60,13 +60,13 @@ export async function updateMarketData(payload, deps) {
   return { ok: true, market: updated, broadcast };
 }
 
-export async function settleMarketData({ slug, mode }, deps) {
+export async function settleMarketData({ slug, mode, previousResult = "" }, deps) {
   const market = await findMarketBySlug(slug);
   if (!market) return { ok: false, status: 404, error: "Market not found" };
-  if (!["settle", "resettle", "reset"].includes(mode)) {
+  if (!["settle", "resettle", "reset", "resettle-changed"].includes(mode)) {
     return { ok: false, status: 400, error: "Invalid settlement mode" };
   }
-  if (mode === "resettle" && !deps.canSettleMarketResult(market.result)) {
+  if ((mode === "resettle" || mode === "resettle-changed") && !deps.canSettleMarketResult(market.result)) {
     return { ok: false, status: 400, error: "Cannot resettle market while result is placeholder or incomplete" };
   }
 
@@ -75,6 +75,8 @@ export async function settleMarketData({ slug, mode }, deps) {
       ? await deps.resetMarketSettlement(market)
       : mode === "resettle"
         ? await deps.resettleMarket(market)
+        : mode === "resettle-changed"
+          ? await deps.resettleChangedMarket(market, previousResult)
         : await deps.settlePendingBidsForMarket(market);
 
   return { ok: true, market, settlement };

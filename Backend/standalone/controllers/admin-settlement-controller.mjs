@@ -74,14 +74,15 @@ export async function adminSettleMarketController(request, deps) {
   const body = await getJsonBody(request);
   const slug = String(body.slug ?? "");
   const mode = String(body.mode ?? "settle");
+  const previousResult = String(body.previousResult ?? "");
   if (!slug) return fail("slug is required", 400, request);
 
-  const result = await settleMarketData({ slug, mode }, deps);
+  const result = await settleMarketData({ slug, mode, previousResult }, deps);
   if (!result.ok) return fail(result.error, result.status, request);
 
   await addAuditLog({
     actorUserId: admin.user.id,
-    action: mode === "reset" ? "MARKET_RESET" : mode === "resettle" ? "MARKET_RESETTLE" : "MARKET_SETTLE",
+    action: mode === "reset" ? "MARKET_RESET" : mode === "resettle" || mode === "resettle-changed" ? "MARKET_RESETTLE" : "MARKET_SETTLE",
     entityType: "market",
     entityId: result.market.slug,
     details: JSON.stringify(result.settlement)

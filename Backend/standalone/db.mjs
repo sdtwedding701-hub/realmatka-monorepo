@@ -1518,7 +1518,7 @@ export async function getUserAdminSummaries() {
         u.signup_bonus_granted,
         u.first_deposit_bonus_granted,
         u.referred_by_user_id,
-        COALESCE(balance.after_balance, 0) AS wallet_balance,
+        COALESCE(balance.wallet_balance, 0) AS wallet_balance,
         COALESCE(session_stats.login_count, 0) AS login_count,
         COALESCE(bid_stats.bid_count, 0) AS bid_count,
         COALESCE(bid_stats.total_bet_amount, 0) AS total_bet_amount,
@@ -1533,11 +1533,18 @@ export async function getUserAdminSummaries() {
         END AS last_activity
       FROM users u
       LEFT JOIN LATERAL (
-        SELECT after_balance
+        SELECT COALESCE(
+          SUM(
+            CASE
+              WHEN status = 'SUCCESS' AND type IN ('DEPOSIT', 'REFERRAL_COMMISSION', 'BID_WIN', 'SIGNUP_BONUS', 'FIRST_DEPOSIT_BONUS', 'ADMIN_CREDIT') THEN COALESCE(amount, 0)
+              WHEN status = 'SUCCESS' AND type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT') THEN -COALESCE(amount, 0)
+              ELSE 0
+            END
+          ),
+          0
+        ) AS wallet_balance
         FROM wallet_entries
         WHERE user_id = u.id
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1
       ) balance ON TRUE
       LEFT JOIN (
         SELECT user_id, COUNT(*)::int AS login_count, MAX(created_at) AS last_session_at
@@ -1608,11 +1615,15 @@ export async function getUserAdminSummaries() {
          u.first_deposit_bonus_granted,
          u.referred_by_user_id,
          COALESCE((
-           SELECT after_balance
+           SELECT SUM(
+             CASE
+               WHEN we.status = 'SUCCESS' AND we.type IN ('DEPOSIT', 'REFERRAL_COMMISSION', 'BID_WIN', 'SIGNUP_BONUS', 'FIRST_DEPOSIT_BONUS', 'ADMIN_CREDIT') THEN COALESCE(we.amount, 0)
+               WHEN we.status = 'SUCCESS' AND we.type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT') THEN -COALESCE(we.amount, 0)
+               ELSE 0
+             END
+           )
            FROM wallet_entries we
            WHERE we.user_id = u.id
-           ORDER BY created_at DESC, id DESC
-           LIMIT 1
          ), 0) AS wallet_balance,
          (
            SELECT COUNT(*)
@@ -1688,7 +1699,7 @@ function getWalletEntryBalanceDelta(entry) {
 
   const amount = Number(entry.amount ?? 0);
   const type = String(entry.type || "").toUpperCase();
-  const creditTypes = new Set(["DEPOSIT", "REFERRAL_COMMISSION", "BID_WIN", "SIGNUP_BONUS", "ADMIN_CREDIT"]);
+  const creditTypes = new Set(["DEPOSIT", "REFERRAL_COMMISSION", "BID_WIN", "SIGNUP_BONUS", "FIRST_DEPOSIT_BONUS", "ADMIN_CREDIT"]);
   const debitTypes = new Set(["WITHDRAW", "BID_PLACED", "BID_WIN_REVERSAL", "ADMIN_DEBIT"]);
 
   if (creditTypes.has(type)) return amount;

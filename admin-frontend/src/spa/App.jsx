@@ -895,13 +895,13 @@ function RequestsPage({
   const urgentPendingCount = prioritizedPending.filter((item) => getWalletQueuePriority(item) >= 3).length;
   const oldestPending = prioritizedPending[0] || null;
   const metricStats = isDepositOnly
-    ? [
+      ? [
         miniStat("Pending Deposits", pendingDeposits),
-        miniStat("Credited Deposits", successfulDeposits),
+        miniStat("Paid Deposits", successfulDeposits),
         miniStat("Failed Deposits", rejectedDeposits),
         miniStat("Stale Pending", staleWithdraws),
         miniStat("Pending Amount", formatCurrency(pendingDepositAmount)),
-        miniStat("Total Credited", formatCurrency(state.reconciliation?.summary?.depositSuccessAmount ?? 0))
+        miniStat("Total Paid", formatCurrency(state.reconciliation?.summary?.depositSuccessAmount ?? 0))
       ]
     : isWithdrawOnly
       ? [
@@ -966,7 +966,7 @@ function RequestsPage({
               <option value="all">All</option>
               <option value="INITIATED">Pending</option>
               <option value="BACKOFFICE">Processing</option>
-              <option value="SUCCESS">{isDepositOnly ? "Credited" : "Paid"}</option>
+              <option value="SUCCESS">Paid</option>
               <option value="FAILED">Failed</option>
               <option value="CANCELLED">Cancelled</option>
               <option value="REJECTED">Rejected</option>
@@ -1441,7 +1441,11 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
           setState((current) => ({ ...current, auditLogs }));
         })
         .catch(() => {});
-      if (result.didPublishOpenResult) {
+      if (result.didCorrectOpenResult) {
+        setMessage("Open result correction publish ho gaya. Sirf open-side eligible bets dobara settle hui.");
+      } else if (result.didCorrectFullResult) {
+        setMessage("Final result correction publish ho gaya. Sirf close/full-game bets dobara settle hui.");
+      } else if (result.didPublishOpenResult) {
         setMessage(result.previousResult && /^[0-9]{3}-[0-9]{2}-[0-9]{3}$/.test(result.previousResult) ? "Half result restore ho gaya. Ab sirf pending close-side bets full result tak wait karengi." : "Open result publish ho gaya. Open-side eligible bets settle ho gayi.");
       } else if (!result.didSettle) {
         setMessage("Placeholder result reset ho gaya. Settled bids pending me wapas aa gayi.");
@@ -1499,7 +1503,11 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
           });
         }
       }
-      if (result.didPublishOpenResult) {
+      if (result.didCorrectOpenResult) {
+        setMessage(`${market.name}: open result correction publish ho gaya.`);
+      } else if (result.didCorrectFullResult) {
+        setMessage(`${market.name}: final result correction publish ho gaya.`);
+      } else if (result.didPublishOpenResult) {
         setMessage(result.previousResult && /^[0-9]{3}-[0-9]{2}-[0-9]{3}$/.test(result.previousResult) ? `${market.name}: full se half correction ho gaya.` : `${market.name}: open result publish ho gaya.`);
       } else if (!result.didSettle) {
         setMessage(`${market.name}: placeholder reset ho gaya, settled bids pending me aa gayi.`);
@@ -2351,7 +2359,7 @@ function getPayoutActionButton(action, requestType = "WITHDRAW") {
 
 function getPayoutSuccessMessage(action, requestType = "WITHDRAW") {
   if (requestType === "DEPOSIT") {
-    if (action === "approve") return "Deposit credited successfully.";
+    if (action === "approve") return "Deposit paid successfully.";
     if (action === "complete") return "Deposit review closed successfully.";
     if (action === "reject") return "Deposit rejected successfully.";
     return "Deposit note updated successfully.";
@@ -2365,7 +2373,7 @@ function getPayoutSuccessMessage(action, requestType = "WITHDRAW") {
 function getPayoutStatusLabel(status, requestType = "WITHDRAW") {
   if (status === "INITIATED") return "Pending";
   if (status === "BACKOFFICE") return "Processing";
-  if (status === "SUCCESS") return requestType === "DEPOSIT" ? "Credited" : "Paid";
+  if (status === "SUCCESS") return "Paid";
   if (status === "FAILED") return "Failed";
   if (status === "CANCELLED") return "Cancelled";
   if (status === "REJECTED") return "Rejected";

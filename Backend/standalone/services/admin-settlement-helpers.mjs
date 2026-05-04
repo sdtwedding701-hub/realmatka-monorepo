@@ -323,6 +323,14 @@ export function canSettleMarketResult(result) {
   return Boolean(parsed.openPanna || parsed.openAnk || parsed.jodi || parsed.closeAnk || parsed.closePanna);
 }
 
+function isOpenResultFormat(result) {
+  return /^[0-9]{3}-[0-9\*]{2}-\*{3}$/.test(String(result ?? "").trim());
+}
+
+function isFullResultFormat(result) {
+  return /^[0-9]{3}-[0-9]{2}-[0-9]{3}$/.test(String(result ?? "").trim());
+}
+
 function canEvaluateBidAgainstMarket(bid, parsed) {
   const board = bid.boardLabel;
   const sessionType = getEffectiveSessionType(bid);
@@ -350,6 +358,20 @@ function getEffectiveSessionType(bid) {
   if (sessionType === "Open" || sessionType === "Close") return sessionType;
   if (board === "SP DP TP") return "Open";
   return "Close";
+}
+
+function isOpenResultDependentBid(bid) {
+  if (!usesSession(bid.boardLabel)) {
+    return false;
+  }
+  return getEffectiveSessionType(bid) === "Open";
+}
+
+function isFullResultDependentBid(bid) {
+  if (!usesSession(bid.boardLabel)) {
+    return true;
+  }
+  return getEffectiveSessionType(bid) === "Close";
 }
 
 function isSingleDigitWin(board, digit, parsed, sessionType) {
@@ -520,6 +542,47 @@ export async function resettleMarket(market) {
   const result = await settlePendingBidsForMarket(market);
   return {
     ...result,
+    settlementDayKey: result.settlementDayKey || cycle.settlementDayKey,
+    skippedCrossDay: Number(result.skippedCrossDay || 0) + cycle.skippedCrossDay
+  };
+}
+
+export async function resettleChangedMarket(market, previousResult) {
+  const previous = String(previousResult || "").trim();
+  const next = String(market.result || "").trim();
+  const cycle = await getMarketCycleBids(market);
+
+  let affectedSettled = [];
+  if (isOpenResultFormat(previous) && isOpenResultFormat(next) && previous !== next) {
+    affectedSettled = cycle.matched.filter((bid) => bid.status !== "Pending" && isOpenResultDependentBid(bid));
+  } else if (isFullResultFormat(previous) && isFullResultFormat(next) && previous !== next) {
+    affectedSettled = cycle.matched.filter((bid) => bid.status !== "Pending" && isFullResultDependentBid(bid));
+  } else {
+    return settlePendingBidsForMarket(market);
+  }
+
+  for (const bid of affectedSettled) {
+    if (bid.status === "Won" && bid.payout > 0) {
+      const beforeBalance = await getUserBalance(bid.userId);
+      const afterBalance = Math.max(0, beforeBalance - bid.payout);
+      await addWalletEntry({
+        userId: bid.userId,
+        type: "BID_WIN_REVERSAL",
+        status: "SUCCESS",
+        amount: bid.payout,
+        beforeBalance,
+        afterBalance,
+        note: `Corrected ${bid.market} result from ${previous || "unknown"} to ${next || "unknown"}`
+      });
+    }
+    await updateBidSettlement(bid.id, "Pending", 0, "");
+  }
+
+  const result = await settlePendingBidsForMarket(market);
+  return {
+    ...result,
+    correctedPreviousResult: previous,
+    correctedBidCount: affectedSettled.length,
     settlementDayKey: result.settlementDayKey || cycle.settlementDayKey,
     skippedCrossDay: Number(result.skippedCrossDay || 0) + cycle.skippedCrossDay
   };

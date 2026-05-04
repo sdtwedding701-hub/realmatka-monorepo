@@ -838,6 +838,7 @@ function RequestsPage({
   pageTitle = "Wallet Requests",
   pageSubtitle = "Loading deposit and withdraw history..."
 }) {
+  const todayInput = toDateInputValue(new Date());
   const [state, setState] = useState({ loading: true, error: "", items: [], pending: [], reconciliation: null });
   const [proof, setProof] = useState(null);
   const [query, setQuery] = useState("");
@@ -860,6 +861,19 @@ function RequestsPage({
   const effectiveRequestType = lockedRequestType || requestType;
   const isDepositOnly = effectiveRequestType === "DEPOSIT";
   const isWithdrawOnly = effectiveRequestType === "WITHDRAW";
+
+  useEffect(() => {
+    if (isDepositOnly) {
+      setFromDate(todayInput);
+      setToDate(todayInput);
+      return;
+    }
+    if (!lockedRequestType) {
+      setFromDate("");
+      setToDate("");
+    }
+  }, [isDepositOnly, lockedRequestType, todayInput]);
+
   const historyItems = effectiveRequestType === "all" ? state.items : state.items.filter((item) => item.type === effectiveRequestType);
   const sortedHistoryItems = useMemo(
     () => [...historyItems].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()),
@@ -898,6 +912,20 @@ function RequestsPage({
   const staleWithdraws = prioritizedPending.filter((item) => isOlderThanMinutes(item.createdAt, 24 * 60)).length;
   const urgentPendingCount = prioritizedPending.filter((item) => getWalletQueuePriority(item) >= 3).length;
   const oldestPending = prioritizedPending[0] || null;
+  const rangeLabel = fromDate && toDate ? fromDate === toDate ? "Today only" : `${fromDate} to ${toDate}` : "All history";
+  const canShiftDay = Boolean(fromDate && toDate && fromDate === toDate);
+  const setSingleDay = (value) => {
+    if (!value) return;
+    setFromDate(value);
+    setToDate(value);
+  };
+  const shiftSingleDay = (diff) => {
+    if (!canShiftDay) return;
+    const current = new Date(`${fromDate}T00:00:00`);
+    if (Number.isNaN(current.getTime())) return;
+    current.setDate(current.getDate() + diff);
+    setSingleDay(toDateInputValue(current));
+  };
   const metricStats = isDepositOnly
       ? [
         miniStat("Pending Deposits", pendingDeposits),
@@ -950,6 +978,18 @@ function RequestsPage({
       </section>
       <section className="panel">
         <div className="toolbar-grid toolbar-grid-requests">
+          {isDepositOnly ? (
+            <div className="toolbar-field wide">
+              <span>History Range</span>
+              <div className="inline-actions">
+                <strong className="muted">{rangeLabel}</strong>
+                <button className="secondary" type="button" onClick={() => shiftSingleDay(-1)} disabled={!canShiftDay}>Previous Day</button>
+                <button className="secondary" type="button" onClick={() => setSingleDay(todayInput)}>Today</button>
+                <button className="secondary" type="button" onClick={() => shiftSingleDay(1)} disabled={!canShiftDay || fromDate === todayInput}>Next Day</button>
+                <button className="secondary" type="button" onClick={() => { setFromDate(""); setToDate(""); }}>All History</button>
+              </div>
+            </div>
+          ) : null}
           <label className="toolbar-field toolbar-field-search">
             <span>Search</span>
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="User, phone, reference ID" />

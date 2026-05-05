@@ -24,13 +24,42 @@ function toSqlStringList(values) {
 
 const CREDIT_WALLET_ENTRY_TYPES_SQL = toSqlStringList(CREDIT_WALLET_ENTRY_TYPES);
 const DEBIT_WALLET_ENTRY_TYPES_SQL = toSqlStringList(DEBIT_WALLET_ENTRY_TYPES);
+const WITHDRAW_PROCESSING_TIMEOUT_MS = 3 * 60 * 60 * 1000;
+const AUTO_REJECT_SWEEP_MIN_INTERVAL_MS = 60 * 1000;
+
+let lastAutoRejectSweepAt = 0;
+let autoRejectSweepPromise = null;
 
 function getWalletBalanceDeltaSql(columnPrefix = "") {
   return `CASE
     WHEN ${columnPrefix}status = 'SUCCESS' AND ${columnPrefix}type IN (${CREDIT_WALLET_ENTRY_TYPES_SQL}) THEN COALESCE(${columnPrefix}amount, 0)
-    WHEN ${columnPrefix}status = 'SUCCESS' AND ${columnPrefix}type IN (${DEBIT_WALLET_ENTRY_TYPES_SQL}) THEN -COALESCE(${columnPrefix}amount, 0)
+    WHEN ((${columnPrefix}status = 'SUCCESS' AND ${columnPrefix}type IN (${DEBIT_WALLET_ENTRY_TYPES_SQL}))
+       OR (${columnPrefix}status = 'BACKOFFICE' AND ${columnPrefix}type = 'WITHDRAW')) THEN -COALESCE(${columnPrefix}amount, 0)
     ELSE 0
   END`;
+}
+
+function getIndiaDateKey(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+function getAutoRejectReason(entry, now = new Date()) {
+  const createdAt = new Date(entry?.createdAt || "");
+  if (Number.isNaN(createdAt.getTime())) {
+    return "Auto rejected: pending withdraw expired.";
+  }
+
+  const status = String(entry?.status || "").toUpperCase();
+  if (status === "BACKOFFICE" && now.getTime() - createdAt.getTime() > WITHDRAW_PROCESSING_TIMEOUT_MS) {
+    return "Auto rejected: withdraw stayed in processing for more than 3 hours.";
+  }
+
+  return "Auto rejected: withdraw was not completed on the same day.";
 }
 
 async function getAccurateUserBalanceFromPg(executor, userId) {
@@ -55,6 +84,7 @@ function getAccurateUserBalanceFromSqlite(db, userId) {
 }
 
 export async function getUserBalance(userId) {
+  await autoRejectExpiredWithdrawRequests();
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     return getAccurateUserBalanceFromPg(pool, userId);
@@ -64,6 +94,7 @@ export async function getUserBalance(userId) {
 }
 
 export async function getWalletEntriesForUser(userId, limit = 50) {
+  await autoRejectExpiredWithdrawRequests();
   const normalizedLimit = Math.max(1, Math.min(5000, Number(limit) || 50));
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
@@ -92,13 +123,12 @@ export async function getWalletEntriesForUser(userId, limit = 50) {
 }
 
 function getWalletEntryBalanceDelta(entry) {
-  if (String(entry.status || "") !== "SUCCESS") {
-    return 0;
-  }
   const amount = Number(entry.amount ?? 0);
   const type = String(entry.type || "").toUpperCase();
-  if (CREDIT_WALLET_ENTRY_TYPES.includes(type)) return amount;
-  if (DEBIT_WALLET_ENTRY_TYPES.includes(type)) return -amount;
+  const status = String(entry.status || "").toUpperCase();
+  if (status === "SUCCESS" && CREDIT_WALLET_ENTRY_TYPES.includes(type)) return amount;
+  if (status === "SUCCESS" && DEBIT_WALLET_ENTRY_TYPES.includes(type)) return -amount;
+  if (status === "BACKOFFICE" && type === "WITHDRAW") return -amount;
   return 0;
 }
 
@@ -336,6 +366,7 @@ export async function updateWalletEntryAdmin(entryId, updates = {}) {
 }
 
 export async function getWalletApprovalRequests() {
+  await autoRejectExpiredWithdrawRequests();
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     const result = await pool.query(
@@ -362,6 +393,7 @@ export async function getWalletApprovalRequests() {
 }
 
 export async function getWalletRequestHistory() {
+  await autoRejectExpiredWithdrawRequests();
   const filters = ["DEPOSIT", "WITHDRAW"];
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
@@ -387,6 +419,7 @@ export async function getWalletRequestHistory() {
 }
 
 export async function getWalletRequestHistoryPage({ limit = 500, offset = 0 } = {}) {
+  await autoRejectExpiredWithdrawRequests();
   const filters = ["DEPOSIT", "WITHDRAW"];
   const normalizedLimit = Math.max(1, Math.min(5000, Number(limit) || 500));
   const normalizedOffset = Math.max(0, Number(offset) || 0);
@@ -441,6 +474,7 @@ export async function getWalletRequestHistoryPage({ limit = 500, offset = 0 } = 
 }
 
 export async function getWalletAdminRequestItems({ history = false } = {}) {
+  await autoRejectExpiredWithdrawRequests();
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     const params = history ? [["DEPOSIT", "WITHDRAW"]] : [["INITIATED", "BACKOFFICE"]];
@@ -526,6 +560,103 @@ export async function getWalletAdminRequestItems({ history = false } = {}) {
   }));
 }
 
+async function listAutoRejectCandidateWithdraws() {
+  const todayIndia = getIndiaDateKey();
+  const processingCutoffIso = new Date(Date.now() - WITHDRAW_PROCESSING_TIMEOUT_MS).toISOString();
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await __internalGetReadyPgPool();
+    const result = await pool.query(
+      `SELECT id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at
+       FROM wallet_entries
+       WHERE type = 'WITHDRAW'
+         AND status IN ('INITIATED', 'BACKOFFICE')
+         AND (
+           (status = 'BACKOFFICE' AND created_at <= $1)
+           OR to_char((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') < $2
+         )
+       ORDER BY created_at ASC, id ASC`,
+      [processingCutoffIso, todayIndia]
+    );
+    return result.rows.map((row) => __internalMapWalletEntryRow(row));
+  }
+
+  const rows = __internalGetSqlite()
+    .prepare(
+      `SELECT id, user_id, type, status, amount, before_balance, after_balance, reference_id, proof_url, note, created_at
+       FROM wallet_entries
+       WHERE type = 'WITHDRAW'
+         AND status IN ('INITIATED', 'BACKOFFICE')
+       ORDER BY created_at ASC, id ASC`
+    )
+    .all()
+    .map((row) => __internalMapWalletEntryRow(row));
+
+  return rows.filter((entry) => {
+    const createdAt = new Date(entry?.createdAt || "");
+    if (Number.isNaN(createdAt.getTime())) {
+      return false;
+    }
+    const status = String(entry?.status || "").toUpperCase();
+    const isTimedOutProcessing = status === "BACKOFFICE" && createdAt.getTime() <= Date.now() - WITHDRAW_PROCESSING_TIMEOUT_MS;
+    const isPreviousIndiaDay = getIndiaDateKey(createdAt) < todayIndia;
+    return isTimedOutProcessing || isPreviousIndiaDay;
+  });
+}
+
+async function applyAutoRejectToWithdrawEntry(entry, reason) {
+  const currentNote = String(entry?.note || "").trim();
+  const nextNote = currentNote ? `${currentNote} | ${reason}` : reason;
+  const status = String(entry?.status || "").toUpperCase();
+
+  if (status === "BACKOFFICE") {
+    return updateWalletEntryAdmin(entry.id, {
+      status: "REJECTED",
+      beforeBalance: Number(entry.afterBalance ?? entry.beforeBalance ?? 0),
+      afterBalance: Number(entry.beforeBalance ?? entry.afterBalance ?? 0),
+      note: nextNote
+    });
+  }
+
+  return updateWalletEntryAdmin(entry.id, {
+    status: "REJECTED",
+    beforeBalance: Number(entry.beforeBalance ?? 0),
+    afterBalance: Number(entry.afterBalance ?? entry.beforeBalance ?? 0),
+    note: nextNote
+  });
+}
+
+export async function autoRejectExpiredWithdrawRequests({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now - lastAutoRejectSweepAt < AUTO_REJECT_SWEEP_MIN_INTERVAL_MS) {
+    return { checked: false, rejectedCount: 0 };
+  }
+  if (autoRejectSweepPromise) {
+    return autoRejectSweepPromise;
+  }
+
+  autoRejectSweepPromise = (async () => {
+    const candidates = await listAutoRejectCandidateWithdraws();
+    let rejectedCount = 0;
+    for (const entry of candidates) {
+      const latest = await findWalletEntryById(entry.id);
+      if (!latest || !["INITIATED", "BACKOFFICE"].includes(String(latest.status || "").toUpperCase())) {
+        continue;
+      }
+      await applyAutoRejectToWithdrawEntry(latest, getAutoRejectReason(latest, new Date()));
+      rejectedCount += 1;
+    }
+    lastAutoRejectSweepAt = Date.now();
+    return { checked: true, rejectedCount };
+  })();
+
+  try {
+    return await autoRejectSweepPromise;
+  } finally {
+    autoRejectSweepPromise = null;
+  }
+}
+
 export async function resolveWalletApprovalRequest(entryId, action) {
   const request = await findWalletEntryById(entryId);
   if (!request || request.status !== "INITIATED" || !["DEPOSIT", "WITHDRAW"].includes(request.type)) {
@@ -566,7 +697,14 @@ export async function resolveWalletApprovalRequest(entryId, action) {
     };
   }
 
-  return { request: await updateWalletEntryStatus(entryId, "BACKOFFICE"), settlementEntry: null };
+  return {
+    request: await updateWalletEntryAdmin(entryId, {
+      status: "BACKOFFICE",
+      beforeBalance,
+      afterBalance: beforeBalance - request.amount
+    }),
+    settlementEntry: null
+  };
 }
 
 export async function completeWalletRequest(entryId) {
@@ -576,6 +714,16 @@ export async function completeWalletRequest(entryId) {
 
   if (request.type === "DEPOSIT" && request.status !== "INITIATED") {
     throw new Error("Deposit completion skipped: only pending deposits can be credited safely");
+  }
+
+  if (request.type === "WITHDRAW" && request.status === "BACKOFFICE") {
+    const completedRequest = await updateWalletEntryAdmin(entryId, {
+      status: "SUCCESS",
+      beforeBalance: Number(request.beforeBalance ?? 0),
+      afterBalance: Number(request.afterBalance ?? 0)
+    });
+    await rebalanceWalletEntriesForUser(request.userId);
+    return (await findWalletEntryById(entryId)) ?? completedRequest;
   }
 
   await rebalanceWalletEntriesForUser(request.userId);
@@ -612,6 +760,16 @@ export async function rejectWalletRequest(entryId) {
   const request = await findWalletEntryById(entryId);
   if (!request || !["DEPOSIT", "WITHDRAW"].includes(request.type)) return null;
   if (!["INITIATED", "BACKOFFICE"].includes(String(request.status || ""))) return null;
+
+  if (request.type === "WITHDRAW" && String(request.status || "") === "BACKOFFICE") {
+    const restored = await updateWalletEntryAdmin(entryId, {
+      status: "REJECTED",
+      beforeBalance: Number(request.afterBalance ?? request.beforeBalance ?? 0),
+      afterBalance: Number(request.beforeBalance ?? request.afterBalance ?? 0)
+    });
+    await rebalanceWalletEntriesForUser(request.userId);
+    return restored;
+  }
 
   return updateWalletEntryAdmin(entryId, {
     status: "REJECTED",

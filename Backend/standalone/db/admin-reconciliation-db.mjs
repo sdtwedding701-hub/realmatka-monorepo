@@ -24,7 +24,7 @@ export async function getReconciliationSummaryData(options = {}) {
            COUNT(*) FILTER (WHERE status = 'BACKOFFICE')::int AS backoffice_count,
            COUNT(*) FILTER (WHERE status = 'SUCCESS')::int AS successful_count,
            COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status = 'SUCCESS' THEN amount ELSE 0 END), 0) AS deposit_success_amount,
-           COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'SUCCESS' THEN amount ELSE 0 END), 0) AS withdraw_success_amount
+          COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'SUCCESS' THEN amount ELSE 0 END), 0) AS withdraw_success_amount
          FROM wallet_entries
          WHERE type = ANY($2::text[])
            AND ($3 = '' OR type = $3)
@@ -99,7 +99,7 @@ export async function getReconciliationSummaryData(options = {}) {
            SUM(CASE WHEN status = 'BACKOFFICE' THEN 1 ELSE 0 END) AS backoffice_count,
            SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) AS successful_count,
            COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status = 'SUCCESS' THEN amount ELSE 0 END), 0) AS deposit_success_amount,
-           COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'SUCCESS' THEN amount ELSE 0 END), 0) AS withdraw_success_amount
+          COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'SUCCESS' THEN amount ELSE 0 END), 0) AS withdraw_success_amount
          FROM wallet_entries
          WHERE type IN (?, ?)
            AND (? = '' OR type = ?)

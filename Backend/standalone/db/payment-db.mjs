@@ -10,7 +10,8 @@ const DEBIT_WALLET_ENTRY_TYPES_SQL = "'WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSA
 function getWalletBalanceDeltaSql(columnPrefix = "") {
   return `CASE
     WHEN ${columnPrefix}status = 'SUCCESS' AND ${columnPrefix}type IN (${CREDIT_WALLET_ENTRY_TYPES_SQL}) THEN COALESCE(${columnPrefix}amount, 0)
-    WHEN ${columnPrefix}status = 'SUCCESS' AND ${columnPrefix}type IN (${DEBIT_WALLET_ENTRY_TYPES_SQL}) THEN -COALESCE(${columnPrefix}amount, 0)
+    WHEN ((${columnPrefix}status = 'SUCCESS' AND ${columnPrefix}type IN (${DEBIT_WALLET_ENTRY_TYPES_SQL}))
+       OR (${columnPrefix}status = 'BACKOFFICE' AND ${columnPrefix}type = 'WITHDRAW')) THEN -COALESCE(${columnPrefix}amount, 0)
     ELSE 0
   END`;
 }

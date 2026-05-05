@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const webAppBaseUrl = "https://play.realmatka.in";
@@ -9,7 +10,14 @@ export default function Footer() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.12),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.12),transparent_28%)]" />
       <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-3">
         <div>
-          <img src="/header-logo.png" alt="Real Matka" className="h-14 w-auto object-contain" />
+          <Image
+            src="/header-logo.png"
+            alt="Real Matka"
+            width={220}
+            height={56}
+            sizes="220px"
+            className="h-14 w-auto object-contain"
+          />
           <p className="mt-3 max-w-md text-sm leading-7 text-slate-300">
             Full game rate, complete markets, charts, and quick access to the live Real Matka website.
           </p>

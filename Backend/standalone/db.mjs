@@ -1654,7 +1654,8 @@ export async function getUserAdminSummaries() {
           SUM(
             CASE
               WHEN status = 'SUCCESS' AND type IN ('DEPOSIT', 'REFERRAL_COMMISSION', 'BID_WIN', 'SIGNUP_BONUS', 'FIRST_DEPOSIT_BONUS', 'ADMIN_CREDIT') THEN COALESCE(amount, 0)
-              WHEN status = 'SUCCESS' AND type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT') THEN -COALESCE(amount, 0)
+        WHEN ((status = 'SUCCESS' AND type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT'))
+           OR (status = 'BACKOFFICE' AND type = 'WITHDRAW')) THEN -COALESCE(amount, 0)
               ELSE 0
             END
           ),
@@ -1735,7 +1736,8 @@ export async function getUserAdminSummaries() {
            SELECT SUM(
              CASE
                WHEN we.status = 'SUCCESS' AND we.type IN ('DEPOSIT', 'REFERRAL_COMMISSION', 'BID_WIN', 'SIGNUP_BONUS', 'FIRST_DEPOSIT_BONUS', 'ADMIN_CREDIT') THEN COALESCE(we.amount, 0)
-               WHEN we.status = 'SUCCESS' AND we.type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT') THEN -COALESCE(we.amount, 0)
+        WHEN ((we.status = 'SUCCESS' AND we.type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT'))
+           OR (we.status = 'BACKOFFICE' AND we.type = 'WITHDRAW')) THEN -COALESCE(we.amount, 0)
                ELSE 0
              END
            )
@@ -2124,7 +2126,8 @@ export async function applyReferralDepositBonusIfEligible({ userId, depositAmoun
             `SELECT COALESCE(SUM(
               CASE
                 WHEN status = 'SUCCESS' AND type IN ('DEPOSIT', 'REFERRAL_COMMISSION', 'BID_WIN', 'SIGNUP_BONUS', 'FIRST_DEPOSIT_BONUS', 'ADMIN_CREDIT') THEN COALESCE(amount, 0)
-                WHEN status = 'SUCCESS' AND type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT') THEN -COALESCE(amount, 0)
+                WHEN ((status = 'SUCCESS' AND type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT'))
+                   OR (status = 'BACKOFFICE' AND type = 'WITHDRAW')) THEN -COALESCE(amount, 0)
                 ELSE 0
               END
             ), 0) AS balance
@@ -2209,7 +2212,8 @@ export async function applyReferralDepositBonusIfEligible({ userId, depositAmoun
             `SELECT COALESCE(SUM(
               CASE
                 WHEN status = 'SUCCESS' AND type IN ('DEPOSIT', 'REFERRAL_COMMISSION', 'BID_WIN', 'SIGNUP_BONUS', 'FIRST_DEPOSIT_BONUS', 'ADMIN_CREDIT') THEN COALESCE(amount, 0)
-                WHEN status = 'SUCCESS' AND type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT') THEN -COALESCE(amount, 0)
+                WHEN ((status = 'SUCCESS' AND type IN ('WITHDRAW', 'BID_PLACED', 'BID_WIN_REVERSAL', 'ADMIN_DEBIT'))
+                   OR (status = 'BACKOFFICE' AND type = 'WITHDRAW')) THEN -COALESCE(amount, 0)
                 ELSE 0
               END
             ), 0) AS balance

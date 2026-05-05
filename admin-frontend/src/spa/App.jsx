@@ -2583,7 +2583,7 @@ function getWalletQueueLabel(item) {
 function getWalletQueueSummary(item) {
   const age = formatRelativeAge(item.createdAt);
   if (item.type === "WITHDRAW" && item.status === "BACKOFFICE") {
-    return `Withdraw already processing since ${age}. Final payout confirmation needed.`;
+    return `Withdraw already processing since ${age}. 3 hour se zyada ya next day tak unpaid raha to auto reject ho jayega.`;
   }
   if (item.type === "WITHDRAW") {
     return `Withdraw request in queue since ${age}. Bank details aur operator note verify karo.`;
@@ -2596,14 +2596,14 @@ function getWalletActionChecklist(item, action) {
     return "Proof, reference, amount, aur client-reported payment detail cross-check karke hi wallet credit karo.";
   }
   if (action === "approve" && item.type === "WITHDRAW") {
-    return "Bank details verify karke request ko processing me bhejo. Actual payout ke baad complete mark karo.";
+    return "Bank details verify karke request ko processing me bhejo. Is step par wallet se amount debit/block ho jayega. Actual payout ke baad complete mark karo.";
   }
   if (action === "complete") {
     return "Sirf tab complete karo jab payout/credit final ho chuka ho aur operator reference save ho.";
   }
   if (action === "reject") {
     if (item.type === "WITHDRAW" && item.status === "BACKOFFICE") {
-      return "Agar bank payout fail ho gaya ya transfer complete nahi hua, to yahin se reject karo. Is path me user balance debit nahi hona chahiye.";
+      return "Agar bank payout fail ho gaya ya transfer complete nahi hua, to yahin se reject karo. Is path me blocked withdraw amount wallet me wapas restore ho jayega.";
     }
     return "Reject reason clear note me likho taaki audit aur support dono side context rahe.";
   }

@@ -21,7 +21,7 @@ export async function getReportsSummaryData(from, to) {
         `SELECT
            COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status = ANY(ARRAY['SUCCESS', 'BACKOFFICE']) THEN amount ELSE 0 END), 0) AS deposits_success,
            COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status = 'INITIATED' THEN amount ELSE 0 END), 0) AS deposits_pending,
-           COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = ANY(ARRAY['SUCCESS', 'BACKOFFICE']) THEN amount ELSE 0 END), 0) AS withdraws_success,
+           COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'SUCCESS' THEN amount ELSE 0 END), 0) AS withdraws_success,
            COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'INITIATED' THEN amount ELSE 0 END), 0) AS withdraws_pending,
            COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'REJECTED' THEN amount ELSE 0 END), 0) AS withdraws_rejected
          FROM wallet_entries
@@ -144,7 +144,7 @@ export async function getReportsSummaryData(from, to) {
       `SELECT
          COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status IN ('SUCCESS', 'BACKOFFICE') THEN amount ELSE 0 END), 0) AS deposits_success,
          COALESCE(SUM(CASE WHEN type = 'DEPOSIT' AND status = 'INITIATED' THEN amount ELSE 0 END), 0) AS deposits_pending,
-         COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status IN ('SUCCESS', 'BACKOFFICE') THEN amount ELSE 0 END), 0) AS withdraws_success,
+         COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'SUCCESS' THEN amount ELSE 0 END), 0) AS withdraws_success,
          COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'INITIATED' THEN amount ELSE 0 END), 0) AS withdraws_pending,
          COALESCE(SUM(CASE WHEN type = 'WITHDRAW' AND status = 'REJECTED' THEN amount ELSE 0 END), 0) AS withdraws_rejected
        FROM wallet_entries

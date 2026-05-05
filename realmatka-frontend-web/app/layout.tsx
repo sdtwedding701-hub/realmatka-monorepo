@@ -15,6 +15,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <html lang="en-IN">
+      <head>
+        <link rel="preconnect" href="https://www.googletagmanager.com" />
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+        <link rel="preconnect" href="https://api.realmatka.in" />
+        <link rel="dns-prefetch" href="https://api.realmatka.in" />
+        <link rel="preconnect" href="https://play.realmatka.in" />
+        <link rel="dns-prefetch" href="https://play.realmatka.in" />
+      </head>
       <body className={inter.className}>
         <Script src={`https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`} strategy="afterInteractive" />
         <Script id="google-analytics" strategy="afterInteractive">

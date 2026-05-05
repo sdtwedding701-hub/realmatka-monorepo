@@ -413,7 +413,8 @@ async function getAccurateUserBalancePostgres(client, userId) {
     `SELECT COALESCE(SUM(
       CASE
         WHEN status = 'SUCCESS' AND type IN ('DEPOSIT','BID_WIN','ADMIN_CREDIT','REFERRAL_COMMISSION','SIGNUP_BONUS','FIRST_DEPOSIT_BONUS') THEN amount
-        WHEN status = 'SUCCESS' AND type IN ('WITHDRAW','BID_PLACED','ADMIN_DEBIT','BID_WIN_REVERSAL') THEN -amount
+        WHEN ((status = 'SUCCESS' AND type IN ('WITHDRAW','BID_PLACED','ADMIN_DEBIT','BID_WIN_REVERSAL'))
+           OR (status = 'BACKOFFICE' AND type = 'WITHDRAW')) THEN -amount
         ELSE 0
       END
     ), 0) AS live_balance

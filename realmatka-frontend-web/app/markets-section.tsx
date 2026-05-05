@@ -57,6 +57,29 @@ function mergeMarkets(initialMarkets: MarketCard[], liveMarkets: LiveMarket[]) {
   return [...mergedLiveMarkets, ...missingFallbackMarkets];
 }
 
+function areMarketsEqual(currentMarkets: MarketCard[], nextMarkets: MarketCard[]) {
+  if (currentMarkets.length !== nextMarkets.length) {
+    return false;
+  }
+
+  for (let index = 0; index < currentMarkets.length; index += 1) {
+    const current = currentMarkets[index];
+    const next = nextMarkets[index];
+    if (
+      current.slug !== next.slug ||
+      current.name !== next.name ||
+      current.result !== next.result ||
+      current.open !== next.open ||
+      current.close !== next.close ||
+      current.tag !== next.tag
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: MarketsSectionProps) {
   const [markets, setMarkets] = useState<MarketCard[]>(() =>
     initialMarkets.map((market) => ({
@@ -83,7 +106,8 @@ export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: Market
           return;
         }
 
-        setMarkets(mergeMarkets(initialMarkets, liveMarkets));
+        const mergedMarkets = mergeMarkets(initialMarkets, liveMarkets);
+        setMarkets((current) => (areMarketsEqual(current, mergedMarkets) ? current : mergedMarkets));
       } catch {
         if (!cancelled) {
           setMarkets((current) => current);
@@ -101,8 +125,6 @@ export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: Market
       window.clearInterval(interval);
     };
   }, [initialMarkets]);
-
-  const orderedMarkets = useMemo(() => markets, [markets]);
   return (
     <>
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -114,7 +136,7 @@ export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: Market
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        {orderedMarkets.map((market) => (
+        {markets.map((market) => (
           <div key={market.slug} className="glass-card market-card market-card-mobile p-5">
             <div className="market-card-layout">
               <div className="market-card-copy">

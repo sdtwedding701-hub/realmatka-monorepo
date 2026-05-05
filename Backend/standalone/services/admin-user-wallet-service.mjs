@@ -57,8 +57,8 @@ async function sendWalletActionNotification(entry, action, settlementEntry = nul
   if (action === "approve" && type === "WITHDRAW") {
     await sendUserNotification({
       userId,
-      title: "Withdraw approved",
-      body: `Your withdraw request of Rs ${amount.toFixed(2)} has been approved.`,
+      title: "Withdraw moved to processing",
+      body: `Your withdraw request of Rs ${amount.toFixed(2)} is now processing. Amount has been blocked from your wallet.`,
       channel: "wallet",
       url: "/wallet/history"
     });
@@ -80,7 +80,7 @@ async function sendWalletActionNotification(entry, action, settlementEntry = nul
     await sendUserNotification({
       userId,
       title: "Withdraw rejected",
-      body: `Your withdraw request of Rs ${amount.toFixed(2)} was rejected.`,
+      body: `Your withdraw request of Rs ${amount.toFixed(2)} was rejected and amount has been restored to your wallet.`,
       channel: "wallet",
       url: "/wallet/history"
     });

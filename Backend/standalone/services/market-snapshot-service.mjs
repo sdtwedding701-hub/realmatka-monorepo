@@ -149,7 +149,39 @@ function getBlockedBoardLabelsForPhase(phase) {
 
 export function getMarketRuntimeMeta(market, date = getIndiaNow()) {
   const scheduledMarket = applyScheduledMarketTimeOverride(market, date);
+  const savedStatus = String(scheduledMarket?.status || "").trim().toLowerCase();
+  const savedAction = String(scheduledMarket?.action || "").trim().toLowerCase();
   const currentMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
+
+  if (
+    savedStatus === "closed" ||
+    savedStatus.includes("closed for today") ||
+    savedAction === "closed"
+  ) {
+    return {
+      phase: "closed",
+      sortBucket: 2,
+      anchor: parseClockTimeToMinutes(scheduledMarket?.close),
+      canPlaceBet: false,
+      isClosed: true,
+      label: "Betting is Closed for Today",
+      status: "Closed for Today",
+      action: "Closed"
+    };
+  }
+
+  if (savedStatus === "paused" || savedAction === "paused") {
+    return {
+      phase: "closed",
+      sortBucket: 2,
+      anchor: parseClockTimeToMinutes(scheduledMarket?.close),
+      canPlaceBet: false,
+      isClosed: true,
+      label: "Betting is Closed for Today",
+      status: "Paused",
+      action: "Closed"
+    };
+  }
 
   if (isMarketWeeklyOff(scheduledMarket, date)) {
     return {

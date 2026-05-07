@@ -2012,6 +2012,104 @@ async function recordReferralCommissionReference(referrerUserId, referenceId, am
   return Number(insertResult.changes || 0) > 0;
 }
 
+async function getReferralLossCommissionRecordedTotal(referrerUserId, referredUserId) {
+  if (!referrerUserId || !referredUserId) {
+    return 0;
+  }
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await getReadyPgPool();
+    const result = await pool.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total
+       FROM referral_commission_refs
+       WHERE referrer_user_id = $1
+         AND referred_user_id = $2
+         AND reference_id LIKE 'referral-loss:%'`,
+      [referrerUserId, referredUserId]
+    );
+    return roundMoney(result.rows[0]?.total ?? 0);
+  }
+
+  const row = getSqlite()
+    .prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS total
+       FROM referral_commission_refs
+       WHERE referrer_user_id = ?
+         AND referred_user_id = ?
+         AND reference_id LIKE 'referral-loss:%'`
+    )
+    .get(referrerUserId, referredUserId);
+  return roundMoney(row?.total ?? 0);
+}
+
+async function getReferralExternalCreditTotal(userId) {
+  if (!userId) {
+    return 0;
+  }
+
+  const creditTypes = [
+    "DEPOSIT",
+    "ADMIN_CREDIT",
+    "SIGNUP_BONUS",
+    "FIRST_DEPOSIT_BONUS",
+    "REFERRAL_COMMISSION"
+  ];
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await getReadyPgPool();
+    const result = await pool.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total
+       FROM wallet_entries
+       WHERE user_id = $1
+         AND status = 'SUCCESS'
+         AND type = ANY($2::text[])`,
+      [userId, creditTypes]
+    );
+    return roundMoney(result.rows[0]?.total ?? 0);
+  }
+
+  const row = getSqlite()
+    .prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS total
+       FROM wallet_entries
+       WHERE user_id = ?
+         AND status = 'SUCCESS'
+         AND type IN (?, ?, ?, ?, ?)`
+    )
+    .get(userId, ...creditTypes);
+  return roundMoney(row?.total ?? 0);
+}
+
+async function getSuccessfulWithdrawTotal(userId) {
+  if (!userId) {
+    return 0;
+  }
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await getReadyPgPool();
+    const result = await pool.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total
+       FROM wallet_entries
+       WHERE user_id = $1
+         AND status = 'SUCCESS'
+         AND type = 'WITHDRAW'`,
+      [userId]
+    );
+    return roundMoney(result.rows[0]?.total ?? 0);
+  }
+
+  const row = getSqlite()
+    .prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS total
+       FROM wallet_entries
+       WHERE user_id = ?
+         AND status = 'SUCCESS'
+         AND type = 'WITHDRAW'`
+    )
+    .get(userId);
+  return roundMoney(row?.total ?? 0);
+}
+
 export async function applyReferralLossCommission({ userId, lostAmount, bidId, market = "", boardLabel = "" }) {
   const player = await findUserById(userId);
   if (!player?.referredByUserId) {
@@ -2023,7 +2121,16 @@ export async function applyReferralLossCommission({ userId, lostAmount, bidId, m
     return null;
   }
 
-  const commissionAmount = roundMoney(Number(lostAmount || 0) * (referralLossCommissionRate / 100));
+  const [externalCredits, currentBalanceRaw, successfulWithdraws, alreadyRecorded] = await Promise.all([
+    getReferralExternalCreditTotal(player.id),
+    getUserBalance(player.id),
+    getSuccessfulWithdrawTotal(player.id),
+    getReferralLossCommissionRecordedTotal(referrer.id, player.id)
+  ]);
+  const currentBalance = Math.max(0, roundMoney(currentBalanceRaw));
+  const currentNetLoss = Math.max(0, roundMoney(externalCredits - currentBalance - successfulWithdraws));
+  const targetCommissionTotal = roundMoney(currentNetLoss * (referralLossCommissionRate / 100));
+  const commissionAmount = roundMoney(targetCommissionTotal - alreadyRecorded);
   if (commissionAmount <= 0) {
     return null;
   }

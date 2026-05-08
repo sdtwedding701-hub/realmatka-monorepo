@@ -489,18 +489,19 @@ export async function webhook(request) {
   const paymentLinkEntity = body?.payload?.payment_link?.entity || {};
   const orderEntity = body?.payload?.order?.entity || {};
   const paymentEntity = body?.payload?.payment?.entity || {};
+  const paymentNotes = paymentEntity?.notes || {};
+  const paymentLinkNotes = paymentLinkEntity?.notes || {};
   const reference =
-    String(paymentLinkEntity.reference_id || paymentLinkEntity.reference || orderEntity.receipt || "").trim();
+    String(paymentLinkEntity.reference_id || paymentLinkEntity.reference || orderEntity.receipt || paymentNotes.reference || "").trim();
+  const paymentOrderId =
+    String(paymentNotes.paymentOrderId || paymentLinkNotes.paymentOrderId || "").trim();
   const gatewayOrderId =
-    String(paymentLinkEntity.id || paymentLinkEntity.order_id || orderEntity.order_id || orderEntity.id || "").trim();
+    String(paymentLinkEntity.id || paymentLinkEntity.order_id || paymentEntity.order_id || orderEntity.order_id || orderEntity.id || "").trim();
   const gatewayPaymentId =
     String(paymentEntity.id || paymentLinkEntity.payments?.[0]?.payment_id || paymentLinkEntity.payments?.[0]?.id || orderEntity.payment_id || orderEntity.id || "").trim();
-
-  if (event === "payment_link.cancelled" || event === "payment_link.expired") {
-    return ok({ received: true, event, status: "IGNORED" }, request);
-  }
   const result = await processPaymentWebhook({
     event,
+    paymentOrderId,
     reference,
     gatewayOrderId,
     gatewayPaymentId,

@@ -351,7 +351,7 @@ export async function completeCheckoutSession({ paymentOrderId, checkoutToken, p
   return { ok: true, data: { paymentOrder: updatedOrder ?? paymentOrder } };
 }
 
-export async function processPaymentWebhook({ event, reference, gatewayOrderId, gatewayPaymentId, gatewaySignature }) {
+export async function processPaymentWebhook({ event, paymentOrderId, reference, gatewayOrderId, gatewayPaymentId, gatewaySignature }) {
   if (event === "payment_link.paid") {
     const updated = await completePaymentLinkOrder({
       reference,
@@ -365,6 +365,45 @@ export async function processPaymentWebhook({ event, reference, gatewayOrderId, 
     }
 
     return { ok: true, data: { received: true, event, status: "SUCCESS", order: updated } };
+  }
+
+  if (event === "payment.failed") {
+    const updated = await handlePaymentWebhook({
+      paymentOrderId,
+      reference,
+      gatewayOrderId,
+      status: "FAILED"
+    });
+    if (!updated) {
+      return { ok: false, status: 404, error: "Payment order not found" };
+    }
+    return { ok: true, data: { received: true, event, status: "FAILED", order: updated } };
+  }
+
+  if (event === "payment_link.cancelled") {
+    const updated = await handlePaymentWebhook({
+      paymentOrderId,
+      reference,
+      gatewayOrderId,
+      status: "CANCELLED"
+    });
+    if (!updated) {
+      return { ok: false, status: 404, error: "Payment order not found" };
+    }
+    return { ok: true, data: { received: true, event, status: "CANCELLED", order: updated } };
+  }
+
+  if (event === "payment_link.expired") {
+    const updated = await handlePaymentWebhook({
+      paymentOrderId,
+      reference,
+      gatewayOrderId,
+      status: "EXPIRED"
+    });
+    if (!updated) {
+      return { ok: false, status: 404, error: "Payment order not found" };
+    }
+    return { ok: true, data: { received: true, event, status: "EXPIRED", order: updated } };
   }
 
   return { ok: true, data: { received: true, event, status: "IGNORED" } };

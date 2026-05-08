@@ -112,6 +112,35 @@ async function findPaymentOrderByReference(reference) {
   );
 }
 
+async function findPaymentOrderByGatewayOrderId(gatewayOrderId) {
+  if (!gatewayOrderId) {
+    return null;
+  }
+
+  const pool = __internalGetPgPool();
+  if (pool) {
+    const result = await pool.query(
+      `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
+       FROM payment_orders
+       WHERE gateway_order_id = $1
+       LIMIT 1`,
+      [gatewayOrderId]
+    );
+    return mapPaymentOrderRow(result.rows[0]);
+  }
+
+  return mapPaymentOrderRow(
+    __internalGetSqlite()
+      .prepare(
+        `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
+         FROM payment_orders
+         WHERE gateway_order_id = ?
+         LIMIT 1`
+      )
+      .get(gatewayOrderId)
+  );
+}
+
 export async function findPaymentOrderByReferenceForUser(userId, reference) {
   const order = await findPaymentOrderByReference(reference);
   if (!order || order.userId !== userId) {
@@ -436,31 +465,69 @@ export async function completePaymentLinkOrder({ reference, gatewayOrderId, gate
   });
 }
 
-export async function handlePaymentWebhook(reference, status) {
+export async function handlePaymentWebhook(referenceOrLookup, statusArg) {
+  const lookup =
+    typeof referenceOrLookup === "object" && referenceOrLookup !== null
+      ? referenceOrLookup
+      : { reference: referenceOrLookup, status: statusArg };
+  const nextStatus = String(lookup.status || statusArg || "").trim().toUpperCase();
+  const paymentOrderId = String(lookup.paymentOrderId || "").trim();
+  const reference = String(lookup.reference || "").trim();
+  const gatewayOrderId = String(lookup.gatewayOrderId || "").trim();
+
+  if (!nextStatus) {
+    return null;
+  }
+
+  let targetOrder = null;
+  if (paymentOrderId) {
+    targetOrder = await findPaymentOrderById(paymentOrderId);
+  }
+  if (!targetOrder && reference) {
+    targetOrder = await findPaymentOrderByReference(reference);
+  }
+  if (!targetOrder && gatewayOrderId) {
+    targetOrder = await findPaymentOrderByGatewayOrderId(gatewayOrderId);
+  }
+  if (!targetOrder) {
+    return null;
+  }
+
   const updatedAt = __internalNowIso();
   const pool = __internalGetPgPool();
 
   if (pool) {
+    await pool.query(
+      `UPDATE wallet_entries
+       SET status = $2, note = COALESCE(note, 'Processor flow deposit request')
+       WHERE user_id = $1 AND type = 'DEPOSIT' AND status = 'INITIATED' AND reference_id = $3`,
+      [targetOrder.userId, nextStatus, targetOrder.reference]
+    );
     const result = await pool.query(
       `UPDATE payment_orders
        SET status = $2, updated_at = $3
-       WHERE reference = $1
+       WHERE id = $1
        RETURNING id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at`,
-      [reference, status, updatedAt]
+      [targetOrder.id, nextStatus, updatedAt]
     );
     return mapPaymentOrderRow(result.rows[0]);
   }
 
   const db = __internalGetSqlite();
-  db.prepare(`UPDATE payment_orders SET status = ?, updated_at = ? WHERE reference = ?`).run(status, updatedAt, reference);
+  db.prepare(
+    `UPDATE wallet_entries
+     SET status = ?, note = COALESCE(note, 'Processor flow deposit request')
+     WHERE user_id = ? AND type = 'DEPOSIT' AND status = 'INITIATED' AND reference_id = ?`
+  ).run(nextStatus, targetOrder.userId, targetOrder.reference);
+  db.prepare(`UPDATE payment_orders SET status = ?, updated_at = ? WHERE id = ?`).run(nextStatus, updatedAt, targetOrder.id);
   return mapPaymentOrderRow(
     db
       .prepare(
         `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
          FROM payment_orders
-         WHERE reference = ?
+         WHERE id = ?
          LIMIT 1`
       )
-      .get(reference)
+      .get(targetOrder.id)
   );
 }

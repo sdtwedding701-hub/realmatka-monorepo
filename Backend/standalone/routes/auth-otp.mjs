@@ -6,6 +6,15 @@ const otpProvider = String(process.env.OTP_PROVIDER || "local").trim().toLowerCa
 const twilioAccountSid = String(process.env.TWILIO_ACCOUNT_SID || "").trim();
 const twilioAuthToken = String(process.env.TWILIO_AUTH_TOKEN || "").trim();
 const twilioVerifyServiceSid = String(process.env.TWILIO_VERIFY_SERVICE_SID || "").trim();
+const msg91AuthKey = String(process.env.MSG91_AUTH_KEY || "").trim();
+const msg91WidgetId = String(process.env.MSG91_WIDGET_ID || "").trim();
+const msg91WidgetTokenAuth = String(process.env.MSG91_WIDGET_TOKEN_AUTH || "").trim();
+const defaultAppScheme = String(process.env.EXPO_PUBLIC_APP_SCHEME || "realmatka").trim() || "realmatka";
+const defaultAppWebUrl = String(process.env.EXPO_PUBLIC_APP_URL || "https://play.realmatka.in").trim() || "https://play.realmatka.in";
+
+function isMsg91Enabled() {
+  return otpProvider === "msg91" && Boolean(msg91AuthKey && msg91WidgetId && msg91WidgetTokenAuth);
+}
 
 function assertOtpProviderConfiguration() {
   if (otpProvider === "local" || !otpProvider) {
@@ -14,6 +23,12 @@ function assertOtpProviderConfiguration() {
   if (otpProvider === "twilio") {
     if (!twilioAccountSid || !twilioAuthToken || !twilioVerifyServiceSid) {
       throw new Error("Twilio OTP provider selected hai, lekin credentials missing hain.");
+    }
+    return;
+  }
+  if (otpProvider === "msg91") {
+    if (!msg91AuthKey || !msg91WidgetId || !msg91WidgetTokenAuth) {
+      throw new Error("MSG91 OTP provider selected hai, lekin widget/auth credentials missing hain.");
     }
     return;
   }
@@ -56,6 +71,142 @@ async function twilioRequest(path, body) {
   }
 
   return payload;
+}
+
+async function verifyMsg91AccessToken(accessToken) {
+  const response = await fetch("https://control.msg91.com/api/v5/widget/verifyAccessToken", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      authkey: msg91AuthKey,
+      "access-token": accessToken
+    })
+  });
+
+  const raw = await response.text();
+  let payload = null;
+  try {
+    payload = raw ? JSON.parse(raw) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const message =
+      payload?.message ||
+      payload?.error ||
+      payload?.details ||
+      `MSG91 request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return payload;
+}
+
+function getMsg91WidgetTokenFromPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+
+  const candidates = [
+    payload?.token,
+    payload?.accessToken,
+    payload?.access_token,
+    payload?.jwtToken,
+    payload?.jwt_token,
+    payload?.data?.token,
+    payload?.data?.accessToken,
+    payload?.data?.access_token
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
+function getMsg91VerifiedIdentifier(payload) {
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+
+  const candidates = [
+    payload?.identifier,
+    payload?.mobile,
+    payload?.phone,
+    payload?.phone_number,
+    payload?.data?.identifier,
+    payload?.data?.mobile,
+    payload?.data?.phone,
+    payload?.data?.phone_number
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
+function getMsg91VerificationStatus(payload) {
+  const candidates = [
+    payload?.status,
+    payload?.type,
+    payload?.message,
+    payload?.data?.status,
+    payload?.data?.type,
+    payload?.data?.message
+  ];
+
+  return candidates
+    .map((value) => String(value || "").trim().toLowerCase())
+    .find(Boolean) || "";
+}
+
+function isMsg91VerificationApproved(payload) {
+  const status = getMsg91VerificationStatus(payload);
+  if (!status) {
+    return true;
+  }
+
+  return !["error", "failed", "failure", "unauthorized", "invalid"].includes(status);
+}
+
+function buildMsg91ReturnUrl(request, purpose, phone) {
+  const requestUrl = new URL(request.url);
+  const requested = String(requestUrl.searchParams.get("returnUrl") || "").trim();
+  if (requested) {
+    return requested;
+  }
+
+  const callbackPath =
+    purpose === "register"
+      ? "/auth/register"
+      : purpose === "password_reset"
+        ? "/auth/forgot-password"
+        : "/auth/otp-login";
+  const query = `purpose=${encodeURIComponent(purpose)}&phone=${encodeURIComponent(phone)}`;
+  const nativeUrl = `${defaultAppScheme}://${callbackPath.replace(/^\/+/, "")}?${query}`;
+  if (request.headers.get("origin")) {
+    return `${defaultAppWebUrl.replace(/\/+$/, "")}${callbackPath}?${query}`;
+  }
+  return nativeUrl;
+}
+
+function buildMsg91WidgetUrl(request, phone, purpose) {
+  const requestUrl = new URL(request.url);
+  const baseUrl = new URL("/api/auth/msg91/widget", requestUrl.origin);
+  baseUrl.searchParams.set("phone", phone);
+  baseUrl.searchParams.set("purpose", purpose);
+  baseUrl.searchParams.set("returnUrl", buildMsg91ReturnUrl(request, purpose, phone));
+  return baseUrl.toString();
 }
 
 function getRequestFingerprint(request, namespace, value = "") {
@@ -103,6 +254,16 @@ async function sendOtp(phone, purpose) {
     };
   }
 
+  if (isMsg91Enabled()) {
+    return {
+      sent: true,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      provider: "msg91",
+      devCode: null,
+      mode: "widget"
+    };
+  }
+
   const code = createOtpCode();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   challenges.set(`${phone}:${purpose}`, { code, expiresAt });
@@ -114,8 +275,28 @@ async function sendOtp(phone, purpose) {
   };
 }
 
-export async function verifyOtp(phone, purpose, code) {
+export async function verifyOtp(phone, purpose, code, accessToken = "") {
   assertOtpProviderConfiguration();
+
+  if (isMsg91Enabled()) {
+    const normalizedAccessToken = String(accessToken || "").trim();
+    if (!normalizedAccessToken) {
+      return false;
+    }
+    const payload = await verifyMsg91AccessToken(normalizedAccessToken);
+    if (!isMsg91VerificationApproved(payload)) {
+      return false;
+    }
+    const identifier = getMsg91VerifiedIdentifier(payload);
+    if (identifier) {
+      const digits = identifier.replace(/\D/g, "");
+      const normalizedIdentifier = digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits;
+      if (normalizedIdentifier && normalizedIdentifier !== phone) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   if (isTwilioEnabled()) {
     const payload = await twilioRequest("/VerificationCheck", {
@@ -208,7 +389,9 @@ export async function requestOtp(request) {
         purpose,
         expiresAt: otpState.expiresAt,
         provider: otpState.provider,
-        devCode: otpState.devCode
+        devCode: otpState.devCode,
+        mode: otpState.mode ?? "otp",
+        widgetUrl: otpState.provider === "msg91" ? buildMsg91WidgetUrl(request, phone, purpose) : null
       },
       request
     );
@@ -217,10 +400,135 @@ export async function requestOtp(request) {
   }
 }
 
+export async function msg91Widget(request) {
+  if (request.method === "OPTIONS") {
+    return corsPreflight(request);
+  }
+
+  try {
+    assertOtpProviderConfiguration();
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "OTP configuration missing", 500, request);
+  }
+
+  if (!isMsg91Enabled()) {
+    return fail("MSG91 OTP provider is not enabled", 400, request);
+  }
+
+  const url = new URL(request.url);
+  const phone = normalizeIndianPhone(String(url.searchParams.get("phone") ?? "")) ?? String(url.searchParams.get("phone") ?? "").trim();
+  const purpose = String(url.searchParams.get("purpose") || "login").trim();
+  const returnUrl = String(url.searchParams.get("returnUrl") || "").trim();
+  if (!phone || !returnUrl) {
+    return new Response("Missing phone or returnUrl", { status: 400 });
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Real Matka OTP Verification</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #0f172a; color: #fff; display: flex; min-height: 100vh; align-items: center; justify-content: center; }
+    .wrap { width: min(92vw, 420px); background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { margin: 0 0 16px; color: #cbd5e1; line-height: 1.5; }
+    .meta { font-size: 13px; color: #94a3b8; margin-bottom: 18px; }
+    .error { color: #fca5a5; font-size: 14px; margin-top: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Verify Mobile</h1>
+    <p>OTP verification complete hote hi aap app me wapas redirect ho jaoge.</p>
+    <div class="meta">Purpose: ${purpose} | Mobile: ${phone}</div>
+    <div id="error" class="error"></div>
+  </div>
+  <script>
+    function extractVerifiedToken(payload) {
+      var values = [
+        payload && payload.token,
+        payload && payload.accessToken,
+        payload && payload.access_token,
+        payload && payload.jwtToken,
+        payload && payload.jwt_token,
+        payload && payload.data && payload.data.token,
+        payload && payload.data && payload.data.accessToken,
+        payload && payload.data && payload.data.access_token
+      ];
+      for (var i = 0; i < values.length; i += 1) {
+        if (typeof values[i] === 'string' && values[i].trim()) {
+          return values[i].trim();
+        }
+      }
+      return '';
+    }
+    var configuration = {
+      widgetId: ${JSON.stringify(msg91WidgetId)},
+      tokenAuth: ${JSON.stringify(msg91WidgetTokenAuth)},
+      identifier: ${JSON.stringify(phone)},
+      exposeMethods: false,
+      success: function (data) {
+        var token = extractVerifiedToken(data);
+        if (!token) {
+          document.getElementById('error').textContent = 'Verified token receive nahi hua. Dobara try karo.';
+          return;
+        }
+        var redirect = new URL(${JSON.stringify(returnUrl)});
+        redirect.searchParams.set('msg91Token', token);
+        redirect.searchParams.set('phone', ${JSON.stringify(phone)});
+        redirect.searchParams.set('purpose', ${JSON.stringify(purpose)});
+        window.location.replace(redirect.toString());
+      },
+      failure: function (error) {
+        var message = 'OTP verify nahi ho paya. Dobara try karo.';
+        if (error && typeof error === 'object' && error.message) {
+          message = error.message;
+        }
+        document.getElementById('error').textContent = message;
+      }
+    };
+    (function loadOtpScript(urls) {
+      var index = 0;
+      function attempt() {
+        var s = document.createElement('script');
+        s.src = urls[index];
+        s.async = true;
+        s.onload = function() {
+          if (typeof window.initSendOTP === 'function') {
+            window.initSendOTP(configuration);
+          }
+        };
+        s.onerror = function() {
+          index += 1;
+          if (index < urls.length) attempt();
+          else document.getElementById('error').textContent = 'OTP widget load nahi hua. Dobara try karo.';
+        };
+        document.head.appendChild(s);
+      }
+      attempt();
+    })([
+      'https://verify.msg91.com/otp-provider.js',
+      'https://verify.phone91.com/otp-provider.js'
+    ]);
+  </script>
+</body>
+</html>`;
+
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8"
+    }
+  });
+}
+
 export async function otpLogin(request) {
   const body = await getJsonBody(request);
   const phone = normalizeIndianPhone(String(body.phone ?? "")) ?? String(body.phone ?? "").trim();
   const otp = String(body.otp ?? "").trim();
+  const accessToken = String(body.accessToken ?? "").trim();
   const rateLimit = assertRateLimit({
     key: getRequestFingerprint(request, "auth-otp-login", phone),
     windowMs: 10 * 60 * 1000,
@@ -231,13 +539,13 @@ export async function otpLogin(request) {
     return fail(`Too many OTP login attempts. Try again in ${rateLimit.retryAfterSeconds}s.`, 429, request);
   }
 
-  if (!phone || !/^[0-9]{6}$/.test(otp)) {
-    return fail("Valid phone number and 6 digit OTP are required", 400, request);
+  if (!phone || (!accessToken && !/^[0-9]{6}$/.test(otp))) {
+    return fail("Valid phone number and OTP verification are required", 400, request);
   }
 
   let valid = false;
   try {
-    valid = await verifyOtp(phone, "login", otp);
+    valid = await verifyOtp(phone, "login", otp, accessToken);
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Unable to verify OTP", 500, request);
   }
@@ -290,6 +598,7 @@ export async function forgotPassword(request) {
   const body = await getJsonBody(request);
   const phone = normalizeIndianPhone(String(body.phone ?? "")) ?? String(body.phone ?? "").trim();
   const otp = String(body.otp ?? "").trim();
+  const accessToken = String(body.accessToken ?? "").trim();
   const password = String(body.password ?? "");
   const confirmPassword = String(body.confirmPassword ?? "");
   const rateLimit = assertRateLimit({
@@ -302,8 +611,8 @@ export async function forgotPassword(request) {
     return fail(`Too many reset attempts. Try again in ${rateLimit.retryAfterSeconds}s.`, 429, request);
   }
 
-  if (!phone || !/^[0-9]{6}$/.test(otp)) {
-    return fail("Valid phone number and 6 digit OTP are required", 400, request);
+  if (!phone || (!accessToken && !/^[0-9]{6}$/.test(otp))) {
+    return fail("Valid phone number and OTP verification are required", 400, request);
   }
 
   if (password.length < 8) {
@@ -316,7 +625,7 @@ export async function forgotPassword(request) {
 
   let valid = false;
   try {
-    valid = await verifyOtp(phone, "password_reset", otp);
+    valid = await verifyOtp(phone, "password_reset", otp, accessToken);
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Unable to verify OTP", 500, request);
   }

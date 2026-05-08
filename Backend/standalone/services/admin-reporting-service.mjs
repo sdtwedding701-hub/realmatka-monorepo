@@ -10,16 +10,42 @@ import {
   listBidsPage
 } from "../stores/admin-store.mjs";
 
+const INDIA_BUSINESS_DAY_UTC_OFFSET_HOURS = 5;
+
+function getIndiaBusinessDateKey(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return new Date(date.getTime() + INDIA_BUSINESS_DAY_UTC_OFFSET_HOURS * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function businessDayKeyToRangeStartIso(key) {
+  const match = String(key || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return "";
+  }
+  const [, year, month, day] = match;
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 19, 0, 0, 0)).toISOString();
+}
+
+function businessDayKeyToRangeEndIso(key) {
+  const match = String(key || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return "";
+  }
+  const [, year, month, day] = match;
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 18, 59, 59, 999)).toISOString();
+}
+
 function startOfTodayIso() {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return now.toISOString();
+  return businessDayKeyToRangeStartIso(getIndiaBusinessDateKey(new Date()));
 }
 
 function lastNDates(days) {
   const dates = [];
-  const current = new Date();
-  current.setHours(0, 0, 0, 0);
+  const currentKey = getIndiaBusinessDateKey(new Date());
+  const current = new Date(`${currentKey}T00:00:00Z`);
   for (let index = days - 1; index >= 0; index -= 1) {
     const item = new Date(current);
     item.setDate(current.getDate() - index);
@@ -28,12 +54,20 @@ function lastNDates(days) {
   return dates;
 }
 
-function normalizeDate(value, fallback) {
+function normalizeFromDate(value, fallback) {
   if (!value) {
     return fallback;
   }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
+  const rangeStart = businessDayKeyToRangeStartIso(value);
+  return rangeStart || fallback;
+}
+
+function normalizeToDate(value, fallback) {
+  if (!value) {
+    return fallback;
+  }
+  const rangeEnd = businessDayKeyToRangeEndIso(value);
+  return rangeEnd || fallback;
 }
 
 function csvEscape(value) {
@@ -70,8 +104,8 @@ export async function getDashboardSummary(options = {}) {
 }
 
 export async function getReportsSummary(fromValue, toValue, options = {}) {
-  const from = normalizeDate(fromValue, startOfTodayIso());
-  const to = normalizeDate(toValue, new Date().toISOString());
+  const from = normalizeFromDate(fromValue, startOfTodayIso());
+  const to = normalizeToDate(toValue, new Date().toISOString());
   const report = await getReportsSummaryData(from, to);
   const userLimit = Math.max(1, Math.min(500, Number(options.userLimit ?? 100) || 100));
   const marketLimit = Math.max(1, Math.min(500, Number(options.marketLimit ?? 100) || 100));

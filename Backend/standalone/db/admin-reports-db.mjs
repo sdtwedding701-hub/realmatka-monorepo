@@ -78,14 +78,14 @@ export async function getReportsSummaryData(from, to) {
         [from, to]
       ),
       pool.query(
-        `SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, COALESCE(SUM(points), 0) AS collection
+        `SELECT to_char((created_at AT TIME ZONE 'UTC') + interval '5 hours', 'YYYY-MM-DD') AS date, COALESCE(SUM(points), 0) AS collection
          FROM bids
          WHERE created_at >= $1 AND created_at <= $2
          GROUP BY 1`,
         [from, to]
       ),
       pool.query(
-        `SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, COALESCE(SUM(amount), 0) AS payout
+        `SELECT to_char((created_at AT TIME ZONE 'UTC') + interval '5 hours', 'YYYY-MM-DD') AS date, COALESCE(SUM(amount), 0) AS payout
          FROM wallet_entries
          WHERE type = 'BID_WIN'
            AND created_at >= $1
@@ -178,8 +178,8 @@ export async function getReportsSummaryData(from, to) {
        GROUP BY market
        ORDER BY bets_amount DESC`
     ).all(from, to);
-    const collectionSeries = sqlite.prepare(`SELECT substr(created_at, 1, 10) AS date, COALESCE(SUM(points), 0) AS collection FROM bids WHERE created_at >= ? AND created_at <= ? GROUP BY substr(created_at, 1, 10)`).all(from, to);
-    const payoutSeries = sqlite.prepare(`SELECT substr(created_at, 1, 10) AS date, COALESCE(SUM(amount), 0) AS payout FROM wallet_entries WHERE type = 'BID_WIN' AND created_at >= ? AND created_at <= ? GROUP BY substr(created_at, 1, 10)`).all(from, to);
+    const collectionSeries = sqlite.prepare(`SELECT strftime('%Y-%m-%d', datetime(created_at, '+5 hours')) AS date, COALESCE(SUM(points), 0) AS collection FROM bids WHERE created_at >= ? AND created_at <= ? GROUP BY strftime('%Y-%m-%d', datetime(created_at, '+5 hours'))`).all(from, to);
+    const payoutSeries = sqlite.prepare(`SELECT strftime('%Y-%m-%d', datetime(created_at, '+5 hours')) AS date, COALESCE(SUM(amount), 0) AS payout FROM wallet_entries WHERE type = 'BID_WIN' AND created_at >= ? AND created_at <= ? GROUP BY strftime('%Y-%m-%d', datetime(created_at, '+5 hours'))`).all(from, to);
 
     const dailySeriesMap = new Map();
     for (const row of collectionSeries) dailySeriesMap.set(row.date, { date: row.date, collection: Number(row.collection ?? 0), payout: 0 });

@@ -21,6 +21,15 @@ export default function WalletScreen() {
     <View style={styles.page}>
       <AppHeader title="Wallet" subtitle={undefined} rightLabel={`Rs ${walletBalance}`} />
       <AppScreen showPromo={false}>
+        <SurfaceCard style={styles.heroCard}>
+          <View style={styles.heroIcon}>
+            <Ionicons color={colors.surface} name="wallet-outline" size={22} />
+          </View>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroValue}>Rs {walletBalance}</Text>
+            <Text style={styles.heroLabel}>Available wallet balance</Text>
+          </View>
+        </SurfaceCard>
         <View style={styles.list}>
           {walletActions.map((item) => {
             const isAddFund = item.href === "/wallet/add-fund";
@@ -68,8 +77,40 @@ const styles = StyleSheet.create({
   list: {
     gap: 12
   },
+  heroCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 18,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong
+  },
+  heroIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: colors.accentDark,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  heroCopy: {
+    flex: 1,
+    gap: 4
+  },
+  heroValue: {
+    color: colors.primaryDark,
+    fontSize: 28,
+    fontWeight: "900"
+  },
+  heroLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "700"
+  },
   actionCard: {
-    paddingVertical: 14
+    paddingVertical: 16,
+    borderRadius: 20
   },
   actionRow: {
     flexDirection: "row",
@@ -83,8 +124,8 @@ const styles = StyleSheet.create({
     flex: 1
   },
   actionIconWrap: {
-    width: 52,
-    height: 52,
+    width: 56,
+    height: 56,
     borderRadius: 999,
     borderWidth: 1,
     alignItems: "center",
@@ -92,9 +133,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff"
   },
   actionIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center"
   },

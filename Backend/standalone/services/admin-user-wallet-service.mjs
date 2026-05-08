@@ -365,18 +365,18 @@ function doesAdminBidMatchFilter(bid, search, status) {
     .some((value) => String(value).toLowerCase().includes(normalizedSearch));
 }
 
+function getAdminBusinessDateKey(value) {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 function matchesAdminBidDateRange(bid, from, to) {
   if (!from && !to) return true;
-  const createdAt = new Date(bid?.createdAt || "");
-  if (Number.isNaN(createdAt.getTime())) return false;
-  if (from) {
-    const fromDate = new Date(`${from}T00:00:00`);
-    if (createdAt < fromDate) return false;
-  }
-  if (to) {
-    const toDate = new Date(`${to}T23:59:59.999`);
-    if (createdAt > toDate) return false;
-  }
+  const dateKey = getAdminBusinessDateKey(bid?.createdAt || "");
+  if (!dateKey) return false;
+  if (from && dateKey < from) return false;
+  if (to && dateKey > to) return false;
   return true;
 }
 

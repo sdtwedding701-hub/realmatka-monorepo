@@ -123,7 +123,7 @@ export default function AddFundScreen() {
 
   return (
     <View style={styles.page}>
-      <BackHeader title="Add Fund" subtitle="Razorpay se wallet top-up karo." />
+      <BackHeader title="Add Fund" subtitle={undefined} />
       <AppScreen showPromo={false}>
         {!addFundSupported ? (
           <SurfaceCard style={styles.unsupportedCard}>

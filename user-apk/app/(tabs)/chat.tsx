@@ -115,6 +115,16 @@ export default function ChatScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <View style={styles.heroCard}>
+            <View style={styles.heroIcon}>
+              <Ionicons color={colors.surface} name="chatbubble-ellipses-outline" size={20} />
+            </View>
+            <View style={styles.heroCopy}>
+              <Text style={styles.heroTitle}>Support is here</Text>
+              <Text style={styles.heroSubtitle}>Wallet, result, withdraw aur bid help ke liye message bhejo.</Text>
+            </View>
+          </View>
+
           <View style={styles.dateChip}>
             <Text style={styles.dateChipText}>Support Chat</Text>
           </View>
@@ -247,6 +257,39 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   body: { padding: 12, paddingBottom: 240, gap: 12 },
+  heroCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 14
+  },
+  heroIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.accentDark,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  heroCopy: {
+    flex: 1,
+    gap: 3
+  },
+  heroTitle: {
+    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: "900"
+  },
+  heroSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18
+  },
   dateChip: {
     alignSelf: "center",
     borderRadius: 999,
@@ -267,7 +310,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     maxWidth: "82%",
-    gap: 8
+    gap: 8,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2
   },
   supportBubble: { backgroundColor: colors.surface },
   userBubble: { backgroundColor: colors.primary },
@@ -303,7 +351,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8
+    gap: 8,
+    backgroundColor: "rgba(255,248,243,0.96)"
   },
   input: {
     flex: 1,

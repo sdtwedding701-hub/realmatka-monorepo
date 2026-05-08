@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Animated, Easing, Image, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { marketCatalog } from "../../data/mock";
 import { api, formatApiError } from "@/lib/api";
@@ -198,7 +198,6 @@ export default function HomeScreen() {
   const listedMarkets = markets;
   const isCompactScreen = height < 760;
   const showHardError = listedMarkets.length === 0 && Boolean(error);
-
   useEffect(() => {
     if (!listedMarkets.length) {
       return;
@@ -246,13 +245,18 @@ export default function HomeScreen() {
       </View>
 
       <AppScreen
-        onRefresh={() => void refreshScreen()}
         padded={false}
-        refreshing={refreshing}
         scrollContentStyle={isCompactScreen ? styles.homeScrollCompact : styles.homeScroll}
         showPromo={false}
       >
         <View style={styles.contentWrap}>
+        <View style={styles.heroBannerCard}>
+          <Image
+            resizeMode="stretch"
+            source={require("../../assets/images/realmatkabanner.jpg")}
+            style={styles.heroBannerImage}
+          />
+        </View>
         <Pressable
           onPress={() => {
             void Linking.openURL("https://wa.me/918446012081");
@@ -287,34 +291,47 @@ export default function HomeScreen() {
               const isClosed = phaseMeta.isClosed;
               const hasResult = Boolean(market.result?.trim());
               const canPlaceBet = phaseMeta.canPlaceBet;
-
-              return (
-                <View key={market.slug} style={[styles.marketGradient, isClosed ? styles.marketGradientClosed : styles.marketGradientOpen]}>
+                return (
+                  <View
+                    key={market.slug}
+                    style={[
+                      styles.marketGradient,
+                      isClosed ? styles.marketGradientClosed : styles.marketGradientOpen,
+                      canPlaceBet ? styles.marketGradientWithAction : styles.marketGradientStatic
+                    ]}
+                  >
                     <View style={styles.marketHeaderRow}>
                       <View style={styles.marketIdentity}>
                         <View style={styles.marketTitleRow}>
                           <Text style={styles.marketName}>{market.name}</Text>
-                          <Text style={[styles.resultValue, !hasResult && styles.resultPending]}>{hasResult ? market.result : "***-**-***"}</Text>
                         </View>
+                      </View>
+                      <View style={[styles.resultBadge, isClosed ? styles.resultBadgeClosed : styles.resultBadgeOpen, !hasResult && styles.resultBadgePending]}>
+                        <Text style={[styles.resultValue, !hasResult && styles.resultPending]}>{hasResult ? market.result : "***-**-***"}</Text>
                       </View>
                     </View>
 
                     <View style={styles.middleRow}>
-                      <Text style={[styles.marketState, isClosed ? styles.marketStateClosed : styles.marketStateOpen]}>
-                        {phaseMeta.label}
-                      </Text>
+                      <View style={styles.marketStatusWrap}>
+                        <Text style={[styles.marketState, isClosed ? styles.marketStateClosed : styles.marketStateOpen]}>
+                          {phaseMeta.label}
+                        </Text>
+                        <Text style={styles.timeInlineText}>
+                          Open {market.open} | Close {market.close}
+                        </Text>
+                      </View>
                       <View style={styles.chartWrap}>
-                        <Pressable onPress={() => setSelectedChartMarket({ slug: market.slug, name: market.name })} style={styles.chartIconButton}>
+                        <Pressable
+                          onPress={() => setSelectedChartMarket({ slug: market.slug, name: market.name })}
+                          style={[styles.chartIconButton, isClosed ? styles.chartIconButtonClosed : styles.chartIconButtonOpen]}
+                        >
                           <Ionicons color={colors.surface} name="stats-chart-outline" size={18} />
                         </Pressable>
                       </View>
                     </View>
 
-                    <View style={styles.bottomRow}>
-                      <Text style={styles.timeInlineText}>
-                        Open {market.open} | Close {market.close}
-                      </Text>
-                      {canPlaceBet ? (
+                    {canPlaceBet ? (
+                      <View style={styles.bottomRow}>
                         <Link
                           asChild
                           href={{
@@ -328,17 +345,11 @@ export default function HomeScreen() {
                           }}
                         >
                           <Pressable style={styles.openButton}>
-                            <Text style={styles.openButtonText}>Place Bet</Text>
+                            <Text style={styles.openButtonText}>Place Bet Now</Text>
                           </Pressable>
                         </Link>
-                      ) : (
-                        <Pressable disabled style={[styles.openButton, styles.openButtonClosed]}>
-                          <Text style={[styles.openButtonText, isClosed && styles.openButtonTextClosed]}>
-                            Closed
-                          </Text>
-                        </Pressable>
-                      )}
-                    </View>
+                      </View>
+                    ) : null}
                 </View>
               );
             })}
@@ -544,13 +555,35 @@ const styles = StyleSheet.create({
   homeScrollCompact: {
     paddingBottom: 76
   },
+  heroBannerCard: {
+      borderRadius: 6,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      backgroundColor: "#ffffff",
+      marginBottom: 10,
+      shadowColor: "#000",
+      shadowOpacity: 0.12,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 4
+    },
+  heroBannerImage: {
+      width: "100%",
+      height: 144,
+      backgroundColor: "#ffffff"
+    },
   whatsappStrip: {
     paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 6,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8
+    gap: 8,
+    borderRadius: 14,
+    backgroundColor: "#ecfdf3",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    marginBottom: 14
   },
   whatsappText: {
     color: "#166534",
@@ -686,52 +719,80 @@ const styles = StyleSheet.create({
     paddingBottom: 8
   },
   marketGradient: {
-    borderRadius: 18,
-    padding: 14,
-    gap: 12,
-    borderWidth: 1,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4
-  },
+      borderRadius: 22,
+      paddingHorizontal: 16,
+      paddingVertical: 15,
+      gap: 10,
+      borderWidth: 1,
+      minHeight: 154,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.1,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 5
+    },
+  marketGradientWithAction: {
+      justifyContent: "flex-start"
+    },
+  marketGradientStatic: {
+      justifyContent: "space-between",
+      paddingBottom: 18
+    },
   marketGradientOpen: {
-    backgroundColor: colors.cardTint,
-    borderColor: colors.border
-  },
+      backgroundColor: colors.cardTint,
+      borderColor: colors.border
+    },
   marketGradientClosed: {
-    backgroundColor: colors.dangerSoft,
-    borderColor: colors.dangerBorder
-  },
+      backgroundColor: colors.dangerSoft,
+      borderColor: colors.dangerBorder,
+      shadowOpacity: 0.08
+    },
   marketHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12
-  },
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: 12,
+        marginBottom: 0
+      },
   marketIdentity: {
-    flex: 1,
-    gap: 0
-  },
+      flex: 1,
+      justifyContent: "center"
+    },
   marketTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12
-  },
+      justifyContent: "center"
+    },
   marketName: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: "900",
-    textTransform: "uppercase"
+      color: colors.textPrimary,
+      fontSize: 17,
+      fontWeight: "900",
+      textTransform: "uppercase",
+      lineHeight: 22
+    },
+  resultBadge: {
+      minWidth: 122,
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      borderWidth: 1,
+      alignItems: "flex-end",
+      justifyContent: "center"
+    },
+  resultBadgeOpen: {
+      backgroundColor: colors.surface,
+      borderColor: colors.borderStrong
+    },
+  resultBadgeClosed: {
+      backgroundColor: "#fffaf8",
+      borderColor: colors.dangerBorder
+    },
+  resultBadgePending: {
+    backgroundColor: colors.surfaceAlt
   },
   marketState: {
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 16
-  },
+      fontSize: 14,
+      fontWeight: "800",
+      lineHeight: 18
+    },
   marketStateOpen: {
     color: colors.success
   },
@@ -739,31 +800,42 @@ const styles = StyleSheet.create({
     color: colors.danger
   },
   middleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12
-  },
-  timeInlineText: {
-    flex: 1,
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 16
-  },
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+        marginTop: 0
+      },
+  marketStatusWrap: {
+        flex: 1,
+        gap: 2,
+        justifyContent: "center",
+        minHeight: 44
+      },
+     timeInlineText: {
+        color: colors.textSecondary,
+        fontSize: 12,
+        fontWeight: "600",
+        lineHeight: 17
+      },
   chartWrap: {
-    width: 100,
-    alignItems: "flex-end",
-    justifyContent: "center"
-  },
+      width: 48,
+      alignItems: "flex-end",
+      justifyContent: "center"
+    },
   chartIconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.accent
-  },
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+  chartIconButtonOpen: {
+      backgroundColor: colors.accent
+    },
+  chartIconButtonClosed: {
+      backgroundColor: "#20b7a8"
+    },
   resultCard: {
     display: "none"
   },
@@ -775,10 +847,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6
   },
   resultValue: {
-    color: colors.primaryDark,
-    fontSize: 20,
-    fontWeight: "900"
-  },
+      color: colors.primaryDark,
+      fontSize: 19,
+      fontWeight: "900",
+      lineHeight: 24
+    },
   resultCardValue: {
     color: colors.primary,
     fontSize: 16,
@@ -788,27 +861,21 @@ const styles = StyleSheet.create({
     color: colors.accent
   },
   bottomRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12
-  },
+      marginTop: 6
+    },
   openButton: {
-    width: 100,
-    minHeight: 38,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.accentSoft
-  },
-  openButtonClosed: {
-    backgroundColor: colors.dangerSoft
-  },
-  openButtonText: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  openButtonTextClosed: {
-    color: colors.danger
-  }
+      width: "100%",
+      minHeight: 46,
+      borderRadius: 15,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.accentSoft,
+      borderWidth: 1,
+      borderColor: "#c7f0ea"
+    },
+    openButtonText: {
+      color: colors.accent,
+      fontSize: 13,
+      fontWeight: "800"
+    }
 });

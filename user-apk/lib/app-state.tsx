@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
-import { ApiError, api, setAuthFailureListener, type BankAccount, type BidEntry, type SessionUser, type WalletEntry } from "@/lib/api";
+import { ApiError, api, setAuthFailureListener, type BankAccount, type BidEntry, type OtpRequestResponse, type SessionUser, type WalletEntry } from "@/lib/api";
 import { readStoredMpinConfigured, writeStoredMpinValue, writeStoredMpinConfigured } from "@/lib/security-storage";
 import {
   getCachedBidHistory,
@@ -37,8 +37,8 @@ type AppStateValue = {
   bankAccounts: BankAccount[];
   draftBid: DraftBid | null;
   login: (phone: string, password: string) => Promise<void>;
-  otpLogin: (phone: string, otp: string) => Promise<void>;
-  register: (firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode?: string) => Promise<void>;
+  otpLogin: (phone: string, otp: string, accessToken?: string) => Promise<void>;
+  register: (firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode?: string, accessToken?: string) => Promise<void>;
   logout: () => Promise<void>;
   reloadSessionData: (options?: { force?: boolean }) => Promise<void>;
   loadWalletHistory: (options?: { force?: boolean }) => Promise<void>;
@@ -48,7 +48,7 @@ type AppStateValue = {
   updateMpin: (pin: string, confirmPin: string) => Promise<void>;
   verifyMpin: (pin: string) => Promise<void>;
   addBankAccount: (accountNumber: string, holderName: string, ifsc: string) => Promise<void>;
-  requestWithdrawOtp: (amount: number) => Promise<{ sent: boolean; expiresAt: string; provider: string; devCode: string | null }>;
+  requestWithdrawOtp: (amount: number) => Promise<OtpRequestResponse>;
   confirmWithdraw: (amount: number, otp: string) => Promise<void>;
   setDraftBid: (draft: DraftBid | null) => void;
   submitDraftBid: () => Promise<void>;
@@ -306,8 +306,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     });
   }, [applySessionUser, clearSession, hydrateSession, persistSessionSnapshot]);
 
-  const otpLogin = useCallback(async (phone: string, otp: string) => {
-    const response = await api.otpLogin(phone, otp);
+  const otpLogin = useCallback(async (phone: string, otp: string, accessToken = "") => {
+    const response = await api.otpLogin(phone, otp, accessToken);
     await writeStoredSessionToken(response.token);
     applySessionUser(response.token, response.user);
     await persistSessionSnapshot(response.user, getResolvedWalletBalance(response.user));
@@ -318,8 +318,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     });
   }, [applySessionUser, clearSession, hydrateSession, persistSessionSnapshot]);
 
-  const register = useCallback(async (firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode = "") => {
-    await api.register(firstName, lastName, phone, otp, password, confirmPassword, referenceCode);
+  const register = useCallback(async (firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode = "", accessToken = "") => {
+    await api.register(firstName, lastName, phone, otp, password, confirmPassword, referenceCode, accessToken);
   }, []);
 
   const logout = useCallback(async () => {

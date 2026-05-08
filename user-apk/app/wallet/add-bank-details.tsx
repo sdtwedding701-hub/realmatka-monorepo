@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
@@ -33,8 +34,18 @@ export default function AddBankDetailsScreen() {
     <View style={styles.page}>
       <BackHeader title="Add Bank Details" subtitle={undefined} />
       <AppScreen showPromo={false}>
-        <SurfaceCard>
+        <SurfaceCard style={styles.heroCard}>
+          <View style={styles.heroIcon}>
+            <Ionicons color={colors.surface} name="business-outline" size={20} />
+          </View>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroTitle}>Bank account setup</Text>
+            <Text style={styles.heroSubtitle}>Withdraw ke liye account details yahan safely save karo.</Text>
+          </View>
+        </SurfaceCard>
+        <SurfaceCard style={styles.formCard}>
           <Text style={styles.title}>Bank Account Details</Text>
+          <Text style={styles.helper}>Naam, account number aur IFSC ko bilkul sahi fill karo.</Text>
           <TextInput keyboardType="number-pad" onChangeText={setAccountNumber} placeholder="Enter account number" placeholderTextColor="#98a2b3" style={styles.input} value={accountNumber} />
           <TextInput autoCapitalize="words" onChangeText={setHolderName} placeholder="Enter holder name" placeholderTextColor="#98a2b3" style={styles.input} value={holderName} />
           <TextInput autoCapitalize="characters" onChangeText={setIfsc} placeholder="Enter IFSC code" placeholderTextColor="#98a2b3" style={styles.input} value={ifsc} />
@@ -70,11 +81,50 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background
   },
+  heroCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderRadius: 22,
+    borderColor: colors.borderStrong
+  },
+  heroIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.accentDark,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  heroCopy: {
+    flex: 1,
+    gap: 3
+  },
+  heroTitle: {
+    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: "900"
+  },
+  heroSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18
+  },
+  formCard: {
+    gap: 12,
+    borderRadius: 22
+  },
   title: {
     textAlign: "center",
     color: "#111827",
     fontSize: 20,
     fontWeight: "900"
+  },
+  helper: {
+    textAlign: "center",
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18
   },
   input: {
     minHeight: 54,

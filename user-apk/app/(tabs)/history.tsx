@@ -282,7 +282,6 @@ export default function HistoryScreen() {
     [pageItems, selectedBetId]
   );
   const hasValidPendingRange = Boolean(parseDateInput(pendingFromDate) && parseDateInput(pendingToDate, true));
-
   const applyRange = () => {
     if (!hasValidPendingRange) {
       return;
@@ -304,7 +303,7 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.page}>
-      <AppHeader title="History" subtitle="All history" />
+      <AppHeader title="History" subtitle={undefined} />
       <AppScreen onRefresh={() => void refreshData()} refreshing={refreshing}>
         {paymentBanner ? (
           <SurfaceCard style={styles.paymentBanner}>
@@ -313,7 +312,7 @@ export default function HistoryScreen() {
         ) : null}
 
         <View style={styles.toolbar}>
-          <Text style={styles.toolbarLabel}>{activeRange ? `${activeRange.from} to ${activeRange.to}` : "Today only"}</Text>
+          <Text style={styles.toolbarValue}>{activeRange ? `${activeRange.from} to ${activeRange.to}` : "Today only"}</Text>
           <Pressable onPress={() => setFilterOpen(true)} style={styles.calendarButton}>
             <Ionicons color={colors.surface} name="calendar-outline" size={18} />
           </Pressable>
@@ -505,7 +504,7 @@ const styles = StyleSheet.create({
     lineHeight: 18
   },
   toolbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  toolbarLabel: { color: "#475467", fontSize: 13, fontWeight: "700" },
+  toolbarValue: { color: "#475467", fontSize: 14, fontWeight: "800" },
   calendarButton: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
   paginationRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   paginationLabel: { color: "#344054", fontSize: 13, fontWeight: "700" },

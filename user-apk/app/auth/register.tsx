@@ -9,8 +9,9 @@ import { clearStoredReferralCode, normalizeReferralCode, readStoredReferralCode,
 import { colors } from "@/theme/colors";
 
 export default function RegisterScreen() {
+  const OTP_RESEND_SECONDS = 30;
   const { register } = useAppState();
-  const params = useLocalSearchParams<{ ref?: string; referenceCode?: string; referralCode?: string }>();
+  const params = useLocalSearchParams<{ ref?: string; referenceCode?: string; referralCode?: string; msg91Token?: string; phone?: string }>();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -23,6 +24,8 @@ export default function RegisterScreen() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [registered, setRegistered] = useState(false);
+  const [verifiedAccessToken, setVerifiedAccessToken] = useState("");
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const incomingReferralCode = normalizeReferralCode(params.ref ?? params.referenceCode ?? params.referralCode);
   const downloadUrl = String(process.env.EXPO_PUBLIC_DOWNLOAD_URL || process.env.EXPO_PUBLIC_APP_DOWNLOAD_URL || "").trim();
   const normalizedPhone = phone.replace(/[^0-9]/g, "");
@@ -35,6 +38,16 @@ export default function RegisterScreen() {
   const hasValidOtp = normalizedOtp.length === 6;
   const hasValidPassword = password.trim().length >= 8;
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setCooldownSeconds((current) => (current > 0 ? current - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
 
   useEffect(() => {
     let active = true;
@@ -57,6 +70,19 @@ export default function RegisterScreen() {
     };
   }, [incomingReferralCode, referenceCode]);
 
+  useEffect(() => {
+    const callbackPhone = String(params.phone || "").replace(/[^0-9]/g, "");
+    const token = String(params.msg91Token || "").trim();
+    if (callbackPhone) {
+      setPhone(callbackPhone);
+    }
+    if (token) {
+      setVerifiedAccessToken(token);
+      setSuccess("Mobile number verified successfully.");
+      setError("");
+    }
+  }, [params.msg91Token, params.phone]);
+
   return (
     <View style={styles.page}>
       <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.hero}>
@@ -66,7 +92,7 @@ export default function RegisterScreen() {
 
       <AppScreen padded={false} showPromo={false}>
         <View style={styles.content}>
-          <SurfaceCard>
+          <SurfaceCard style={styles.formCard}>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>Reference code optional hai. Account create karne se pehle mobile OTP verify karna hoga.</Text>
             <View style={styles.fieldWrap}>
@@ -132,34 +158,51 @@ export default function RegisterScreen() {
                   setError("");
                   setSuccess("");
                   const response = await api.requestOtp(normalizedPhone, "register");
-                  setSuccess(response.provider === "twilio" ? "Registration OTP SMS successfully sent." : "Registration OTP generated successfully.");
+                  if (response.mode === "widget" && response.widgetUrl) {
+                    setSuccess("Verification window open ho rahi hai...");
+                    setCooldownSeconds(OTP_RESEND_SECONDS);
+                    await Linking.openURL(response.widgetUrl);
+                  } else {
+                    setSuccess(response.provider === "twilio" ? "Registration OTP SMS successfully sent." : "Registration OTP generated successfully.");
+                    setCooldownSeconds(OTP_RESEND_SECONDS);
+                  }
                 } catch (otpError) {
                   setError(formatApiError(otpError, "Unable to send registration OTP"));
                 } finally {
                   setSendingOtp(false);
                 }
               }}
-              disabled={sendingOtp || !hasValidFirstName || !hasValidLastName || !hasValidPhone}
-              style={[styles.secondaryButton, (sendingOtp || !hasValidFirstName || !hasValidLastName || !hasValidPhone) && styles.disabled]}
+              disabled={sendingOtp || cooldownSeconds > 0 || !hasValidFirstName || !hasValidLastName || !hasValidPhone}
+              style={[styles.secondaryButton, (sendingOtp || cooldownSeconds > 0 || !hasValidFirstName || !hasValidLastName || !hasValidPhone) && styles.disabled]}
             >
-              {sendingOtp ? <ActivityIndicator color="#111827" /> : <Text style={styles.secondaryText}>Send OTP</Text>}
+              {sendingOtp ? (
+                <ActivityIndicator color="#111827" />
+              ) : (
+                <Text style={styles.secondaryText}>
+                  {cooldownSeconds > 0 ? `Wait ${cooldownSeconds}s` : success ? "Resend OTP" : "Send OTP"}
+                </Text>
+              )}
             </Pressable>
 
-            <View style={styles.fieldWrap}>
-              <Text style={styles.label}>OTP</Text>
-              <TextInput
-                keyboardType="number-pad"
-                maxLength={6}
-                onChangeText={(value) => {
-                  setOtp(value.replace(/[^0-9]/g, ""));
-                  setError("");
-                }}
-                placeholder="Enter 6 digit OTP"
-                placeholderTextColor="#94a3b8"
-                style={styles.input}
-                value={otp}
-              />
-            </View>
+            {!verifiedAccessToken ? (
+              <View style={styles.fieldWrap}>
+                <Text style={styles.label}>OTP</Text>
+                <TextInput
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  onChangeText={(value) => {
+                    setOtp(value.replace(/[^0-9]/g, ""));
+                    setError("");
+                  }}
+                  placeholder="Enter 6 digit OTP"
+                  placeholderTextColor="#94a3b8"
+                  style={styles.input}
+                  value={otp}
+                />
+              </View>
+            ) : (
+              <Text style={styles.autoReferralHint}>Mobile verification complete. Ab account create kar sakte ho.</Text>
+            )}
 
             <View style={styles.fieldWrap}>
               <Text style={styles.label}>Password</Text>
@@ -236,7 +279,7 @@ export default function RegisterScreen() {
                   setError("Valid 10 digit phone number dalo.");
                   return;
                 }
-                if (!hasValidOtp) {
+                if (!verifiedAccessToken && !hasValidOtp) {
                   setError("Valid 6 digit OTP dalo.");
                   return;
                 }
@@ -252,7 +295,7 @@ export default function RegisterScreen() {
                   setSubmitting(true);
                   setError("");
                   setSuccess("");
-                  await register(normalizedFirstName, normalizedLastName, normalizedPhone, normalizedOtp, password.trim(), confirmPassword.trim(), referenceCode);
+                  await register(normalizedFirstName, normalizedLastName, normalizedPhone, normalizedOtp, password.trim(), confirmPassword.trim(), referenceCode, verifiedAccessToken);
                   setError("");
                   await clearStoredReferralCode();
                   setRegistered(true);
@@ -264,21 +307,24 @@ export default function RegisterScreen() {
                   setPassword("");
                   setConfirmPassword("");
                   setReferenceCode("");
+                  setVerifiedAccessToken("");
                 } catch (registrationError) {
                   setError(formatApiError(registrationError, "Registration failed"));
                 } finally {
                   setSubmitting(false);
                 }
               }}
-              style={[styles.primaryButton, (submitting || registered || !hasValidFirstName || !hasValidLastName || !hasValidPhone || !hasValidOtp || !hasValidPassword || !passwordsMatch) && styles.disabled]}
-              disabled={registered || submitting || !hasValidFirstName || !hasValidLastName || !hasValidPhone || !hasValidOtp || !hasValidPassword || !passwordsMatch}
+              style={[styles.primaryButton, (submitting || registered || !hasValidFirstName || !hasValidLastName || !hasValidPhone || (!verifiedAccessToken && !hasValidOtp) || !hasValidPassword || !passwordsMatch) && styles.disabled]}
+              disabled={registered || submitting || !hasValidFirstName || !hasValidLastName || !hasValidPhone || (!verifiedAccessToken && !hasValidOtp) || !hasValidPassword || !passwordsMatch}
             >
               {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>Create Account</Text>}
             </Pressable>
 
-            <Link href="/auth/login" style={styles.link}>
-              Already have an account? Login
-            </Link>
+            <View style={styles.linkGroup}>
+              <Link href="/auth/login" style={styles.link}>
+                Already have an account? Login
+              </Link>
+            </View>
           </SurfaceCard>
         </View>
       </AppScreen>
@@ -313,6 +359,9 @@ const styles = StyleSheet.create({
     marginTop: 0,
     paddingHorizontal: 16,
     paddingBottom: 32
+  },
+  formCard: {
+    borderRadius: 24
   },
   title: {
     color: "#111827",
@@ -358,12 +407,17 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     minHeight: 48,
-    borderRadius: 14,
-    backgroundColor: "#f8fafc",
+    borderRadius: 999,
+    backgroundColor: "#fff7ed",
     borderWidth: 1,
-    borderColor: "#dbe1ea",
+    borderColor: "#fdba74",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    shadowColor: "#fb923c",
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2
   },
   secondaryText: {
     color: "#111827",
@@ -388,6 +442,10 @@ const styles = StyleSheet.create({
   },
   nextStepsWrap: {
     gap: 10
+  },
+  linkGroup: {
+    gap: 12,
+    paddingTop: 4
   },
   link: {
     color: "#111827",

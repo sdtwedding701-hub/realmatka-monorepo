@@ -1,30 +1,76 @@
-import { useEffect, useState } from "react";
-import { Link, router } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, router, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Linking from "expo-linking";
 import { AppScreen, SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
 import { api, formatApiError } from "@/lib/api";
 import { colors } from "@/theme/colors";
 
 export default function OtpLoginScreen() {
+  const OTP_RESEND_SECONDS = 30;
   const { otpLogin, isAuthenticated, loading } = useAppState();
+  const params = useLocalSearchParams<{ msg91Token?: string; phone?: string }>();
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [sendingOtp, setSendingOtp] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const handledTokenRef = useRef("");
   const normalizedPhone = phone.replace(/[^0-9]/g, "");
   const normalizedOtp = otp.replace(/[^0-9]/g, "");
   const hasValidPhone = normalizedPhone.length === 10;
   const hasValidOtp = normalizedOtp.length === 6;
 
   useEffect(() => {
+    if (cooldownSeconds <= 0) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setCooldownSeconds((current) => (current > 0 ? current - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
+
+  useEffect(() => {
+    const callbackPhone = String(params.phone || "").replace(/[^0-9]/g, "");
+    if (callbackPhone && callbackPhone !== phone) {
+      setPhone(callbackPhone);
+    }
+  }, [params.phone, phone]);
+
+  useEffect(() => {
     if (!loading && isAuthenticated) {
       router.replace("/(tabs)");
     }
   }, [loading, isAuthenticated]);
+
+  useEffect(() => {
+    const token = String(params.msg91Token || "").trim();
+    const callbackPhone = String(params.phone || "").replace(/[^0-9]/g, "");
+    if (!token || !callbackPhone || handledTokenRef.current === token) {
+      return;
+    }
+
+    handledTokenRef.current = token;
+    void (async () => {
+      try {
+        setLoggingIn(true);
+        setError("");
+        setMessage("Mobile verified. Logging in...");
+        await otpLogin(callbackPhone, "", token);
+        router.replace("/(tabs)");
+      } catch (loginError) {
+        handledTokenRef.current = "";
+        setError(formatApiError(loginError, "OTP login failed"));
+      } finally {
+        setLoggingIn(false);
+      }
+    })();
+  }, [otpLogin, params.msg91Token, params.phone]);
 
   return (
     <View style={styles.page}>
@@ -35,10 +81,9 @@ export default function OtpLoginScreen() {
 
       <AppScreen padded={false} showPromo={false}>
         <View style={styles.content}>
-          <SurfaceCard>
+          <SurfaceCard style={styles.formCard}>
             <Text style={styles.title}>OTP Login</Text>
             <Text style={styles.subtitle}>Phone number dalo, OTP lo, phir login karo.</Text>
-
             <Text style={styles.label}>Phone Number</Text>
             <TextInput
               keyboardType="phone-pad"
@@ -46,6 +91,7 @@ export default function OtpLoginScreen() {
               onChangeText={(value) => {
                 setPhone(value.replace(/[^0-9]/g, ""));
                 setError("");
+                setMessage("");
               }}
               style={styles.input}
               value={phone}
@@ -54,8 +100,8 @@ export default function OtpLoginScreen() {
             />
 
             <Pressable
-              disabled={sendingOtp || !hasValidPhone}
-              style={[styles.secondaryButton, (sendingOtp || !hasValidPhone) && styles.disabled]}
+              disabled={sendingOtp || cooldownSeconds > 0 || !hasValidPhone}
+              style={[styles.secondaryButton, (sendingOtp || cooldownSeconds > 0 || !hasValidPhone) && styles.disabled]}
               onPress={async () => {
                 if (!hasValidPhone) {
                   setError("Valid 10 digit phone number dalo.");
@@ -66,7 +112,14 @@ export default function OtpLoginScreen() {
                   setError("");
                   setMessage("");
                   const response = await api.requestOtp(phone, "login");
-                  setMessage(response.provider === "twilio" ? "OTP SMS successfully sent." : "OTP generated successfully.");
+                  if (response.mode === "widget" && response.widgetUrl) {
+                    setMessage("Verification window open ho rahi hai...");
+                    setCooldownSeconds(OTP_RESEND_SECONDS);
+                    await Linking.openURL(response.widgetUrl);
+                  } else {
+                    setMessage(response.provider === "twilio" ? "OTP SMS successfully sent." : "OTP generated successfully.");
+                    setCooldownSeconds(OTP_RESEND_SECONDS);
+                  }
                 } catch (otpError) {
                   setError(formatApiError(otpError, "Unable to send OTP"));
                 } finally {
@@ -74,22 +127,32 @@ export default function OtpLoginScreen() {
                 }
               }}
             >
-              <Text style={styles.secondaryText}>Send OTP</Text>
+              {sendingOtp ? (
+                <ActivityIndicator color="#111827" />
+              ) : (
+                <Text style={styles.secondaryText}>
+                  {cooldownSeconds > 0 ? `Wait ${cooldownSeconds}s` : message ? "Resend OTP" : "Send OTP"}
+                </Text>
+              )}
             </Pressable>
 
-            <Text style={styles.label}>OTP</Text>
-            <TextInput
-              keyboardType="number-pad"
-              maxLength={6}
-              onChangeText={(value) => {
-                setOtp(value.replace(/[^0-9]/g, ""));
-                setError("");
-              }}
-              style={styles.input}
-              value={otp}
-              placeholder="Enter 6 digit OTP"
-              placeholderTextColor="#94a3b8"
-            />
+            {!String(params.msg91Token || "").trim() ? (
+              <>
+                <Text style={styles.label}>OTP</Text>
+                <TextInput
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  onChangeText={(value) => {
+                    setOtp(value.replace(/[^0-9]/g, ""));
+                    setError("");
+                  }}
+                  style={styles.input}
+                  value={otp}
+                  placeholder="Enter 6 digit OTP"
+                  placeholderTextColor="#94a3b8"
+                />
+              </>
+            ) : null}
 
             {message ? <Text style={styles.success}>{message}</Text> : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -100,14 +163,14 @@ export default function OtpLoginScreen() {
                 setError("Valid 10 digit phone number dalo.");
                 return;
               }
-              if (!hasValidOtp) {
+              if (!String(params.msg91Token || "").trim() && !hasValidOtp) {
                 setError("Valid 6 digit OTP dalo.");
                 return;
               }
               try {
                 setLoggingIn(true);
                 setError("");
-                await otpLogin(normalizedPhone, normalizedOtp);
+                await otpLogin(normalizedPhone, normalizedOtp, String(params.msg91Token || "").trim());
                 router.replace("/(tabs)");
               } catch (loginError) {
                 setError(formatApiError(loginError, "OTP login failed"));
@@ -115,15 +178,17 @@ export default function OtpLoginScreen() {
                 setLoggingIn(false);
                 }
               }}
-              disabled={loggingIn || sendingOtp || !hasValidPhone || !hasValidOtp}
-              style={[styles.primaryButton, (loggingIn || sendingOtp || !hasValidPhone || !hasValidOtp) && styles.disabled]}
+              disabled={loggingIn || sendingOtp || !hasValidPhone || (!String(params.msg91Token || "").trim() && !hasValidOtp)}
+              style={[styles.primaryButton, (loggingIn || sendingOtp || !hasValidPhone || (!String(params.msg91Token || "").trim() && !hasValidOtp)) && styles.disabled]}
             >
               {loggingIn ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>Login with OTP</Text>}
             </Pressable>
 
-            <Link href="/auth/login" style={styles.link}>
-              Back to password login
-            </Link>
+            <View style={styles.linkGroup}>
+              <Link href="/auth/login" style={styles.link}>
+                Back to password login
+              </Link>
+            </View>
           </SurfaceCard>
         </View>
       </AppScreen>
@@ -137,16 +202,18 @@ const styles = StyleSheet.create({
   logo: { width: 280, height: 110, marginTop: 20, marginBottom: 0 },
   tagline: { maxWidth: 320, color: colors.whiteOverlayTextStrong, lineHeight: 20, marginTop: -14 },
   content: { marginTop: 0, paddingHorizontal: 16, paddingBottom: 32 },
+  formCard: { borderRadius: 24 },
   title: { color: "#111827", fontSize: 24, fontWeight: "800" },
   subtitle: { color: "#64748b", lineHeight: 20 },
   label: { color: "#0f172a", fontWeight: "700" },
   input: { minHeight: 50, borderRadius: 14, borderWidth: 1, borderColor: "#dbe1ea", paddingHorizontal: 14, color: "#111827", backgroundColor: "#f8fafc" },
   primaryButton: { minHeight: 48, borderRadius: 999, backgroundColor: "#111827", alignItems: "center", justifyContent: "center" },
-  secondaryButton: { minHeight: 46, borderRadius: 14, backgroundColor: "#f8fafc", borderWidth: 1, borderColor: "#dbe1ea", alignItems: "center", justifyContent: "center" },
+  secondaryButton: { minHeight: 48, borderRadius: 999, backgroundColor: "#fff7ed", borderWidth: 1, borderColor: "#fdba74", alignItems: "center", justifyContent: "center", shadowColor: "#fb923c", shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 2 },
   primaryText: { color: "#ffffff", fontWeight: "800", fontSize: 15 },
   secondaryText: { color: "#111827", fontWeight: "800" },
   disabled: { opacity: 0.7 },
   error: { color: "#dc2626", fontWeight: "600" },
   success: { color: "#16a34a", fontWeight: "600" },
+  linkGroup: { gap: 12, paddingTop: 4 },
   link: { color: "#111827", fontWeight: "700", textAlign: "center" }
 });

@@ -3,6 +3,9 @@ import { addWalletEntry, getBankAccountsForUser, getUserBalance, getWalletEntrie
 
 export const MIN_WITHDRAW_AMOUNT = 500;
 const WITHDRAW_WEEKEND_CLOSED_MESSAGE = "Saturday aur Sunday ko withdraw service band rahegi.";
+const WITHDRAW_TIME_CLOSED_MESSAGE = "Withdraw request timing 11:00 AM se 11:00 PM tak hi available hai.";
+const WITHDRAW_START_MINUTES = 11 * 60;
+const WITHDRAW_END_MINUTES = 23 * 60;
 
 function normalizeAmount(value) {
   return Number(value ?? 0);
@@ -15,9 +18,26 @@ function getIndiaWeekday(date = new Date()) {
   }).format(date);
 }
 
+function getIndiaMinutes(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).formatToParts(date);
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
+  return hour * 60 + minute;
+}
+
 function isWithdrawWeekendClosed(date = new Date()) {
   const weekday = getIndiaWeekday(date);
   return weekday === "Saturday" || weekday === "Sunday";
+}
+
+function isWithdrawTimeClosed(date = new Date()) {
+  const currentMinutes = getIndiaMinutes(date);
+  return currentMinutes < WITHDRAW_START_MINUTES || currentMinutes >= WITHDRAW_END_MINUTES;
 }
 
 function validateWithdrawAmount(amount) {
@@ -33,6 +53,9 @@ function validateWithdrawAmount(amount) {
 async function ensureWithdrawAllowed(userId, amount) {
   if (isWithdrawWeekendClosed()) {
     return { ok: false, status: 400, error: WITHDRAW_WEEKEND_CLOSED_MESSAGE };
+  }
+  if (isWithdrawTimeClosed()) {
+    return { ok: false, status: 400, error: WITHDRAW_TIME_CLOSED_MESSAGE };
   }
 
   const validationError = validateWithdrawAmount(amount);

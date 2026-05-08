@@ -1,12 +1,15 @@
-import { useState } from "react";
-import { Link } from "expo-router";
+import { useEffect, useState } from "react";
+import { Link, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Linking from "expo-linking";
 import { AppScreen, SurfaceCard } from "@/components/ui";
 import { api, formatApiError } from "@/lib/api";
 import { colors } from "@/theme/colors";
 
 export default function ForgotPasswordScreen() {
+  const OTP_RESEND_SECONDS = 30;
+  const params = useLocalSearchParams<{ msg91Token?: string; phone?: string }>();
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
@@ -15,12 +18,37 @@ export default function ForgotPasswordScreen() {
   const [resettingPassword, setResettingPassword] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [verifiedAccessToken, setVerifiedAccessToken] = useState("");
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const normalizedPhone = phone.replace(/[^0-9]/g, "");
   const normalizedOtp = otp.replace(/[^0-9]/g, "");
   const hasValidPhone = normalizedPhone.length === 10;
   const hasValidOtp = normalizedOtp.length === 6;
   const hasValidPassword = password.trim().length >= 8;
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setCooldownSeconds((current) => (current > 0 ? current - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
+
+  useEffect(() => {
+    const callbackPhone = String(params.phone || "").replace(/[^0-9]/g, "");
+    const token = String(params.msg91Token || "").trim();
+    if (callbackPhone) {
+      setPhone(callbackPhone);
+    }
+    if (token) {
+      setVerifiedAccessToken(token);
+      setMessage("Mobile number verified successfully. Ab naya password set karo.");
+      setError("");
+    }
+  }, [params.msg91Token, params.phone]);
 
   return (
     <View style={styles.page}>
@@ -31,10 +59,9 @@ export default function ForgotPasswordScreen() {
 
       <AppScreen padded={false} showPromo={false}>
         <View style={styles.content}>
-          <SurfaceCard>
+          <SurfaceCard style={styles.formCard}>
             <Text style={styles.title}>Forgot Password</Text>
             <Text style={styles.subtitle}>Phone number par OTP lo, phir new password set karo.</Text>
-
             <Text style={styles.label}>Phone Number</Text>
             <TextInput
               keyboardType="phone-pad"
@@ -50,8 +77,8 @@ export default function ForgotPasswordScreen() {
             />
 
             <Pressable
-              disabled={sendingOtp || !hasValidPhone}
-              style={[styles.secondaryButton, (sendingOtp || !hasValidPhone) && styles.disabled]}
+              disabled={sendingOtp || cooldownSeconds > 0 || !hasValidPhone}
+              style={[styles.secondaryButton, (sendingOtp || cooldownSeconds > 0 || !hasValidPhone) && styles.disabled]}
               onPress={async () => {
                 if (!hasValidPhone) {
                   setError("Valid 10 digit phone number dalo.");
@@ -62,7 +89,14 @@ export default function ForgotPasswordScreen() {
                   setError("");
                   setMessage("");
                   const response = await api.requestOtp(normalizedPhone, "password_reset");
-                  setMessage(response.provider === "twilio" ? "Password reset OTP SMS successfully sent." : "Password reset OTP generated.");
+                  if (response.mode === "widget" && response.widgetUrl) {
+                    setMessage("Verification window open ho rahi hai...");
+                    setCooldownSeconds(OTP_RESEND_SECONDS);
+                    await Linking.openURL(response.widgetUrl);
+                  } else {
+                    setMessage(response.provider === "twilio" ? "Password reset OTP SMS successfully sent." : "Password reset OTP generated.");
+                    setCooldownSeconds(OTP_RESEND_SECONDS);
+                  }
                 } catch (otpError) {
                   setError(formatApiError(otpError, "Unable to send OTP"));
                 } finally {
@@ -70,22 +104,34 @@ export default function ForgotPasswordScreen() {
                 }
               }}
             >
-              <Text style={styles.secondaryText}>Send Reset OTP</Text>
+              {sendingOtp ? (
+                <ActivityIndicator color="#111827" />
+              ) : (
+                <Text style={styles.secondaryText}>
+                  {cooldownSeconds > 0 ? `Wait ${cooldownSeconds}s` : message ? "Resend OTP" : "Send Reset OTP"}
+                </Text>
+              )}
             </Pressable>
 
-            <Text style={styles.label}>OTP</Text>
-            <TextInput
-              keyboardType="number-pad"
-              maxLength={6}
-              onChangeText={(value) => {
-                setOtp(value.replace(/[^0-9]/g, ""));
-                setError("");
-              }}
-              style={styles.input}
-              value={otp}
-              placeholder="Enter 6 digit OTP"
-              placeholderTextColor="#94a3b8"
-            />
+            {!verifiedAccessToken ? (
+              <>
+                <Text style={styles.label}>OTP</Text>
+                <TextInput
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  onChangeText={(value) => {
+                    setOtp(value.replace(/[^0-9]/g, ""));
+                    setError("");
+                  }}
+                  style={styles.input}
+                  value={otp}
+                  placeholder="Enter 6 digit OTP"
+                  placeholderTextColor="#94a3b8"
+                />
+              </>
+            ) : (
+              <Text style={styles.success}>Mobile verification complete. OTP manually daalne ki zaroorat nahi hai.</Text>
+            )}
 
             <Text style={styles.label}>New Password</Text>
             <TextInput secureTextEntry onChangeText={setPassword} style={styles.input} value={password} placeholder="Enter new password" placeholderTextColor="#94a3b8" />
@@ -103,7 +149,7 @@ export default function ForgotPasswordScreen() {
                   setError("Valid 10 digit phone number dalo.");
                   return;
                 }
-                if (!hasValidOtp) {
+                if (!verifiedAccessToken && !hasValidOtp) {
                   setError("Valid 6 digit OTP dalo.");
                   return;
                 }
@@ -119,26 +165,29 @@ export default function ForgotPasswordScreen() {
                   setResettingPassword(true);
                   setError("");
                   setMessage("");
-                  await api.forgotPassword(normalizedPhone, normalizedOtp, password.trim(), confirmPassword.trim());
+                  await api.forgotPassword(normalizedPhone, normalizedOtp, password.trim(), confirmPassword.trim(), verifiedAccessToken);
                   setMessage("Password reset successful. Ab login karo.");
                   setOtp("");
                   setPassword("");
                   setConfirmPassword("");
+                  setVerifiedAccessToken("");
                 } catch (resetError) {
                   setError(formatApiError(resetError, "Unable to reset password"));
                 } finally {
                   setResettingPassword(false);
                 }
               }}
-              disabled={resettingPassword || sendingOtp || !hasValidPhone || !hasValidOtp || !hasValidPassword || !passwordsMatch}
-              style={[styles.primaryButton, (resettingPassword || sendingOtp || !hasValidPhone || !hasValidOtp || !hasValidPassword || !passwordsMatch) && styles.disabled]}
+              disabled={resettingPassword || sendingOtp || !hasValidPhone || (!verifiedAccessToken && !hasValidOtp) || !hasValidPassword || !passwordsMatch}
+              style={[styles.primaryButton, (resettingPassword || sendingOtp || !hasValidPhone || (!verifiedAccessToken && !hasValidOtp) || !hasValidPassword || !passwordsMatch) && styles.disabled]}
             >
               {resettingPassword ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>Reset Password</Text>}
             </Pressable>
 
-            <Link href="/auth/login" style={styles.link}>
-              Back to login
-            </Link>
+            <View style={styles.linkGroup}>
+              <Link href="/auth/login" style={styles.link}>
+                Back to login
+              </Link>
+            </View>
           </SurfaceCard>
         </View>
       </AppScreen>
@@ -152,17 +201,19 @@ const styles = StyleSheet.create({
   logo: { width: 280, height: 110, marginTop: 20, marginBottom: 0 },
   tagline: { maxWidth: 320, color: colors.whiteOverlayTextStrong, lineHeight: 20, marginTop: -14 },
   content: { marginTop: 0, paddingHorizontal: 16, paddingBottom: 32 },
+  formCard: { borderRadius: 24 },
   title: { color: "#111827", fontSize: 24, fontWeight: "800" },
   subtitle: { color: "#64748b", lineHeight: 20 },
   label: { color: "#0f172a", fontWeight: "700" },
   helperText: { color: "#64748b", fontSize: 12, lineHeight: 18 },
   input: { minHeight: 50, borderRadius: 14, borderWidth: 1, borderColor: "#dbe1ea", paddingHorizontal: 14, color: "#111827", backgroundColor: "#f8fafc" },
   primaryButton: { minHeight: 48, borderRadius: 999, backgroundColor: "#111827", alignItems: "center", justifyContent: "center" },
-  secondaryButton: { minHeight: 46, borderRadius: 14, backgroundColor: "#f8fafc", borderWidth: 1, borderColor: "#dbe1ea", alignItems: "center", justifyContent: "center" },
+  secondaryButton: { minHeight: 48, borderRadius: 999, backgroundColor: "#fff7ed", borderWidth: 1, borderColor: "#fdba74", alignItems: "center", justifyContent: "center", shadowColor: "#fb923c", shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 2 },
   primaryText: { color: "#ffffff", fontWeight: "800", fontSize: 15 },
   secondaryText: { color: "#111827", fontWeight: "800" },
   disabled: { opacity: 0.7 },
   error: { color: "#dc2626", fontWeight: "600" },
   success: { color: "#16a34a", fontWeight: "600" },
+  linkGroup: { gap: 12, paddingTop: 4 },
   link: { color: "#111827", fontWeight: "700", textAlign: "center" }
 });

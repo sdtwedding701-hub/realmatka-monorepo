@@ -71,6 +71,21 @@ export function validateEnvironment() {
     }
   }
 
+  if (summaries.otpProvider === "msg91") {
+    const msg91Issues = [];
+    if (!process.env.MSG91_AUTH_KEY?.trim()) msg91Issues.push("MSG91_AUTH_KEY");
+    if (!process.env.MSG91_WIDGET_ID?.trim()) msg91Issues.push("MSG91_WIDGET_ID");
+    if (!process.env.MSG91_WIDGET_TOKEN_AUTH?.trim()) msg91Issues.push("MSG91_WIDGET_TOKEN_AUTH");
+    if (msg91Issues.length) {
+      const message = `${msg91Issues.join(", ")} missing while OTP_PROVIDER=msg91`;
+      if (isProduction) {
+        errors.push(message);
+      } else {
+        warnings.push(message);
+      }
+    }
+  }
+
   const hasRazorpayId = Boolean(process.env.RAZORPAY_KEY_ID?.trim());
   const hasRazorpaySecret = Boolean(process.env.RAZORPAY_KEY_SECRET?.trim());
   const hasRazorpayWebhook = Boolean(process.env.RAZORPAY_WEBHOOK_SECRET?.trim());

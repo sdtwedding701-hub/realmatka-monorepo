@@ -56,10 +56,9 @@ export default function LoginScreen() {
       </LinearGradient>
 
       <View style={styles.content}>
-        <SurfaceCard>
+        <SurfaceCard style={styles.formCard}>
           <Text style={styles.title}>Login</Text>
           <Text style={styles.subtitle}>Use your registered phone number and password to continue.</Text>
-
           <View style={styles.fieldWrap}>
             <Text style={styles.label}>Phone Number</Text>
             <TextInput
@@ -111,17 +110,19 @@ export default function LoginScreen() {
             {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>Continue</Text>}
           </Pressable>
 
-          <Link href="/auth/register" style={styles.link}>
-            Create new account
-          </Link>
+          <View style={styles.linkGroup}>
+            <Link href="/auth/register" style={styles.link}>
+              Create new account
+            </Link>
 
-          <Link href="/auth/otp-login" style={styles.link}>
-            Login with OTP
-          </Link>
+            <Link href="/auth/otp-login" style={styles.link}>
+              Login with OTP
+            </Link>
 
-          <Link href="/auth/forgot-password" style={styles.link}>
-            Forgot password
-          </Link>
+            <Link href="/auth/forgot-password" style={styles.link}>
+              Forgot password
+            </Link>
+          </View>
         </SurfaceCard>
       </View>
     </View>
@@ -155,6 +156,9 @@ const styles = StyleSheet.create({
     marginTop: 0,
     paddingHorizontal: 16,
     paddingBottom: 32
+  },
+  formCard: {
+    borderRadius: 24
   },
   title: {
     color: "#111827",
@@ -199,6 +203,10 @@ const styles = StyleSheet.create({
   error: {
     color: "#dc2626",
     fontWeight: "600"
+  },
+  linkGroup: {
+    gap: 12,
+    paddingTop: 4
   },
   link: {
     color: "#111827",

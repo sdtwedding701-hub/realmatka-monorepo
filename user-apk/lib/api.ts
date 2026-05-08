@@ -120,6 +120,16 @@ export type HealthSnapshot = {
   };
 };
 
+export type OtpRequestResponse = {
+  sent: boolean;
+  purpose?: string;
+  expiresAt: string;
+  provider: string;
+  devCode: string | null;
+  mode?: "otp" | "widget";
+  widgetUrl?: string | null;
+};
+
 export type ChartBatchPayload = {
   items: Array<{
     marketSlug: string;
@@ -362,7 +372,7 @@ export const api = {
   },
 
   requestOtp(phone: string, purpose: "login" | "register" | "password_reset" | "withdraw") {
-    return request<{ sent: boolean; purpose: string; expiresAt: string; provider: string; devCode: string | null }>(
+    return request<OtpRequestResponse>(
       "/api/auth/request-otp",
       {
         method: "POST",
@@ -371,24 +381,24 @@ export const api = {
     );
   },
 
-  otpLogin(phone: string, otp: string) {
+  otpLogin(phone: string, otp: string, accessToken = "") {
     return request<{ token: string; user: SessionUser }>("/api/auth/otp-login", {
       method: "POST",
-      body: { phone, otp }
+      body: { phone, otp, accessToken }
     });
   },
 
-  register(firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode = "") {
+  register(firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode = "", accessToken = "") {
     return request<{ user: SessionUser & { approvalStatus: string } }>("/api/auth/register", {
       method: "POST",
-      body: { firstName, lastName, phone, otp, password, confirmPassword, referenceCode }
+      body: { firstName, lastName, phone, otp, password, confirmPassword, referenceCode, accessToken }
     });
   },
 
-  forgotPassword(phone: string, otp: string, password: string, confirmPassword: string) {
+  forgotPassword(phone: string, otp: string, password: string, confirmPassword: string, accessToken = "") {
     return request<{ success: boolean }>("/api/auth/forgot-password", {
       method: "POST",
-      body: { phone, otp, password, confirmPassword }
+      body: { phone, otp, password, confirmPassword, accessToken }
     });
   },
 

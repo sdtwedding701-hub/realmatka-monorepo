@@ -149,6 +149,7 @@ const standaloneRoutes = new Map([
   ["/api/auth/admin-verify-2fa", { loader: "auth", methods: { OPTIONS: "options", POST: "verifyAdminTwoFactor" } }],
   ["/api/auth/me", { loader: "auth", methods: { OPTIONS: "options", GET: "me" } }],
   ["/api/auth/request-otp", { loader: "authOtp", methods: { OPTIONS: "options", POST: "requestOtp" } }],
+  ["/api/auth/msg91/widget", { loader: "authOtp", methods: { OPTIONS: "options", GET: "msg91Widget" } }],
   ["/api/auth/otp-login", { loader: "authOtp", methods: { OPTIONS: "options", POST: "otpLogin" } }],
   ["/api/auth/forgot-password", { loader: "authOtp", methods: { OPTIONS: "options", POST: "forgotPassword" } }],
   ["/api/auth/register", { loader: "authRegister", methods: { OPTIONS: "options", POST: "register" } }],

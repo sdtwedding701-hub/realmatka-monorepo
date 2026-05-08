@@ -39,6 +39,7 @@ export async function register(request) {
   const confirmPassword = String(body.confirmPassword ?? "");
   const referenceCode = String(body.referenceCode ?? "").trim();
   const otp = String(body.otp ?? "").trim();
+  const accessToken = String(body.accessToken ?? "").trim();
   const rateLimit = assertRateLimit({
     key: getRequestFingerprint(request, "auth-register", phone),
     windowMs: 10 * 60 * 1000,
@@ -49,8 +50,8 @@ export async function register(request) {
     return fail(`Too many registration attempts. Try again in ${rateLimit.retryAfterSeconds}s.`, 429, request);
   }
 
-  if (!firstName || !lastName || !phone || !password || !confirmPassword || !/^[0-9]{6}$/.test(otp)) {
-    return fail("firstName, lastName, phone, password, confirmPassword, and valid 6 digit OTP are required", 400, request);
+  if (!firstName || !lastName || !phone || !password || !confirmPassword || (!accessToken && !/^[0-9]{6}$/.test(otp))) {
+    return fail("firstName, lastName, phone, password, confirmPassword, and mobile verification are required", 400, request);
   }
 
   if (password.length < 8) {
@@ -63,7 +64,7 @@ export async function register(request) {
 
   let validOtp = false;
   try {
-    validOtp = await verifyOtp(phone, "register", otp);
+    validOtp = await verifyOtp(phone, "register", otp, accessToken);
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Unable to verify OTP", 500, request);
   }

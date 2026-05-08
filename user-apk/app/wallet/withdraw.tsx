@@ -91,6 +91,7 @@ export default function WithdrawScreen() {
           <ScrollView bounces={false} contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.handle} />
             <Text style={styles.title}>Withdraw Fund</Text>
+            <Text style={styles.subtitle}>Secure request flow ke saath bank account par withdraw bhejo.</Text>
 
             <View style={styles.balanceCard}>
               <View style={styles.balanceIcon}>
@@ -121,6 +122,21 @@ export default function WithdrawScreen() {
                 <Text style={styles.emptyBankText}>Withdraw request se pehle bank account add karo</Text>
               </Pressable>
             )}
+
+            <View style={styles.infoStrip}>
+              <View style={styles.infoPill}>
+                <Text style={styles.infoPillLabel}>Minimum</Text>
+                <Text style={styles.infoPillValue}>Rs 500</Text>
+              </View>
+              <View style={styles.infoPill}>
+                <Text style={styles.infoPillLabel}>Multiple</Text>
+                <Text style={styles.infoPillValue}>Rs 100</Text>
+              </View>
+              <View style={styles.infoPillAccent}>
+                <Text style={styles.infoPillLabelAccent}>Timing</Text>
+                <Text style={styles.infoPillValueAccent}>11 AM - 11 PM</Text>
+              </View>
+            </View>
 
             <Text style={styles.fieldLabel}>Amount</Text>
             <View style={styles.inputRow}>
@@ -360,6 +376,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "900"
   },
+  subtitle: {
+    textAlign: "center",
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18
+  },
   balanceCard: {
     minHeight: 76,
     borderRadius: 16,
@@ -438,6 +460,54 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontSize: 13,
     fontWeight: "700"
+  },
+  infoStrip: {
+    flexDirection: "row",
+    gap: 10
+  },
+  infoPill: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 3
+  },
+  infoPillAccent: {
+    flex: 1.15,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    backgroundColor: colors.accentDark,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 3
+  },
+  infoPillLabel: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.7
+  },
+  infoPillValue: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  infoPillLabelAccent: {
+    color: colors.whiteOverlayTextStrong,
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.7
+  },
+  infoPillValueAccent: {
+    color: colors.surface,
+    fontSize: 13,
+    fontWeight: "900"
   },
   fieldLabel: {
     color: colors.textPrimary,

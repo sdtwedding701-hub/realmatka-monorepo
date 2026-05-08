@@ -146,7 +146,6 @@ export default function BidsScreen() {
   const pageEnd = Math.min(pageStart + PAGE_SIZE, filteredItems.length);
   const pageItems = filteredItems.slice(pageStart, pageEnd);
   const hasValidPendingRange = Boolean(parseDateInput(pendingFromDate) && parseDateInput(pendingToDate, true));
-
   const applyRange = () => {
     if (!hasValidPendingRange) {
       return;
@@ -166,10 +165,10 @@ export default function BidsScreen() {
 
   return (
     <View style={styles.page}>
-      <AppHeader title="All Bids" subtitle="Daily bid history" />
+      <AppHeader title="All Bids" subtitle={undefined} />
       <AppScreen onRefresh={() => void refreshData()} refreshing={refreshing}>
         <View style={styles.toolbar}>
-          <Text style={styles.toolbarLabel}>{activeRange ? `${activeRange.from} to ${activeRange.to}` : "Today only"}</Text>
+          <Text style={styles.toolbarValue}>{activeRange ? `${activeRange.from} to ${activeRange.to}` : "Today only"}</Text>
           <Pressable onPress={() => setFilterOpen(true)} style={styles.calendarButton}>
             <Ionicons color={colors.surface} name="calendar-outline" size={18} />
           </Pressable>
@@ -246,7 +245,7 @@ export default function BidsScreen() {
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background },
   toolbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  toolbarLabel: { color: "#475467", fontSize: 13, fontWeight: "700" },
+  toolbarValue: { color: "#475467", fontSize: 14, fontWeight: "800" },
   calendarButton: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
   paginationRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   paginationLabel: { color: "#344054", fontSize: 13, fontWeight: "700" },
@@ -255,8 +254,8 @@ const styles = StyleSheet.create({
   pageButtonDisabled: { opacity: 0.45 },
   emptyTitle: { color: "#111827", fontSize: 17, fontWeight: "800" },
   emptySubtitle: { color: "#667085", fontSize: 13, lineHeight: 20 },
-  listStack: { gap: 4 },
-  betCard: { borderRadius: 10, gap: 8, padding: 12 },
+  listStack: { gap: 8 },
+  betCard: { borderRadius: 18, gap: 10, padding: 14 },
   cardTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   cardBottomRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   cardLeft: { flex: 1, gap: 2, paddingRight: 8 },

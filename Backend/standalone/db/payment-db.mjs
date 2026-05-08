@@ -297,9 +297,8 @@ export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gat
     }
 
     if (bonusPayload) {
-      const { applyFirstDepositBonusIfEligible, applyReferralDepositBonusIfEligible } = await import("../db.mjs");
+      const { applyFirstDepositBonusIfEligible } = await import("../db.mjs");
       await applyFirstDepositBonusIfEligible(bonusPayload);
-      await applyReferralDepositBonusIfEligible(bonusPayload);
     }
 
     return findPaymentOrderById(paymentOrderId);
@@ -384,9 +383,8 @@ export async function completePaymentOrder({ paymentOrderId, gatewayOrderId, gat
   }
 
   if (bonusPayload) {
-    const { applyFirstDepositBonusIfEligible, applyReferralDepositBonusIfEligible } = await import("../db.mjs");
+    const { applyFirstDepositBonusIfEligible } = await import("../db.mjs");
     await applyFirstDepositBonusIfEligible(bonusPayload);
-    await applyReferralDepositBonusIfEligible(bonusPayload);
   }
 
   return findPaymentOrderById(paymentOrderId);

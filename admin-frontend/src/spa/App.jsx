@@ -11,6 +11,7 @@ import { SupportChatPage } from "./SupportChatPage.jsx";
 
 const SUPPORT_CONVERSATIONS_REFRESH_MS = 15_000;
 const SUPPORT_MESSAGES_REFRESH_MS = 15_000;
+const ADMIN_BUSINESS_DAY_OFFSET_MS = 5 * 60 * 60 * 1000;
 
 function isAllowedAdminRole(role) {
   return ["admin", "super_admin"].includes(String(role || "").toLowerCase());
@@ -334,6 +335,7 @@ function DashboardPage({ apiBase, token }) {
     { label: "Pending Withdraws", value: state.summary.pendingWork.pendingWithdraws, tone: "danger" },
     { label: "Processing Withdraws", value: Math.max(0, state.summary.pendingWork.walletApprovals - state.summary.pendingWork.pendingDeposits), tone: "accent" }
   ];
+  const marketExposure = state.summary.marketExposure || [];
 
   return (
     <>
@@ -439,6 +441,24 @@ function DashboardPage({ apiBase, token }) {
               <div className="compact-row"><strong>Total Payout Amount</strong><span>{formatCurrency(state.reports.totals.payoutAmount)}</span></div>
               <div className="compact-row"><strong>Collection vs Payout</strong><span>{formatCurrency(state.reports.totals.collectionVsPayoutDelta)}</span></div>
             </div>
+          </div>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="subpanel">
+          <div className="panel-head">
+            <h2>Live Market Exposure</h2>
+            <p>Aaj ke bids me kis market par kitna pressure hai, aur kaunse digit ya panna par sabse zyada points lage hain.</p>
+          </div>
+          <div className="compact-list">
+            {marketExposure.length ? marketExposure.map((item) => (
+              <div className="empty-card" key={item.market}>
+                <div className="compact-row"><strong>{item.market}</strong><span>{formatCurrency(item.totalPoints)}</span></div>
+                <div className="compact-row"><strong>Total Bets</strong><span>{item.betsCount}</span></div>
+                <div className="compact-row"><strong>Top Digits</strong><span>{formatExposureList(item.topDigits)}</span></div>
+                <div className="compact-row"><strong>Top Pannas</strong><span>{formatExposureList(item.topPannas)}</span></div>
+              </div>
+            )) : <div className="empty-card">Aaj ke live market bids abhi available nahi hain.</div>}
           </div>
         </div>
       </section>
@@ -861,9 +881,10 @@ function RequestsPage({
   const effectiveRequestType = lockedRequestType || requestType;
   const isDepositOnly = effectiveRequestType === "DEPOSIT";
   const isWithdrawOnly = effectiveRequestType === "WITHDRAW";
+  const isDailyHistoryView = Boolean(lockedRequestType);
 
   useEffect(() => {
-    if (isDepositOnly) {
+    if (isDailyHistoryView) {
       setFromDate(todayInput);
       setToDate(todayInput);
       return;
@@ -872,7 +893,7 @@ function RequestsPage({
       setFromDate("");
       setToDate("");
     }
-  }, [isDepositOnly, lockedRequestType, todayInput]);
+  }, [isDailyHistoryView, lockedRequestType, todayInput]);
 
   const historyItems = effectiveRequestType === "all" ? state.items : state.items.filter((item) => item.type === effectiveRequestType);
   const sortedHistoryItems = useMemo(
@@ -978,7 +999,7 @@ function RequestsPage({
       </section>
       <section className="panel">
         <div className="toolbar-grid toolbar-grid-requests">
-          {isDepositOnly ? (
+          {isDailyHistoryView ? (
             <div className="toolbar-field wide">
               <span>History Range</span>
               <div className="inline-actions">
@@ -1026,7 +1047,7 @@ function RequestsPage({
           </label>
           <div className="toolbar-actions">
             <button className="secondary" onClick={() => void exportAdminData(apiBase, token, "requests")}>Export CSV</button>
-            <button className="secondary" onClick={() => { setQuery(""); setRequestType(initialRequestType); setStatus("all"); setFromDate(""); setToDate(""); }}>Reset</button>
+            <button className="secondary" onClick={() => { setQuery(""); setRequestType(initialRequestType); setStatus("all"); setFromDate(isDailyHistoryView ? todayInput : ""); setToDate(isDailyHistoryView ? todayInput : ""); }}>Reset</button>
           </div>
         </div>
         {message ? <p className={`message ${message.toLowerCase().includes("fail") || message.toLowerCase().includes("error") ? "error" : "success"}`}>{message}</p> : null}
@@ -2272,8 +2293,10 @@ function buildFilteredBidSummary(bids) {
 }
 
 function getDateGroupLabel(value) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-IN", {
+  const key = getAdminBusinessDateKey(value);
+  if (!key) return "-";
+  return new Date(`${key}T00:00:00Z`).toLocaleDateString("en-IN", {
+    timeZone: "UTC",
     year: "numeric",
     month: "short",
     day: "2-digit",
@@ -2534,6 +2557,13 @@ function formatCurrency(value) {
   return `Rs ${Number(value || 0)}`;
 }
 
+function formatExposureList(items) {
+  if (!Array.isArray(items) || !items.length) {
+    return "-";
+  }
+  return items.map((item) => `${item.label} (${formatCurrency(item.points)})`).join(", ");
+}
+
 function formatDate(value) {
   if (!value) return "-";
   return new Date(value).toLocaleString("en-IN", { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -2611,27 +2641,22 @@ function getWalletActionChecklist(item, action) {
 }
 
 function toDateInputValue(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString().slice(0, 10);
+  return getAdminBusinessDateKey(value);
 }
 
 function isWithinDateRange(value, from, to) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-
-  if (from) {
-    const fromDate = new Date(`${from}T00:00:00`);
-    if (date < fromDate) return false;
-  }
-
-  if (to) {
-    const toDate = new Date(`${to}T23:59:59.999`);
-    if (date > toDate) return false;
-  }
-
+  const dateKey = getAdminBusinessDateKey(value);
+  if (!dateKey) return false;
+  if (from && dateKey < from) return false;
+  if (to && dateKey > to) return false;
   return true;
+}
+
+function getAdminBusinessDateKey(value = new Date()) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() + ADMIN_BUSINESS_DAY_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 function parseRowsText(raw) {

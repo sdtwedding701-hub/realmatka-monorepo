@@ -42,6 +42,16 @@ function normalizeUpiClientStatus(value) {
   return "";
 }
 
+function getLatestPaymentLinkAttemptStatus(paymentLink) {
+  const items = Array.isArray(paymentLink?.payments) ? paymentLink.payments : [];
+  if (!items.length) {
+    return "";
+  }
+
+  const latest = items[items.length - 1];
+  return String(latest?.status || "").trim().toLowerCase();
+}
+
 export async function createHostedPaymentOrder({ user, amount, createPaymentLink }) {
   const amountPaise = roundToPaise(amount);
   const validationError = validateDepositAmount(amountPaise);
@@ -127,6 +137,7 @@ export async function getPaymentOrderStatusSnapshot({ userId, referenceId, isPro
   if (order.status === "PENDING" && order.provider === "razorpay_payment_link" && order.gatewayOrderId && isProviderEnabled) {
     const paymentLink = await fetchPaymentLinkStatus(order.gatewayOrderId);
     const remoteStatus = String(paymentLink?.status || "").trim().toLowerCase();
+    const latestAttemptStatus = getLatestPaymentLinkAttemptStatus(paymentLink);
 
     if (remoteStatus === "paid") {
       order = await completePaymentLinkOrder({
@@ -135,12 +146,31 @@ export async function getPaymentOrderStatusSnapshot({ userId, referenceId, isPro
         gatewayPaymentId: String(paymentLink.payment_id || paymentLink.payments?.[0]?.payment_id || paymentLink.payments?.[0]?.id || "").trim(),
         gatewaySignature: "payment_link_status_poll"
       });
-    } else if (remoteStatus === "cancelled" || remoteStatus === "expired") {
-      order = await handlePaymentWebhook(order.reference, "FAILED");
+    } else if (latestAttemptStatus === "failed") {
+      order = await handlePaymentWebhook({
+        paymentOrderId: order.id,
+        reference: order.reference,
+        gatewayOrderId: String(order.gatewayOrderId || paymentLink.id || "").trim(),
+        status: "FAILED"
+      });
+    } else if (remoteStatus === "cancelled") {
+      order = await handlePaymentWebhook({
+        paymentOrderId: order.id,
+        reference: order.reference,
+        gatewayOrderId: String(order.gatewayOrderId || paymentLink.id || "").trim(),
+        status: "CANCELLED"
+      });
+    } else if (remoteStatus === "expired") {
+      order = await handlePaymentWebhook({
+        paymentOrderId: order.id,
+        reference: order.reference,
+        gatewayOrderId: String(order.gatewayOrderId || paymentLink.id || "").trim(),
+        status: "EXPIRED"
+      });
     } else {
       order = {
         ...order,
-        remoteStatus: remoteStatus || "created"
+        remoteStatus: latestAttemptStatus || remoteStatus || "created"
       };
     }
   }
@@ -174,6 +204,7 @@ export async function reconcilePendingPaymentOrdersForUser({
       if (order.provider === "razorpay_payment_link" && order.gatewayOrderId) {
         const paymentLink = await fetchPaymentLinkStatus(order.gatewayOrderId);
         const remoteStatus = String(paymentLink?.status || "").trim().toLowerCase();
+        const latestAttemptStatus = getLatestPaymentLinkAttemptStatus(paymentLink);
 
         if (remoteStatus === "paid") {
           const updated = await completePaymentLinkOrder({
@@ -188,8 +219,26 @@ export async function reconcilePendingPaymentOrdersForUser({
           continue;
         }
 
+        if (latestAttemptStatus === "failed") {
+          const updated = await handlePaymentWebhook({
+            paymentOrderId: order.id,
+            reference: order.reference,
+            gatewayOrderId: String(order.gatewayOrderId || paymentLink.id || "").trim(),
+            status: "FAILED"
+          });
+          if (updated) {
+            reconciled.push(updated);
+          }
+          continue;
+        }
+
         if (remoteStatus === "cancelled" || remoteStatus === "expired") {
-          const updated = await handlePaymentWebhook(order.reference, "FAILED");
+          const updated = await handlePaymentWebhook({
+            paymentOrderId: order.id,
+            reference: order.reference,
+            gatewayOrderId: String(order.gatewayOrderId || paymentLink.id || "").trim(),
+            status: remoteStatus === "cancelled" ? "CANCELLED" : "EXPIRED"
+          });
           if (updated) {
             reconciled.push(updated);
           }

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, AppStateStatus, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppScreen, BackHeader, SurfaceCard } from "@/components/ui";
 import { api, formatApiError, type PaymentOrder } from "@/lib/api";
@@ -10,6 +10,8 @@ import { colors } from "@/theme/colors";
 
 const MIN_DEPOSIT_AMOUNT = 100;
 const PAYMENT_STATUS_REFRESH_MS = 10_000;
+const PAYMENT_RETURN_RETRY_ATTEMPTS = 3;
+const PAYMENT_RETURN_RETRY_DELAY_MS = 3_000;
 
 function statusTone(status: string) {
   const normalized = status.trim().toUpperCase();
@@ -31,6 +33,7 @@ export default function AddFundScreen() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [pendingOrder, setPendingOrder] = useState<PaymentOrder | null>(null);
+  const awaitingCheckoutReturnRef = useRef(false);
 
   const numericAmount = Number(amount || 0);
   const hasValidAmount = Number.isFinite(numericAmount) && numericAmount >= MIN_DEPOSIT_AMOUNT;
@@ -91,6 +94,50 @@ export default function AddFundScreen() {
     [loadBidHistory, loadWalletHistory, reloadSessionData, sessionToken]
   );
 
+  const markReturnedPaymentAsIncomplete = useCallback(
+    (order: PaymentOrder | null) => {
+      if (!order?.reference) {
+        return;
+      }
+
+      setError("Payment complete nahi hua. Wrong PIN ya insufficient balance ho to dobara try karo.");
+      router.replace({
+        pathname: "/wallet/history",
+        params: {
+          payment: "failed",
+          reference: order.reference,
+          status: "not_completed",
+          amount: String(order.amount ?? "")
+        }
+      } as never);
+    },
+    []
+  );
+
+  const resolveReturnedPaymentStatus = useCallback(
+    async (referenceId: string) => {
+      let latest: PaymentOrder | null = null;
+
+      for (let attempt = 0; attempt < PAYMENT_RETURN_RETRY_ATTEMPTS; attempt += 1) {
+        latest = await pollPaymentStatus(referenceId, { silent: true });
+        const normalized = String(latest?.remoteStatus || latest?.status || "")
+          .trim()
+          .toUpperCase();
+
+        if (normalized === "SUCCESS" || normalized === "PAID" || normalized === "FAILED" || normalized === "CANCELLED" || normalized === "EXPIRED") {
+          return;
+        }
+
+        if (attempt < PAYMENT_RETURN_RETRY_ATTEMPTS - 1) {
+          await new Promise((resolve) => setTimeout(resolve, PAYMENT_RETURN_RETRY_DELAY_MS));
+        }
+      }
+
+      markReturnedPaymentAsIncomplete(latest ?? pendingOrder);
+    },
+    [markReturnedPaymentAsIncomplete, pendingOrder, pollPaymentStatus]
+  );
+
   useFocusEffect(
     useCallback(() => {
       if (!pendingOrder?.reference) {
@@ -120,6 +167,11 @@ export default function AddFundScreen() {
 
     const handleAppState = (nextState: AppStateStatus) => {
       if (nextState === "active") {
+        if (awaitingCheckoutReturnRef.current) {
+          awaitingCheckoutReturnRef.current = false;
+          void resolveReturnedPaymentStatus(pendingOrder.reference);
+          return;
+        }
         void pollPaymentStatus(pendingOrder.reference, { silent: true });
       }
     };
@@ -128,7 +180,7 @@ export default function AddFundScreen() {
     return () => {
       subscription.remove();
     };
-  }, [pendingOrder?.reference, pollPaymentStatus]);
+  }, [pendingOrder?.reference, pollPaymentStatus, resolveReturnedPaymentStatus]);
 
   return (
     <View style={styles.page}>
@@ -269,8 +321,10 @@ export default function AddFundScreen() {
         throw new Error("Checkout link unavailable.");
       }
 
+      awaitingCheckoutReturnRef.current = true;
       await Linking.openURL(order.redirectUrl);
     } catch (startError) {
+      awaitingCheckoutReturnRef.current = false;
       setError(formatApiError(startError, "Payment start nahi hua."));
     } finally {
       setSubmitting(false);

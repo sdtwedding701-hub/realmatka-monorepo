@@ -178,10 +178,15 @@ export async function getPaymentOrderStatusSnapshot({ userId, referenceId, isPro
   return { ok: true, data: order };
 }
 
-function getSuccessfulRazorpayOrderPayment(orderPaymentsPayload) {
+function getSuccessfulRazorpayOrderPayment(orderPaymentsPayload, expectedAmount) {
   const items = Array.isArray(orderPaymentsPayload?.items) ? orderPaymentsPayload.items : [];
+  const expectedAmountPaise = roundToPaise(expectedAmount);
   return (
-    items.find((item) => ["captured", "authorized"].includes(String(item?.status || "").trim().toLowerCase())) || null
+    items.find((item) => {
+      const status = String(item?.status || "").trim().toLowerCase();
+      const amountPaise = Number(item?.amount ?? 0);
+      return status === "captured" && amountPaise === expectedAmountPaise;
+    }) || null
   );
 }
 
@@ -248,7 +253,7 @@ export async function reconcilePendingPaymentOrdersForUser({
 
       if (order.provider === "razorpay_checkout" && order.gatewayOrderId) {
         const orderPayments = await fetchOrderPayments(order.gatewayOrderId);
-        const successfulPayment = getSuccessfulRazorpayOrderPayment(orderPayments);
+        const successfulPayment = getSuccessfulRazorpayOrderPayment(orderPayments, order.amount);
         if (successfulPayment?.id) {
           const updated = await completePaymentOrder({
             paymentOrderId: order.id,

@@ -2,6 +2,7 @@ import {
   completePaymentLinkOrder as completePaymentLinkOrderRecord,
   completePaymentOrder as completePaymentOrderRecord,
   createPaymentOrder as createPaymentOrderRecord,
+  findPendingPaymentOrdersForUser as findPendingPaymentOrdersForUserRecord,
   findPaymentOrderByReferenceForUser as findPaymentOrderByReferenceForUserRecord,
   findPaymentOrderForCheckout as findPaymentOrderForCheckoutRecord,
   handlePaymentWebhook as handlePaymentWebhookRecord
@@ -19,6 +20,7 @@ export const addWalletEntry = addWalletEntryRecord;
 export const completePaymentLinkOrder = completePaymentLinkOrderRecord;
 export const completePaymentOrder = completePaymentOrderRecord;
 export const createPaymentOrder = createPaymentOrderRecord;
+export const findPendingPaymentOrdersForUser = findPendingPaymentOrdersForUserRecord;
 export const findPaymentOrderByReferenceForUser = findPaymentOrderByReferenceForUserRecord;
 export const findPaymentOrderForCheckout = findPaymentOrderForCheckoutRecord;
 export const findUserById = findUserByIdRecord;

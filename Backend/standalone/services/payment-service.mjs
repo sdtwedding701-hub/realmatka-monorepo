@@ -3,6 +3,7 @@ import {
   completePaymentLinkOrder,
   completePaymentOrder,
   createPaymentOrder,
+  findPendingPaymentOrdersForUser,
   findPaymentOrderByReferenceForUser,
   findPaymentOrderForCheckout,
   findUserById,
@@ -145,6 +146,78 @@ export async function getPaymentOrderStatusSnapshot({ userId, referenceId, isPro
   }
 
   return { ok: true, data: order };
+}
+
+function getSuccessfulRazorpayOrderPayment(orderPaymentsPayload) {
+  const items = Array.isArray(orderPaymentsPayload?.items) ? orderPaymentsPayload.items : [];
+  return (
+    items.find((item) => ["captured", "authorized"].includes(String(item?.status || "").trim().toLowerCase())) || null
+  );
+}
+
+export async function reconcilePendingPaymentOrdersForUser({
+  userId,
+  isProviderEnabled,
+  fetchPaymentLinkStatus,
+  fetchOrderPayments,
+  limit = 5
+}) {
+  if (!userId || !isProviderEnabled) {
+    return [];
+  }
+
+  const pendingOrders = await findPendingPaymentOrdersForUser(userId, limit);
+  const reconciled = [];
+
+  for (const order of pendingOrders) {
+    try {
+      if (order.provider === "razorpay_payment_link" && order.gatewayOrderId) {
+        const paymentLink = await fetchPaymentLinkStatus(order.gatewayOrderId);
+        const remoteStatus = String(paymentLink?.status || "").trim().toLowerCase();
+
+        if (remoteStatus === "paid") {
+          const updated = await completePaymentLinkOrder({
+            reference: order.reference,
+            gatewayOrderId: String(order.gatewayOrderId || paymentLink.id || "").trim(),
+            gatewayPaymentId: String(paymentLink.payment_id || paymentLink.payments?.[0]?.payment_id || paymentLink.payments?.[0]?.id || "").trim(),
+            gatewaySignature: "payment_link_background_reconcile"
+          });
+          if (updated) {
+            reconciled.push(updated);
+          }
+          continue;
+        }
+
+        if (remoteStatus === "cancelled" || remoteStatus === "expired") {
+          const updated = await handlePaymentWebhook(order.reference, "FAILED");
+          if (updated) {
+            reconciled.push(updated);
+          }
+        }
+        continue;
+      }
+
+      if (order.provider === "razorpay_checkout" && order.gatewayOrderId) {
+        const orderPayments = await fetchOrderPayments(order.gatewayOrderId);
+        const successfulPayment = getSuccessfulRazorpayOrderPayment(orderPayments);
+        if (successfulPayment?.id) {
+          const updated = await completePaymentOrder({
+            paymentOrderId: order.id,
+            gatewayOrderId: String(order.gatewayOrderId).trim(),
+            gatewayPaymentId: String(successfulPayment.id).trim(),
+            gatewaySignature: "checkout_background_reconcile"
+          });
+          if (updated) {
+            reconciled.push(updated);
+          }
+        }
+      }
+    } catch {
+      // Ignore transient provider errors during background reconciliation.
+    }
+  }
+
+  return reconciled;
 }
 
 export async function confirmNativePaymentOrder({ userId, referenceId, payload }) {

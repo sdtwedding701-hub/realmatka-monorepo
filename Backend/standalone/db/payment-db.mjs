@@ -120,6 +120,34 @@ export async function findPaymentOrderByReferenceForUser(userId, reference) {
   return order;
 }
 
+export async function findPendingPaymentOrdersForUser(userId, limit = 5) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 5, 20));
+  const pool = __internalGetPgPool();
+  if (pool) {
+    const result = await pool.query(
+      `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
+       FROM payment_orders
+       WHERE user_id = $1 AND status = 'PENDING'
+       ORDER BY created_at DESC, id DESC
+       LIMIT $2`,
+      [userId, safeLimit]
+    );
+    return result.rows.map(mapPaymentOrderRow).filter(Boolean);
+  }
+
+  return __internalGetSqlite()
+    .prepare(
+      `SELECT id, user_id, provider, amount, status, reference, checkout_token, gateway_order_id, gateway_payment_id, gateway_signature, verified_at, redirect_url, created_at, updated_at
+       FROM payment_orders
+       WHERE user_id = ? AND status = 'PENDING'
+       ORDER BY created_at DESC, id DESC
+       LIMIT ?`
+    )
+    .all(userId, safeLimit)
+    .map(mapPaymentOrderRow)
+    .filter(Boolean);
+}
+
 export async function findPaymentOrderForCheckout(paymentOrderId, checkoutToken) {
   const order = await findPaymentOrderById(paymentOrderId);
   if (!order || !checkoutToken || order.checkoutToken !== checkoutToken) {

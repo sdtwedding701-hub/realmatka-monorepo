@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { createAdminSession, createSession, findAdminById, findAdminByPhone, findUserByPhone, getAppSettings, requireAdminByToken, requireUserSnapshotByToken, updateAdminTwoFactorSecret, verifyUserPassword } from "../stores/auth-store.mjs";
 import { buildTotpSetupPayload, generateTotpSecret, verifyTotpCode } from "./totp-service.mjs";
+import { reconcilePendingPaymentOrdersForUser } from "./payment-service.mjs";
+import { fetchRazorpayOrderPayments, fetchRazorpayPaymentLinkStatus, isRazorpayEnabled } from "./payment-providers/razorpay-adapter.mjs";
 
 const adminTwoFactorChallenges = new Map();
 const ADMIN_TOTP_ISSUER = "Real Matka Admin";
@@ -211,14 +213,23 @@ export async function getCurrentSessionUser(token) {
     return null;
   }
 
+  await reconcilePendingPaymentOrdersForUser({
+    userId: user.id,
+    isProviderEnabled: isRazorpayEnabled(),
+    fetchPaymentLinkStatus: fetchRazorpayPaymentLinkStatus,
+    fetchOrderPayments: fetchRazorpayOrderPayments
+  });
+
+  const refreshedUser = (await requireUserSnapshotByToken(token)) || user;
+
   return {
-    id: user.id,
-    phone: user.phone,
-    name: user.name,
-    role: user.role,
-    hasMpin: user.hasMpin,
-    referralCode: user.referralCode,
-    joinedAt: user.joinedAt,
-    walletBalance: Number(user.walletBalance ?? 0)
+    id: refreshedUser.id,
+    phone: refreshedUser.phone,
+    name: refreshedUser.name,
+    role: refreshedUser.role,
+    hasMpin: refreshedUser.hasMpin,
+    referralCode: refreshedUser.referralCode,
+    joinedAt: refreshedUser.joinedAt,
+    walletBalance: Number(refreshedUser.walletBalance ?? 0)
   };
 }

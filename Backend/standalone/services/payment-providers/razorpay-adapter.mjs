@@ -121,6 +121,27 @@ export async function fetchRazorpayPaymentLinkStatus(paymentLinkId) {
   return payload;
 }
 
+export async function fetchRazorpayOrderPayments(orderId) {
+  if (!orderId || !isRazorpayEnabled()) {
+    return null;
+  }
+
+  const response = await fetch(`https://api.razorpay.com/v1/orders/${encodeURIComponent(orderId)}/payments`, {
+    method: "GET",
+    headers: {
+      Authorization: getRazorpayAuthHeader(),
+      "Content-Type": "application/json"
+    }
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !Array.isArray(payload?.items)) {
+    throw new Error(payload?.error?.description || payload?.description || "Unable to fetch Razorpay order payments");
+  }
+
+  return payload;
+}
+
 export function verifyRazorpaySignature({ orderId, paymentId, signature }) {
   const expected = createHmac("sha256", razorpayKeySecret).update(`${orderId}|${paymentId}`).digest("hex");
   return expected === signature;

@@ -350,7 +350,7 @@ function RootNavigator() {
         </View>
       ) : (
         <>
-          <StatusBar style="light" />
+            <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false }} />
           <UniversalBottomTabs />
           <Modal animationType="fade" transparent visible={Boolean(appUpdatePrompt)}>

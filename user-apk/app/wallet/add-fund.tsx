@@ -228,16 +228,16 @@ export default function AddFundScreen() {
         </SurfaceCard>
 
         {pendingOrder ? (
-          <SurfaceCard style={styles.statusCard}>
-            <View style={styles.statusHeader}>
-              <Text style={styles.sectionTitle}>Pending Payment</Text>
-              <Text style={[styles.statusBadge, statusTone(displayStatus)]}>{displayStatus || "PENDING"}</Text>
-            </View>
-            <View style={styles.statusMeta}>
-              <Text style={styles.statusLine}>Reference: {pendingOrder.reference}</Text>
-              <Text style={styles.statusLine}>Amount: Rs {pendingOrder.amount.toFixed(2)}</Text>
-              <Text style={styles.statusHint}>Payment complete karke app me wapas aao. Status auto verify ho jayega.</Text>
-            </View>
+            <SurfaceCard style={styles.statusCard}>
+              <View style={styles.statusHeader}>
+                <Text style={styles.sectionTitle}>Pending Payment</Text>
+                <Text style={[styles.statusBadge, statusTone(displayStatus)]}>{displayStatus || "PENDING"}</Text>
+              </View>
+              <View style={styles.statusMeta}>
+                <Text style={styles.statusLine}>Reference: {pendingOrder.reference}</Text>
+                <Text style={styles.statusLine}>Amount: Rs {pendingOrder.amount.toFixed(2)}</Text>
+                <Text style={styles.statusHint}>Payment complete karke app me wapas aao. Status auto verify ho jayega.</Text>
+              </View>
             {Platform.OS === "web" && pendingOrder.redirectUrl ? (
               <View style={styles.statusActions}>
                 <Pressable

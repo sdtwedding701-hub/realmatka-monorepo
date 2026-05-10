@@ -2195,9 +2195,70 @@ button.secondary.danger {
   }
 
   .sidebar {
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 50;
     height: auto;
-    overflow: visible;
+    overflow: hidden;
+    padding: 14px;
+    gap: 12px;
+    border-radius: 0 0 22px 22px;
+  }
+
+  .brand h1 {
+    margin: 6px 0 0;
+    font-size: 24px;
+  }
+
+  .brand p,
+  .operator-card small,
+  .nav-link-caption {
+    display: none;
+  }
+
+  .operator-card {
+    padding: 10px 12px;
+    border-radius: 14px;
+  }
+
+  .nav {
+    display: flex;
+    gap: 8px;
+    margin: 0 -2px;
+    padding: 0 2px 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-link {
+    min-width: 150px;
+    padding: 10px 12px;
+    border-radius: 13px;
+  }
+
+  .nav-link:hover {
+    transform: none;
+  }
+
+  .sidebar-logout {
+    width: auto;
+    margin-top: 0;
+    padding: 10px 14px;
+  }
+
+  .main {
+    padding: 14px;
+    gap: 14px;
+  }
+
+  .topbar,
+  .panel {
+    padding: 16px;
+    border-radius: 18px;
   }
 
   .stats {
@@ -2242,7 +2303,17 @@ button.secondary.danger {
   }
 
   .topbar-copy h2 {
-    font-size: 28px;
+    font-size: 26px;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .topbar-chip {
+    min-width: 0;
+    flex: 1 1 160px;
   }
 
   .hero-grid,
@@ -2283,5 +2354,53 @@ button.secondary.danger {
     right: 14px;
     bottom: 14px;
     width: calc(100vw - 28px);
+  }
+}
+
+@media (max-width: 560px) {
+  .main {
+    padding: 10px;
+  }
+
+  .topbar {
+    gap: 12px;
+  }
+
+  .topbar-copy h2,
+  .panel-head h2 {
+    font-size: 22px;
+  }
+
+  .topbar-actions button,
+  .admin-market-actions button,
+  .row-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-market-card {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .result-slot-row {
+    gap: 6px;
+  }
+
+  .result-slot-input {
+    width: 34px;
+    height: 40px;
+    font-size: 16px;
+    border-radius: 9px;
+  }
+
+  .result-entry-card,
+  .chart-editor-panel {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .chart-preview-shell {
+    border-radius: 14px;
   }
 }

@@ -48,13 +48,9 @@ export function AdminShell({ apiBase, route, setRoute, me, navItems, routeMeta, 
             <div className="topbar-copy">
               {currentMeta.eyebrow ? <span className="topbar-eyebrow">{currentMeta.eyebrow}</span> : null}
               <h2>{currentMeta.title}</h2>
-              <p>{currentMeta.subtitle}</p>
+              {currentMeta.subtitle ? <p>{currentMeta.subtitle}</p> : null}
             </div>
             <div className="topbar-actions">
-              <div className="topbar-chip">
-                <span>API</span>
-                <strong>{apiBase.replace(/^https?:\/\//, "")}</strong>
-              </div>
               <div className="topbar-chip">
                 <span>Operator</span>
                 <strong>{me.name}</strong>

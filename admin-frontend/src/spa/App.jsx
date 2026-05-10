@@ -84,7 +84,7 @@ const routeMeta = {
   requests: { eyebrow: "Withdraw", title: "Withdraw History", subtitle: "Manual withdraw queue, paid entries, and operator notes in one place." },
   deposits: { eyebrow: "Deposit", title: "Deposit History", subtitle: "All deposit requests, proofs, and credit actions in one place." },
   support: { eyebrow: "Support", title: "Support Chat Desk", subtitle: "Respond to player issues quickly with a focused conversation workspace." },
-  results: { eyebrow: "Settlement", title: "Result Engine", subtitle: "Publish results, preview settlements, and control payout impact before release." },
+  results: { eyebrow: "Settlement", title: "Result Engine", subtitle: "" },
   charts: { eyebrow: "Data", title: "Chart Operations", subtitle: "Edit and verify chart rows with better visibility into changes and history." },
   reports: { eyebrow: "Reports", title: "Revenue Reports", subtitle: "Track collection, payout, and user-level exposure across time ranges." },
   bids: { eyebrow: "Betting", title: "All Bets", subtitle: "" },
@@ -1581,7 +1581,7 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
     <>
       <PageHeader
         title={isChartsMode ? "All Chart" : "Result Engine"}
-        subtitle={isChartsMode ? "Chart preview, bracket mark, missed-date correction, and save controls." : "Result publish, market timing update, and settlement controls."}
+        subtitle={isChartsMode ? "Chart preview, bracket mark, missed-date correction, and save controls." : ""}
       />
       {!isChartsMode ? (
         <AdminMarketPublishList
@@ -2538,7 +2538,7 @@ function PageHeader({ title, subtitle }) {
     <section className="panel">
       <div className="panel-head">
         <h2>{title}</h2>
-        <p>{subtitle}</p>
+        {subtitle ? <p>{subtitle}</p> : null}
       </div>
     </section>
   );

@@ -6,6 +6,7 @@ const LIVE_EVENT_SEEN_KEY = "realmatka-admin-live-event-seen";
 
 export function AdminShell({ apiBase, route, setRoute, me, navItems, routeMeta, onLogout, pageFactory, token, fetchApi, navBadges = {} }) {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const currentMeta = routeMeta[route] || routeMeta.dashboard;
   const hideTopbar = route === "requests";
 
@@ -13,34 +14,48 @@ export function AdminShell({ apiBase, route, setRoute, me, navItems, routeMeta, 
 
   return (
     <div className="shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-badge">Admin Suite</span>
-          <h1>Real Matka</h1>
-          <p>Structured operator workspace with React core pages and legacy fallbacks.</p>
+      <aside className={`sidebar${mobileMenuOpen ? " mobile-open" : ""}`}>
+        <div className="mobile-sidebar-bar">
+          <div className="mobile-brand">
+            <strong>Real Matka</strong>
+            <span>{me.name}</span>
+          </div>
+          <button className="secondary mobile-menu-button" type="button" onClick={() => setMobileMenuOpen((value) => !value)}>
+            {mobileMenuOpen ? "Close" : "Menu"}
+          </button>
         </div>
-        <div className="operator-card">
-          <strong>{me.name}</strong>
-          <span>{me.phone}</span>
-          <small>Session active</small>
+        <div className="sidebar-body">
+          <div className="brand">
+            <span className="brand-badge">Admin Suite</span>
+            <h1>Real Matka</h1>
+            <p>Structured operator workspace with React core pages and legacy fallbacks.</p>
+          </div>
+          <div className="operator-card">
+            <strong>{me.name}</strong>
+            <span>{me.phone}</span>
+            <small>Session active</small>
+          </div>
+          <nav className="nav">
+            {navItems.map((item) => (
+              <a
+                key={item.key}
+                className={`nav-link${route === item.key ? " active" : ""}`}
+                href={`#/${item.key}`}
+                onClick={() => {
+                  setRoute(item.key);
+                  setMobileMenuOpen(false);
+                }}
+              >
+                <span className="nav-link-row">
+                  <span className="nav-link-title">{item.label}</span>
+                  {Number(navBadges[item.key] || 0) > 0 ? <span className="nav-badge">{formatNavBadge(navBadges[item.key])}</span> : null}
+                </span>
+                <span className="nav-link-caption">{routeMeta[item.key]?.eyebrow || "Section"}</span>
+              </a>
+            ))}
+          </nav>
+          <button className="secondary sidebar-logout" onClick={onLogout}>Logout</button>
         </div>
-        <nav className="nav">
-          {navItems.map((item) => (
-            <a
-              key={item.key}
-              className={`nav-link${route === item.key ? " active" : ""}`}
-              href={`#/${item.key}`}
-              onClick={() => setRoute(item.key)}
-            >
-              <span className="nav-link-row">
-                <span className="nav-link-title">{item.label}</span>
-                {Number(navBadges[item.key] || 0) > 0 ? <span className="nav-badge">{formatNavBadge(navBadges[item.key])}</span> : null}
-              </span>
-              <span className="nav-link-caption">{routeMeta[item.key]?.eyebrow || "Section"}</span>
-            </a>
-          ))}
-        </nav>
-        <button className="secondary sidebar-logout" onClick={onLogout}>Logout</button>
       </aside>
       <main className="main">
         {hideTopbar ? null : (

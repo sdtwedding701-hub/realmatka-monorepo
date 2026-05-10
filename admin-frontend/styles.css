@@ -75,6 +75,14 @@ body {
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
 }
 
+.mobile-sidebar-bar {
+  display: none;
+}
+
+.sidebar-body {
+  display: contents;
+}
+
 .brand h1 {
   margin: 12px 0 5px;
   font-size: 30px;
@@ -2200,20 +2208,71 @@ button.secondary.danger {
     z-index: 50;
     height: auto;
     overflow: hidden;
-    padding: 14px;
-    gap: 12px;
+    padding: 10px 12px;
+    gap: 0;
     border-radius: 0 0 22px 22px;
   }
 
-  .brand h1 {
-    margin: 6px 0 0;
-    font-size: 24px;
+  .mobile-sidebar-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .mobile-brand {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .mobile-brand strong {
+    color: #fff;
+    font-size: 20px;
+    line-height: 1;
+    letter-spacing: -0.035em;
+  }
+
+  .mobile-brand span {
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-menu-button {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    padding: 9px 14px;
+    border-color: rgba(255, 255, 255, 0.42);
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .sidebar-body {
+    display: none;
+    padding-top: 12px;
+  }
+
+  .sidebar.mobile-open .sidebar-body {
+    display: grid;
+    gap: 12px;
   }
 
   .brand p,
-  .operator-card small,
-  .nav-link-caption {
+  .operator-card small {
     display: none;
+  }
+
+  .brand h1 {
+    display: none;
+  }
+
+  .brand-badge {
+    padding: 5px 9px;
+    font-size: 11px;
   }
 
   .operator-card {
@@ -2222,20 +2281,15 @@ button.secondary.danger {
   }
 
   .nav {
-    display: flex;
+    display: grid;
     gap: 8px;
-    margin: 0 -2px;
-    padding: 0 2px 4px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .nav::-webkit-scrollbar {
-    display: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
   }
 
   .nav-link {
-    min-width: 150px;
+    min-width: 0;
     padding: 10px 12px;
     border-radius: 13px;
   }
@@ -2245,7 +2299,7 @@ button.secondary.danger {
   }
 
   .sidebar-logout {
-    width: auto;
+    width: 100%;
     margin-top: 0;
     padding: 10px 14px;
   }

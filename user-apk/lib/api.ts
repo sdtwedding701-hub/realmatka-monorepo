@@ -177,7 +177,16 @@ function mapUserFacingErrorMessage(message: string, fallback: string) {
   if (lower.includes("invalid otp")) {
     return "Wrong OTP. Dobara try karo.";
   }
-  if (lower.includes("otp send") || lower.includes("send otp") || lower.includes("otp sms") || lower.includes("msg91")) {
+  if (
+    lower.includes("otp send") ||
+    lower.includes("send otp") ||
+    lower.includes("otp sms") ||
+    lower.includes("unable to send otp") ||
+    lower.includes("otp configuration") ||
+    lower.includes("template") ||
+    lower.includes("sender") ||
+    lower.includes("msg91")
+  ) {
     return normalized;
   }
   if (
@@ -211,7 +220,7 @@ function mapUserFacingErrorMessage(message: string, fallback: string) {
     return "Saturday aur Sunday ko withdraw service band rahegi.";
   }
   if (lower.includes("otp")) {
-    return "OTP sahi se check karo.";
+    return normalized;
   }
   if (lower.includes("password")) {
     return "Password sahi se check karo.";

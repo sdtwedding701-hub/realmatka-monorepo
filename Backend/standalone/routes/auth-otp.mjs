@@ -186,11 +186,35 @@ function isMsg91VerificationApproved(payload) {
   return !["error", "failed", "failure", "unauthorized", "invalid"].includes(status);
 }
 
+function getMsg91CallbackPath(purpose) {
+  return purpose === "register"
+    ? "/auth/register"
+    : purpose === "password_reset"
+      ? "/auth/forgot-password"
+      : purpose === "withdraw"
+        ? "/wallet/withdraw"
+        : "/auth/otp-login";
+}
+
+function buildNativeMsg91ReturnUrl(purpose, phone) {
+  const callbackPath = getMsg91CallbackPath(purpose);
+  const query = `purpose=${encodeURIComponent(purpose)}&phone=${encodeURIComponent(phone)}`;
+  return `${defaultAppScheme}://${callbackPath.replace(/^\/+/, "")}?${query}`;
+}
+
+function normalizeMsg91ReturnUrl(returnUrl, purpose, phone) {
+  const requested = cleanEnvValue(returnUrl);
+  if (requested.toLowerCase().startsWith(`${defaultAppScheme.toLowerCase()}://`)) {
+    return requested;
+  }
+  return buildNativeMsg91ReturnUrl(purpose, phone);
+}
+
 function buildMsg91ReturnUrl(request, purpose, phone) {
   const requestUrl = new URL(request.url);
   const requested = cleanEnvValue(requestUrl.searchParams.get("returnUrl") || "");
   if (requested) {
-    return requested;
+    return normalizeMsg91ReturnUrl(requested, purpose, phone);
   }
 
   const callbackPath =
@@ -424,7 +448,7 @@ export async function msg91Widget(request) {
   const url = new URL(request.url);
   const phone = normalizeIndianPhone(String(url.searchParams.get("phone") ?? "")) ?? String(url.searchParams.get("phone") ?? "").trim();
   const purpose = String(url.searchParams.get("purpose") || "login").trim();
-  const returnUrl = cleanEnvValue(url.searchParams.get("returnUrl") || "");
+  const returnUrl = normalizeMsg91ReturnUrl(url.searchParams.get("returnUrl") || "", purpose, phone);
   if (!phone || !returnUrl) {
     return new Response("Missing phone or returnUrl", { status: 400 });
   }

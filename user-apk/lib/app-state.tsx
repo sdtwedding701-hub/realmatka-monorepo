@@ -46,6 +46,9 @@ type AppStateValue = {
     password: string;
     confirmPassword: string;
     referenceCode?: string;
+    accountNumber?: string;
+    holderName?: string;
+    ifsc?: string;
   }) => Promise<void>;
   otpLogin: (phone: string, otp: string, accessToken?: string) => Promise<void>;
   register: (firstName: string, lastName: string, phone: string, otp: string, password: string, confirmPassword: string, referenceCode?: string, accessToken?: string) => Promise<void>;
@@ -340,6 +343,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     password: string;
     confirmPassword: string;
     referenceCode?: string;
+    accountNumber?: string;
+    holderName?: string;
+    ifsc?: string;
   }) => {
     const response = await api.googleRegister(payload);
     await writeStoredSessionToken(response.token);

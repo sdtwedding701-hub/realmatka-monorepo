@@ -1,24 +1,20 @@
 import { useEffect, useState } from "react";
 import { Link, router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { AppScreen, SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
-import { api, formatApiError } from "@/lib/api";
+import { formatApiError } from "@/lib/api";
 import { requestGoogleAccessToken } from "@/lib/google-auth";
-import { isMsg91NativeOtpAvailable, sendMsg91NativeOtp, verifyMsg91NativeOtp } from "@/lib/msg91-otp";
 import { clearStoredReferralCode, normalizeReferralCode, readStoredReferralCode, writeStoredReferralCode } from "@/lib/referral-storage";
 import { colors } from "@/theme/colors";
 
 export default function RegisterScreen() {
-  const OTP_RESEND_SECONDS = 30;
-  const { register, googleLogin, googleRegister } = useAppState();
+  const { googleLogin, googleRegister } = useAppState();
   const params = useLocalSearchParams<{
     ref?: string;
     referenceCode?: string;
     referralCode?: string;
-    msg91Token?: string;
-    phone?: string;
     googleRegistrationToken?: string;
     googleEmail?: string;
     googleName?: string;
@@ -28,53 +24,42 @@ export default function RegisterScreen() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [referenceCode, setReferenceCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [holderName, setHolderName] = useState("");
+  const [ifsc, setIfsc] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [registered, setRegistered] = useState(false);
-  const [verifiedAccessToken, setVerifiedAccessToken] = useState("");
-  const [sdkReqId, setSdkReqId] = useState("");
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [googleRegistrationToken, setGoogleRegistrationToken] = useState("");
   const [googleEmail, setGoogleEmail] = useState("");
   const incomingReferralCode = normalizeReferralCode(params.ref ?? params.referenceCode ?? params.referralCode);
-  const downloadUrl = String(process.env.EXPO_PUBLIC_DOWNLOAD_URL || process.env.EXPO_PUBLIC_APP_DOWNLOAD_URL || "").trim();
   const normalizedPhone = phone.replace(/[^0-9]/g, "");
-  const normalizedOtp = otp.replace(/[^0-9]/g, "");
   const normalizedFirstName = firstName.trim();
   const normalizedLastName = lastName.trim();
+  const normalizedAccountNumber = accountNumber.replace(/[^0-9]/g, "");
+  const normalizedHolderName = holderName.trim();
+  const normalizedIfsc = ifsc.trim().toUpperCase();
   const hasValidFirstName = normalizedFirstName.length >= 2;
   const hasValidLastName = normalizedLastName.length >= 2;
   const hasValidPhone = normalizedPhone.length === 10;
-  const hasValidOtp = normalizedOtp.length === 6;
   const hasValidPassword = password.trim().length >= 8;
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
   const isGoogleRegistration = Boolean(googleRegistrationToken && googleEmail);
+  const hasAnyBankDetail = Boolean(normalizedAccountNumber || normalizedHolderName || normalizedIfsc);
+  const hasCompleteBankDetails = normalizedAccountNumber.length >= 6 && normalizedHolderName.length >= 2 && normalizedIfsc.length >= 4;
   const canCreateAccount =
-    !registered &&
+    isGoogleRegistration &&
     !submitting &&
     hasValidFirstName &&
     hasValidLastName &&
     hasValidPhone &&
-    (isGoogleRegistration || verifiedAccessToken || hasValidOtp) &&
     hasValidPassword &&
-    passwordsMatch;
-
-  useEffect(() => {
-    if (cooldownSeconds <= 0) {
-      return;
-    }
-    const timer = setInterval(() => {
-      setCooldownSeconds((current) => (current > 0 ? current - 1 : 0));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [cooldownSeconds]);
+    passwordsMatch &&
+    (!hasAnyBankDetail || hasCompleteBankDetails);
 
   useEffect(() => {
     let active = true;
@@ -98,19 +83,6 @@ export default function RegisterScreen() {
   }, [incomingReferralCode, referenceCode]);
 
   useEffect(() => {
-    const callbackPhone = String(params.phone || "").replace(/[^0-9]/g, "");
-    const token = String(params.msg91Token || "").trim();
-    if (callbackPhone) {
-      setPhone(callbackPhone);
-    }
-    if (token) {
-      setVerifiedAccessToken(token);
-      setSuccess("Mobile number verified successfully.");
-      setError("");
-    }
-  }, [params.msg91Token, params.phone]);
-
-  useEffect(() => {
     const token = String(params.googleRegistrationToken || "").trim();
     const email = String(params.googleEmail || "").trim().toLowerCase();
     const givenName = String(params.googleGivenName || "").trim();
@@ -121,58 +93,113 @@ export default function RegisterScreen() {
     }
     setGoogleRegistrationToken(token);
     setGoogleEmail(email);
-    if (!firstName) {
-      setFirstName(givenName || fullName.split(/\s+/)[0] || "");
-    }
-    if (!lastName) {
-      setLastName(familyName || fullName.split(/\s+/).slice(1).join(" ") || "User");
-    }
-    setVerifiedAccessToken("");
-    setOtp("");
-    setSuccess(`Google verified: ${email}. Ab phone aur password dalke account create karo.`);
+    setFirstName((current) => current || givenName || fullName.split(/\s+/)[0] || "");
+    setLastName((current) => current || familyName || fullName.split(/\s+/).slice(1).join(" ") || "User");
+    setSuccess(`Google verified: ${email}. Ab account details fill karo.`);
     setError("");
-  }, [firstName, lastName, params.googleEmail, params.googleFamilyName, params.googleGivenName, params.googleName, params.googleRegistrationToken]);
+  }, [params.googleEmail, params.googleFamilyName, params.googleGivenName, params.googleName, params.googleRegistrationToken]);
+
+  async function startGoogleRegistration() {
+    if (googleSubmitting) {
+      return;
+    }
+    try {
+      setGoogleSubmitting(true);
+      setError("");
+      setSuccess("");
+      const accessToken = await requestGoogleAccessToken();
+      const response = await googleLogin(accessToken);
+      if (!response.needsRegistration) {
+        router.replace("/(tabs)");
+        return;
+      }
+      if (!response.registrationToken || !response.profile?.email) {
+        setError("Google registration token receive nahi hua. Dobara try karo.");
+        return;
+      }
+      setGoogleRegistrationToken(response.registrationToken);
+      setGoogleEmail(response.profile.email);
+      setFirstName(response.profile.givenName || response.profile.name.split(/\s+/)[0] || "");
+      setLastName(response.profile.familyName || response.profile.name.split(/\s+/).slice(1).join(" ") || "User");
+      setSuccess(`Google verified: ${response.profile.email}. Ab account details fill karo.`);
+    } catch (googleError) {
+      setError(formatApiError(googleError, "Google login failed"));
+    } finally {
+      setGoogleSubmitting(false);
+    }
+  }
+
+  async function submitRegistration() {
+    if (!isGoogleRegistration) {
+      setError("Pehle Google se continue karo.");
+      return;
+    }
+    if (!hasValidFirstName) {
+      setError("Valid first name dalo.");
+      return;
+    }
+    if (!hasValidLastName) {
+      setError("Valid last name dalo.");
+      return;
+    }
+    if (!hasValidPhone) {
+      setError("Valid 10 digit phone number dalo.");
+      return;
+    }
+    if (!hasValidPassword) {
+      setError("Password kam se kam 8 characters ka hona chahiye.");
+      return;
+    }
+    if (!passwordsMatch) {
+      setError("Password aur confirm password same dalo.");
+      return;
+    }
+    if (hasAnyBankDetail && !hasCompleteBankDetails) {
+      setError("Bank details sahi se fill karo ya blank chhod do.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError("");
+      setSuccess("");
+      await googleRegister({
+        registrationToken: googleRegistrationToken,
+        firstName: normalizedFirstName,
+        lastName: normalizedLastName,
+        phone: normalizedPhone,
+        password: password.trim(),
+        confirmPassword: confirmPassword.trim(),
+        referenceCode,
+        accountNumber: hasCompleteBankDetails ? normalizedAccountNumber : "",
+        holderName: hasCompleteBankDetails ? normalizedHolderName : "",
+        ifsc: hasCompleteBankDetails ? normalizedIfsc : ""
+      });
+      await clearStoredReferralCode();
+      router.replace("/(tabs)");
+    } catch (registrationError) {
+      setError(formatApiError(registrationError, "Registration failed"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <View style={styles.page}>
       <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.hero}>
         <Image source={require("../../assets/images/adaptive-icon.png")} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.tagline}>Register with mobile number and password. OTP verification required hai.</Text>
+        <Text style={styles.tagline}>Google verify ke baad account details fill karo. Registration me OTP ki zaroorat nahi.</Text>
       </LinearGradient>
 
       <AppScreen padded={false} showPromo={false}>
         <View style={styles.content}>
           <SurfaceCard style={styles.formCard}>
             <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Pehle Google se verify karo. Agar Google nahi use karna hai to mobile OTP option bhi available hai.</Text>
+            <Text style={styles.subtitle}>Pehle Gmail se verify karo, phir name, mobile aur password details complete karo.</Text>
+
             <Pressable
-              onPress={async () => {
-                try {
-                  setGoogleSubmitting(true);
-                  setError("");
-                  setSuccess("");
-                  const accessToken = await requestGoogleAccessToken();
-                  const response = await googleLogin(accessToken);
-                  if (!response.needsRegistration) {
-                    router.replace("/(tabs)");
-                    return;
-                  }
-                  if (!response.registrationToken || !response.profile?.email) {
-                    setError("Google registration token receive nahi hua. Dobara try karo.");
-                    return;
-                  }
-                  setGoogleRegistrationToken(response.registrationToken);
-                  setGoogleEmail(response.profile.email);
-                  setFirstName(response.profile.givenName || response.profile.name.split(/\s+/)[0] || "");
-                  setLastName(response.profile.familyName || response.profile.name.split(/\s+/).slice(1).join(" ") || "User");
-                  setOtp("");
-                  setVerifiedAccessToken("");
-                  setSuccess(`Google verified: ${response.profile.email}. Ab phone aur password dalke account create karo.`);
-                } catch (googleError) {
-                  setError(formatApiError(googleError, "Google login failed"));
-                } finally {
-                  setGoogleSubmitting(false);
-                }
+              onPress={() => {
+                void startGoogleRegistration();
               }}
               disabled={googleSubmitting}
               style={[styles.googleButton, googleSubmitting && styles.disabled]}
@@ -182,32 +209,34 @@ export default function RegisterScreen() {
               ) : (
                 <>
                   <Text style={styles.googleMark}>G</Text>
-                  <Text style={styles.googleText}>Continue with Google</Text>
+                  <Text style={styles.googleText}>{isGoogleRegistration ? "Change Google Account" : "Continue with Google"}</Text>
                 </>
               )}
             </Pressable>
+
             {isGoogleRegistration ? (
               <View style={styles.googleVerifiedCard}>
                 <Text style={styles.googleVerifiedTitle}>Google verified</Text>
                 <Text style={styles.googleVerifiedEmail}>{googleEmail}</Text>
               </View>
             ) : (
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>or mobile OTP</Text>
-                <View style={styles.dividerLine} />
+              <View style={styles.lockedCard}>
+                <Text style={styles.lockedTitle}>Google verification required</Text>
+                <Text style={styles.lockedText}>Details form tabhi active hoga jab user Gmail se verify ho jayega.</Text>
               </View>
             )}
+
             <View style={styles.fieldWrap}>
               <Text style={styles.label}>First Name</Text>
               <TextInput
+                editable={isGoogleRegistration}
                 onChangeText={(value) => {
                   setFirstName(value);
                   setError("");
                 }}
                 placeholder="Enter first name"
                 placeholderTextColor="#94a3b8"
-                style={styles.input}
+                style={[styles.input, !isGoogleRegistration && styles.disabledInput]}
                 value={firstName}
               />
             </View>
@@ -215,13 +244,14 @@ export default function RegisterScreen() {
             <View style={styles.fieldWrap}>
               <Text style={styles.label}>Last Name</Text>
               <TextInput
+                editable={isGoogleRegistration}
                 onChangeText={(value) => {
                   setLastName(value);
                   setError("");
                 }}
                 placeholder="Enter last name"
                 placeholderTextColor="#94a3b8"
-                style={styles.input}
+                style={[styles.input, !isGoogleRegistration && styles.disabledInput]}
                 value={lastName}
               />
             </View>
@@ -229,6 +259,7 @@ export default function RegisterScreen() {
             <View style={styles.fieldWrap}>
               <Text style={styles.label}>Phone Number</Text>
               <TextInput
+                editable={isGoogleRegistration}
                 keyboardType="phone-pad"
                 maxLength={10}
                 onChangeText={(value) => {
@@ -237,112 +268,78 @@ export default function RegisterScreen() {
                 }}
                 placeholder="Enter phone number"
                 placeholderTextColor="#94a3b8"
-                style={styles.input}
+                style={[styles.input, !isGoogleRegistration && styles.disabledInput]}
                 value={phone}
               />
             </View>
 
-            {!isGoogleRegistration ? <Pressable
-              onPress={async () => {
-                if (!hasValidFirstName) {
-                  setError("Valid first name dalo.");
-                  return;
-                }
-                if (!hasValidLastName) {
-                  setError("Valid last name dalo.");
-                  return;
-                }
-                if (!hasValidPhone) {
-                  setError("Valid 10 digit phone number dalo.");
-                  return;
-                }
-                try {
-                  setSendingOtp(true);
-                  setError("");
-                  setSuccess("");
-                  setVerifiedAccessToken("");
-                  setSdkReqId("");
-                  const response = await api.requestOtp(normalizedPhone, "register");
-                  if (response.mode === "widget" && response.widgetUrl && isMsg91NativeOtpAvailable()) {
-                    const sdkResponse = await sendMsg91NativeOtp(normalizedPhone);
-                    if (sdkResponse.accessToken) {
-                      setVerifiedAccessToken(sdkResponse.accessToken);
-                      setSuccess("Mobile number verified successfully.");
-                    } else {
-                      setSdkReqId(sdkResponse.reqId);
-                      setSuccess("Registration OTP SMS successfully sent.");
-                    }
-                    setCooldownSeconds(OTP_RESEND_SECONDS);
-                    return;
-                  }
-                  if (response.mode === "widget" && response.widgetUrl) {
-                    setSuccess("Verification window open ho rahi hai...");
-                    setCooldownSeconds(OTP_RESEND_SECONDS);
-                    await Linking.openURL(response.widgetUrl);
-                  } else {
-                    setSuccess(response.provider === "local" ? "Registration OTP generated successfully." : "Registration OTP SMS successfully sent.");
-                    setCooldownSeconds(OTP_RESEND_SECONDS);
-                  }
-                } catch (otpError) {
-                  setError(formatApiError(otpError, "Unable to send registration OTP"));
-                } finally {
-                  setSendingOtp(false);
-                }
-              }}
-              disabled={sendingOtp || cooldownSeconds > 0 || !hasValidFirstName || !hasValidLastName || !hasValidPhone}
-              style={[styles.secondaryButton, (sendingOtp || cooldownSeconds > 0 || !hasValidFirstName || !hasValidLastName || !hasValidPhone) && styles.disabled]}
-            >
-              {sendingOtp ? (
-                <ActivityIndicator color="#111827" />
-              ) : (
-                <Text style={styles.secondaryText}>
-                  {cooldownSeconds > 0 ? `Wait ${cooldownSeconds}s` : success ? "Resend OTP" : "Send OTP"}
-                </Text>
-              )}
-            </Pressable> : null}
-
-            {!isGoogleRegistration && !verifiedAccessToken ? (
-              <View style={styles.fieldWrap}>
-                <Text style={styles.label}>OTP</Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  onChangeText={(value) => {
-                    setOtp(value.replace(/[^0-9]/g, ""));
-                    setError("");
-                  }}
-                  placeholder="Enter 6 digit OTP"
-                  placeholderTextColor="#94a3b8"
-                  style={styles.input}
-                  value={otp}
-                />
-              </View>
-            ) : !isGoogleRegistration ? (
-              <Text style={styles.autoReferralHint}>Mobile verification complete. Ab account create kar sakte ho.</Text>
-            ) : null}
-
             <View style={styles.fieldWrap}>
               <Text style={styles.label}>Password</Text>
               <TextInput
+                editable={isGoogleRegistration}
                 onChangeText={setPassword}
                 placeholder="Enter password"
                 placeholderTextColor="#94a3b8"
                 secureTextEntry
-                style={styles.input}
+                style={[styles.input, !isGoogleRegistration && styles.disabledInput]}
                 value={password}
               />
-              <Text style={styles.helperText}>Minimum 8 characters or more required.</Text>
+              <Text style={styles.helperText}>Minimum 8 characters required.</Text>
             </View>
 
             <View style={styles.fieldWrap}>
               <Text style={styles.label}>Confirm Password</Text>
               <TextInput
+                editable={isGoogleRegistration}
                 onChangeText={setConfirmPassword}
                 placeholder="Confirm password"
                 placeholderTextColor="#94a3b8"
                 secureTextEntry
-                style={styles.input}
+                style={[styles.input, !isGoogleRegistration && styles.disabledInput]}
                 value={confirmPassword}
+              />
+            </View>
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Bank Details</Text>
+              <Text style={styles.sectionHint}>Optional now, withdraw ke liye required.</Text>
+            </View>
+
+            <View style={styles.fieldWrap}>
+              <Text style={styles.label}>Account Number</Text>
+              <TextInput
+                editable={isGoogleRegistration}
+                keyboardType="number-pad"
+                onChangeText={(value) => setAccountNumber(value.replace(/[^0-9]/g, ""))}
+                placeholder="Enter account number"
+                placeholderTextColor="#94a3b8"
+                style={[styles.input, !isGoogleRegistration && styles.disabledInput]}
+                value={accountNumber}
+              />
+            </View>
+
+            <View style={styles.fieldWrap}>
+              <Text style={styles.label}>Holder Name</Text>
+              <TextInput
+                editable={isGoogleRegistration}
+                onChangeText={setHolderName}
+                placeholder="Enter holder name"
+                placeholderTextColor="#94a3b8"
+                style={[styles.input, !isGoogleRegistration && styles.disabledInput]}
+                value={holderName}
+              />
+            </View>
+
+            <View style={styles.fieldWrap}>
+              <Text style={styles.label}>IFSC Code</Text>
+              <TextInput
+                autoCapitalize="characters"
+                editable={isGoogleRegistration}
+                onChangeText={(value) => setIfsc(value.toUpperCase())}
+                placeholder="Enter IFSC code"
+                placeholderTextColor="#94a3b8"
+                style={[styles.input, !isGoogleRegistration && styles.disabledInput]}
+                value={ifsc}
               />
             </View>
 
@@ -350,6 +347,7 @@ export default function RegisterScreen() {
               <Text style={styles.label}>Reference Code (Optional)</Text>
               <TextInput
                 autoCapitalize="characters"
+                editable={isGoogleRegistration}
                 onChangeText={(value) => {
                   const normalized = normalizeReferralCode(value);
                   setReferenceCode(normalized);
@@ -357,105 +355,22 @@ export default function RegisterScreen() {
                 }}
                 placeholder="Enter reference code if you have one"
                 placeholderTextColor="#94a3b8"
-                style={styles.input}
+                style={[styles.input, !isGoogleRegistration && styles.disabledInput]}
                 value={referenceCode}
               />
             </View>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {success ? <Text style={styles.success}>{success}</Text> : null}
-            {registered ? (
-              <View style={styles.nextStepsWrap}>
-                <Pressable onPress={() => router.push("/auth/login")} style={styles.primaryButton}>
-                  <Text style={styles.primaryText}>Go to Login</Text>
-                </Pressable>
-                {downloadUrl ? (
-                  <Pressable
-                    onPress={() => {
-                      void Linking.openURL(downloadUrl);
-                    }}
-                    style={styles.secondaryButton}
-                  >
-                    <Text style={styles.secondaryText}>Download App</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            ) : null}
 
             <Pressable
-              onPress={async () => {
-                if (!hasValidFirstName) {
-                  setError("Valid first name dalo.");
-                  return;
-                }
-                if (!hasValidLastName) {
-                  setError("Valid last name dalo.");
-                  return;
-                }
-                if (!hasValidPhone) {
-                  setError("Valid 10 digit phone number dalo.");
-                  return;
-                }
-                if (!isGoogleRegistration && !verifiedAccessToken && !hasValidOtp) {
-                  setError("Valid 6 digit OTP dalo.");
-                  return;
-                }
-                if (!hasValidPassword) {
-                  setError("Password kam se kam 8 characters ka hona chahiye.");
-                  return;
-                }
-                if (!passwordsMatch) {
-                  setError("Password aur confirm password same dalo.");
-                  return;
-                }
-                try {
-                  setSubmitting(true);
-                  setError("");
-                  setSuccess("");
-                  if (isGoogleRegistration) {
-                    await googleRegister({
-                      registrationToken: googleRegistrationToken,
-                      firstName: normalizedFirstName,
-                      lastName: normalizedLastName,
-                      phone: normalizedPhone,
-                      password: password.trim(),
-                      confirmPassword: confirmPassword.trim(),
-                      referenceCode
-                    });
-                    await clearStoredReferralCode();
-                    router.replace("/(tabs)");
-                    return;
-                  }
-                  let accessToken = verifiedAccessToken;
-                  if (!accessToken && sdkReqId) {
-                    setSuccess("OTP verify ho raha hai...");
-                    const verified = await verifyMsg91NativeOtp(sdkReqId, normalizedOtp);
-                    accessToken = verified.accessToken;
-                    setVerifiedAccessToken(accessToken);
-                  }
-                  await register(normalizedFirstName, normalizedLastName, normalizedPhone, accessToken ? "" : normalizedOtp, password.trim(), confirmPassword.trim(), referenceCode, accessToken);
-                  setError("");
-                  await clearStoredReferralCode();
-                  setRegistered(true);
-                  setSuccess("Phone verified. Account created successfully. Ab aap direct login kar sakte ho.");
-                  setFirstName("");
-                  setLastName("");
-                  setPhone("");
-                  setOtp("");
-                  setPassword("");
-                  setConfirmPassword("");
-                  setReferenceCode("");
-                  setVerifiedAccessToken("");
-                } catch (registrationError) {
-                  setError(formatApiError(registrationError, "Registration failed"));
-                } finally {
-                  setSubmitting(false);
-                }
+              onPress={() => {
+                void submitRegistration();
               }}
               style={[styles.primaryButton, !canCreateAccount && styles.disabled]}
               disabled={!canCreateAccount}
             >
-              {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>{isGoogleRegistration ? "Create Google Account" : "Create Account"}</Text>}
+              {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>Create Account</Text>}
             </Pressable>
 
             <View style={styles.linkGroup}>
@@ -490,7 +405,7 @@ const styles = StyleSheet.create({
     marginBottom: 0
   },
   tagline: {
-    maxWidth: 320,
+    maxWidth: 330,
     color: colors.whiteOverlayTextStrong,
     lineHeight: 20,
     marginTop: -14,
@@ -517,11 +432,6 @@ const styles = StyleSheet.create({
     color: "#64748b",
     lineHeight: 20
   },
-  autoReferralHint: {
-    color: "#15803d",
-    fontWeight: "700",
-    lineHeight: 20
-  },
   fieldWrap: {
     gap: 8
   },
@@ -542,6 +452,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     color: "#111827",
     backgroundColor: "#f8fafc"
+  },
+  disabledInput: {
+    backgroundColor: "#f1f5f9",
+    color: "#94a3b8"
   },
   googleButton: {
     minHeight: 50,
@@ -580,20 +494,36 @@ const styles = StyleSheet.create({
     color: "#166534",
     fontWeight: "700"
   },
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10
+  lockedCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+    backgroundColor: "#fff7ed",
+    padding: 12,
+    gap: 4
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#e2e8f0"
+  lockedTitle: {
+    color: "#9a3412",
+    fontWeight: "900"
   },
-  dividerText: {
+  lockedText: {
+    color: "#9a3412",
+    lineHeight: 18,
+    fontWeight: "600"
+  },
+  sectionHeader: {
+    gap: 3,
+    paddingTop: 4
+  },
+  sectionTitle: {
+    color: "#111827",
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  sectionHint: {
     color: "#64748b",
     fontSize: 12,
-    fontWeight: "800"
+    fontWeight: "700"
   },
   primaryButton: {
     minHeight: 48,
@@ -601,25 +531,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#111827",
     alignItems: "center",
     justifyContent: "center"
-  },
-  secondaryButton: {
-    minHeight: 48,
-    borderRadius: 999,
-    backgroundColor: "#fff7ed",
-    borderWidth: 1,
-    borderColor: "#fdba74",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#fb923c",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2
-  },
-  secondaryText: {
-    color: "#111827",
-    fontWeight: "800",
-    fontSize: 15
   },
   disabled: {
     opacity: 0.7
@@ -636,9 +547,6 @@ const styles = StyleSheet.create({
   success: {
     color: "#15803d",
     fontWeight: "600"
-  },
-  nextStepsWrap: {
-    gap: 10
   },
   linkGroup: {
     gap: 12,

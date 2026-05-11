@@ -405,6 +405,9 @@ export const api = {
     password: string;
     confirmPassword: string;
     referenceCode?: string;
+    accountNumber?: string;
+    holderName?: string;
+    ifsc?: string;
   }) {
     return request<{ token: string; user: SessionUser }>("/api/auth/google-register", {
       method: "POST",

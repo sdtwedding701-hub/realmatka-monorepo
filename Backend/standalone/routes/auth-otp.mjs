@@ -103,16 +103,19 @@ async function msg91SendOtp(phone, otp) {
   });
 
   let url = `https://api.msg91.com/api/sendotp.php?${params.toString()}`;
-  if (msg91OtpTemplateId && !msg91UseDefaultTemplate) {
+  const useMsg91V5Otp = msg91UseDefaultTemplate || Boolean(msg91OtpTemplateId);
+  if (useMsg91V5Otp) {
     const v5Params = new URLSearchParams({
       authkey: msg91AuthKey,
-      template_id: msg91OtpTemplateId,
-      mobile,
+      mobile: `+${mobile}`,
       otp,
       otp_length: "6",
       otp_expiry: "10"
     });
-    if (msg91OtpSenderId) {
+    if (msg91OtpTemplateId && !msg91UseDefaultTemplate) {
+      v5Params.set("template_id", msg91OtpTemplateId);
+    }
+    if (msg91OtpSenderId && !msg91UseDefaultTemplate) {
       v5Params.set("sender", msg91OtpSenderId);
     }
     url = `https://control.msg91.com/api/v5/otp?${v5Params.toString()}`;
@@ -122,12 +125,12 @@ async function msg91SendOtp(phone, otp) {
   }
 
   const response = await fetch(url, {
-    method: msg91OtpTemplateId ? "POST" : "GET",
+    method: useMsg91V5Otp ? "POST" : "GET",
     headers: {
       accept: "application/json",
-      ...(msg91OtpTemplateId && !msg91UseDefaultTemplate ? { "Content-Type": "application/json" } : {})
+      ...(useMsg91V5Otp ? { "Content-Type": "application/json" } : {})
     },
-    ...(msg91OtpTemplateId && !msg91UseDefaultTemplate ? { body: "{}" } : {})
+    ...(useMsg91V5Otp ? { body: "{}" } : {})
   });
 
   const raw = await response.text();

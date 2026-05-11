@@ -133,12 +133,24 @@ async function msg91SendOtp(phone, otp) {
   }
 
   const message = String(payload?.message || payload?.error || payload?.request_id || raw || "").trim();
+  const requestId = String(
+    payload?.request_id ||
+      payload?.requestId ||
+      payload?.data?.request_id ||
+      payload?.data?.requestId ||
+      payload?.data?.id ||
+      ""
+  ).trim();
   const type = String(payload?.type || "").trim().toLowerCase();
   if (!response.ok || ["error", "failed", "failure"].includes(type)) {
     throw new Error(message || `MSG91 OTP send failed with status ${response.status}`);
   }
 
-  return payload || { message, type: type || "success" };
+  if (!requestId) {
+    throw new Error(message || "MSG91 ne OTP request id return nahi ki. SMS send confirm nahi hua.");
+  }
+
+  return { ...(payload || {}), request_id: requestId, type: type || "success" };
 }
 
 async function verifyMsg91AccessToken(accessToken) {

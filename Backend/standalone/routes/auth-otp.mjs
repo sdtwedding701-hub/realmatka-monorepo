@@ -111,6 +111,9 @@ async function msg91SendOtp(phone, otp) {
       otp_length: "6",
       otp_expiry: "10"
     });
+    if (msg91OtpSenderId) {
+      v5Params.set("sender", msg91OtpSenderId);
+    }
     url = `https://control.msg91.com/api/v5/otp?${v5Params.toString()}`;
   } else if (msg91OtpSenderId) {
     params.set("sender", msg91OtpSenderId);

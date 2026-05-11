@@ -292,23 +292,27 @@ export async function createWalletAdjustment({ userId, mode, amount, note = "" }
     return { ok: false, status: 400, error: "Insufficient user balance for debit" };
   }
 
+  const entryType = mode === "debit" ? "ADMIN_DEBIT" : mode === "referral" ? "REFERRAL_COMMISSION" : "ADMIN_CREDIT";
+  const isDebit = mode === "debit";
   const entry = await addWalletEntry({
     userId,
-    type: mode === "credit" ? "ADMIN_CREDIT" : "ADMIN_DEBIT",
+    type: entryType,
     status: "SUCCESS",
     amount,
     beforeBalance,
-    afterBalance: mode === "credit" ? beforeBalance + amount : beforeBalance - amount,
+    afterBalance: isDebit ? beforeBalance - amount : beforeBalance + amount,
     note: String(note || "").trim() || null
   });
 
   await sendUserNotification({
     userId,
-    title: mode === "credit" ? "Wallet credited" : "Wallet debited",
+    title: mode === "debit" ? "System debited" : mode === "referral" ? "Referral income credited" : "System credited",
     body:
-      mode === "credit"
-        ? `Rs ${amount.toFixed(2)} added to your wallet by admin.`
-        : `Rs ${amount.toFixed(2)} deducted from your wallet by admin.`,
+      mode === "debit"
+        ? `Rs ${amount.toFixed(2)} deducted from your wallet.`
+        : mode === "referral"
+          ? `Rs ${amount.toFixed(2)} referral income added to your wallet.`
+          : `Rs ${amount.toFixed(2)} added to your wallet.`,
     channel: "wallet",
     url: "/wallet/history"
   });

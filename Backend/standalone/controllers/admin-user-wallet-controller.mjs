@@ -134,7 +134,7 @@ export async function adminWalletAdjustmentController(request) {
   const mode = String(body.mode ?? "").toLowerCase();
   const note = String(body.note ?? "").trim();
   const amount = roundAmount(Number(body.amount ?? 0));
-  if (!userId || !["credit", "debit"].includes(mode) || amount <= 0) {
+  if (!userId || !["credit", "debit", "referral"].includes(mode) || amount <= 0) {
     return fail("userId, mode, and positive amount are required", 400, request);
   }
 
@@ -143,10 +143,10 @@ export async function adminWalletAdjustmentController(request) {
 
   await addAuditLog({
     actorUserId: admin.user.id,
-    action: mode === "credit" ? "WALLET_CREDIT" : "WALLET_DEBIT",
+    action: mode === "debit" ? "WALLET_DEBIT" : mode === "referral" ? "REFERRAL_COMMISSION_CREDIT" : "WALLET_CREDIT",
     entityType: "wallet_entry",
     entityId: result.entry.id,
-    details: JSON.stringify({ userId, amount, note: note || null })
+    details: JSON.stringify({ userId, mode, amount, note: note || null })
   });
 
   return ok({ entry: result.entry }, request);

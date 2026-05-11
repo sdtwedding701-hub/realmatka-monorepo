@@ -901,7 +901,7 @@ function UsersPage({ apiBase, token, me }) {
               {adjustmentDraft.userId === user.id ? (
                 <div className="panel" style={{ gridColumn: "1 / -1", marginTop: 12, background: "#fffaf5" }}>
                   <div className="panel-head">
-                    <h3>Wallet Credit / Debit</h3>
+                    <h3>Wallet Credit / Debit / Referral</h3>
                     <p>{user.name} ({user.phone}) ka wallet yahin se adjust karo.</p>
                   </div>
                   <div className="form-grid">
@@ -913,6 +913,7 @@ function UsersPage({ apiBase, token, me }) {
                       >
                         <option value="credit">Credit</option>
                         <option value="debit">Debit</option>
+                        <option value="referral">Referral</option>
                       </select>
                     </label>
                     <label>
@@ -938,7 +939,7 @@ function UsersPage({ apiBase, token, me }) {
                         disabled={busyId === user.id || !Number(adjustmentDraft.amount || 0)}
                         onClick={() => void submitWalletAdjustment(user)}
                       >
-                        {adjustmentDraft.mode === "credit" ? "Credit Wallet" : "Debit Wallet"}
+                        {adjustmentDraft.mode === "debit" ? "Debit Wallet" : adjustmentDraft.mode === "referral" ? "Credit Referral" : "Credit Wallet"}
                       </button>
                       <button
                         className="secondary"
@@ -1033,9 +1034,11 @@ function UsersPage({ apiBase, token, me }) {
       }
       setAdjustmentDraft({ userId: "", mode: "credit", amount: "", note: "" });
       setMessage(
-        adjustmentDraft.mode === "credit"
-          ? `Rs ${adjustmentDraft.amount} credited to ${user.name}.`
-          : `Rs ${adjustmentDraft.amount} debited from ${user.name}.`
+        adjustmentDraft.mode === "debit"
+          ? `Rs ${adjustmentDraft.amount} debited from ${user.name}.`
+          : adjustmentDraft.mode === "referral"
+            ? `Rs ${adjustmentDraft.amount} referral credited to ${user.name}.`
+            : `Rs ${adjustmentDraft.amount} credited to ${user.name}.`
       );
     } catch (error) {
       setMessage(formatApiError(error, "Wallet adjustment failed."));

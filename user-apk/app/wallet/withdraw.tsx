@@ -287,7 +287,7 @@ export default function WithdrawScreen() {
         await Linking.openURL(response.widgetUrl);
         return;
       }
-      setOtpMessage(response.provider === "twilio" ? "Withdraw OTP SMS successfully sent." : "Withdraw OTP generated.");
+      setOtpMessage(response.provider === "local" ? "Withdraw OTP generated." : "Withdraw OTP SMS successfully sent.");
       showTransientMessage("success", "Withdraw OTP sent successfully.");
     } catch (submitError) {
       showTransientMessage("error", formatApiError(submitError, "Withdraw OTP send nahi hui."));

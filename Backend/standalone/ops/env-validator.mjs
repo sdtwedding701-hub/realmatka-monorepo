@@ -72,9 +72,10 @@ export function validateEnvironment() {
   }
 
   if (summaries.otpProvider === "msg91") {
+    const msg91OtpMode = String(process.env.MSG91_OTP_MODE || "api").trim().toLowerCase();
     const msg91Issues = [];
     if (!process.env.MSG91_AUTH_KEY?.trim()) msg91Issues.push("MSG91_AUTH_KEY");
-    if (!process.env.MSG91_WIDGET_ID?.trim()) msg91Issues.push("MSG91_WIDGET_ID");
+    if (msg91OtpMode === "widget" && !process.env.MSG91_WIDGET_ID?.trim()) msg91Issues.push("MSG91_WIDGET_ID");
     if (msg91Issues.length) {
       const message = `${msg91Issues.join(", ")} missing while OTP_PROVIDER=msg91`;
       if (isProduction) {
@@ -83,7 +84,7 @@ export function validateEnvironment() {
         warnings.push(message);
       }
     }
-    if (!process.env.MSG91_WIDGET_TOKEN_AUTH?.trim() && process.env.MSG91_AUTH_KEY?.trim()) {
+    if (msg91OtpMode === "widget" && !process.env.MSG91_WIDGET_TOKEN_AUTH?.trim() && process.env.MSG91_AUTH_KEY?.trim()) {
       warnings.push("MSG91_WIDGET_TOKEN_AUTH missing, MSG91_AUTH_KEY will be used as widget tokenAuth fallback");
     }
   }

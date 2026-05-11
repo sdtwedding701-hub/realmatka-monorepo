@@ -9,6 +9,9 @@ const twilioVerifyServiceSid = String(process.env.TWILIO_VERIFY_SERVICE_SID || "
 const msg91AuthKey = cleanEnvValue(process.env.MSG91_AUTH_KEY || "");
 const msg91WidgetId = cleanEnvValue(process.env.MSG91_WIDGET_ID || "");
 const msg91WidgetTokenAuth = cleanEnvValue(process.env.MSG91_WIDGET_TOKEN_AUTH || process.env.MSG91_AUTH_KEY || "");
+const msg91OtpMode = cleanEnvValue(process.env.MSG91_OTP_MODE || "api").toLowerCase();
+const msg91OtpTemplateId = cleanEnvValue(process.env.MSG91_OTP_TEMPLATE_ID || "");
+const msg91OtpSenderId = cleanEnvValue(process.env.MSG91_OTP_SENDER_ID || "");
 const defaultAppScheme = cleanEnvValue(process.env.EXPO_PUBLIC_APP_SCHEME || "realmatka") || "realmatka";
 
 function cleanEnvValue(value) {
@@ -16,7 +19,15 @@ function cleanEnvValue(value) {
 }
 
 function isMsg91Enabled() {
-  return otpProvider === "msg91" && Boolean(msg91AuthKey && msg91WidgetId && msg91WidgetTokenAuth);
+  return otpProvider === "msg91" && Boolean(msg91AuthKey) && (isMsg91ApiMode() || Boolean(msg91WidgetId && msg91WidgetTokenAuth));
+}
+
+function isMsg91ApiMode() {
+  return msg91OtpMode !== "widget";
+}
+
+function isMsg91WidgetMode() {
+  return msg91OtpMode === "widget";
 }
 
 function assertOtpProviderConfiguration() {
@@ -30,8 +41,11 @@ function assertOtpProviderConfiguration() {
     return;
   }
   if (otpProvider === "msg91") {
-    if (!msg91AuthKey || !msg91WidgetId || !msg91WidgetTokenAuth) {
-      throw new Error("MSG91 OTP provider selected hai, lekin widget/auth credentials missing hain.");
+    if (!msg91AuthKey) {
+      throw new Error("MSG91 OTP provider selected hai, lekin MSG91_AUTH_KEY missing hai.");
+    }
+    if (isMsg91WidgetMode() && (!msg91WidgetId || !msg91WidgetTokenAuth)) {
+      throw new Error("MSG91 widget mode selected hai, lekin widget credentials missing hain.");
     }
     return;
   }
@@ -74,6 +88,56 @@ async function twilioRequest(path, body) {
   }
 
   return payload;
+}
+
+async function msg91SendOtp(phone, otp) {
+  const mobile = `91${phone}`;
+  const params = new URLSearchParams({
+    authkey: msg91AuthKey,
+    mobile,
+    otp,
+    otp_length: "6",
+    otp_expiry: "10"
+  });
+
+  let url = `https://api.msg91.com/api/sendotp.php?${params.toString()}`;
+  if (msg91OtpTemplateId) {
+    const v5Params = new URLSearchParams({
+      authkey: msg91AuthKey,
+      template_id: msg91OtpTemplateId,
+      mobile,
+      otp,
+      otp_length: "6",
+      otp_expiry: "10"
+    });
+    url = `https://control.msg91.com/api/v5/otp?${v5Params.toString()}`;
+  } else if (msg91OtpSenderId) {
+    params.set("sender", msg91OtpSenderId);
+    url = `https://api.msg91.com/api/sendotp.php?${params.toString()}`;
+  }
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      accept: "application/json"
+    }
+  });
+
+  const raw = await response.text();
+  let payload = null;
+  try {
+    payload = raw ? JSON.parse(raw) : null;
+  } catch {
+    payload = null;
+  }
+
+  const message = String(payload?.message || payload?.error || payload?.request_id || raw || "").trim();
+  const type = String(payload?.type || "").trim().toLowerCase();
+  if (!response.ok || ["error", "failed", "failure"].includes(type)) {
+    throw new Error(message || `MSG91 OTP send failed with status ${response.status}`);
+  }
+
+  return payload || { message, type: type || "success" };
 }
 
 async function verifyMsg91AccessToken(accessToken) {
@@ -284,6 +348,20 @@ async function sendOtp(phone, purpose) {
     };
   }
 
+  if (otpProvider === "msg91" && isMsg91ApiMode()) {
+    const code = createOtpCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    await msg91SendOtp(phone, code);
+    challenges.set(`${phone}:${purpose}`, { code, expiresAt });
+    return {
+      sent: true,
+      expiresAt,
+      provider: "msg91",
+      devCode: null,
+      mode: "otp"
+    };
+  }
+
   if (isMsg91Enabled()) {
     return {
       sent: true,
@@ -308,7 +386,7 @@ async function sendOtp(phone, purpose) {
 export async function verifyOtp(phone, purpose, code, accessToken = "") {
   assertOtpProviderConfiguration();
 
-  if (isMsg91Enabled()) {
+  if (otpProvider === "msg91" && isMsg91WidgetMode()) {
     const normalizedAccessToken = String(accessToken || "").trim();
     if (!normalizedAccessToken) {
       return false;
@@ -421,7 +499,7 @@ export async function requestOtp(request) {
         provider: otpState.provider,
         devCode: otpState.devCode,
         mode: otpState.mode ?? "otp",
-        widgetUrl: otpState.provider === "msg91" ? buildMsg91WidgetUrl(request, phone, purpose) : null
+        widgetUrl: otpState.provider === "msg91" && otpState.mode === "widget" ? buildMsg91WidgetUrl(request, phone, purpose) : null
       },
       request
     );
@@ -441,7 +519,7 @@ export async function msg91Widget(request) {
     return fail(error instanceof Error ? error.message : "OTP configuration missing", 500, request);
   }
 
-  if (!isMsg91Enabled()) {
+  if (!isMsg91WidgetMode() || !isMsg91Enabled()) {
     return fail("MSG91 OTP provider is not enabled", 400, request);
   }
 

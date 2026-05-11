@@ -117,7 +117,7 @@ export default function OtpLoginScreen() {
                     setCooldownSeconds(OTP_RESEND_SECONDS);
                     await Linking.openURL(response.widgetUrl);
                   } else {
-                    setMessage(response.provider === "twilio" ? "OTP SMS successfully sent." : "OTP generated successfully.");
+                    setMessage(response.provider === "local" ? "OTP generated successfully." : "OTP SMS successfully sent.");
                     setCooldownSeconds(OTP_RESEND_SECONDS);
                   }
                 } catch (otpError) {

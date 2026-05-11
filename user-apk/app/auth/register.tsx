@@ -163,7 +163,7 @@ export default function RegisterScreen() {
                     setCooldownSeconds(OTP_RESEND_SECONDS);
                     await Linking.openURL(response.widgetUrl);
                   } else {
-                    setSuccess(response.provider === "twilio" ? "Registration OTP SMS successfully sent." : "Registration OTP generated successfully.");
+                    setSuccess(response.provider === "local" ? "Registration OTP generated successfully." : "Registration OTP SMS successfully sent.");
                     setCooldownSeconds(OTP_RESEND_SECONDS);
                   }
                 } catch (otpError) {

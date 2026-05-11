@@ -94,7 +94,7 @@ export default function ForgotPasswordScreen() {
                     setCooldownSeconds(OTP_RESEND_SECONDS);
                     await Linking.openURL(response.widgetUrl);
                   } else {
-                    setMessage(response.provider === "twilio" ? "Password reset OTP SMS successfully sent." : "Password reset OTP generated.");
+                    setMessage(response.provider === "local" ? "Password reset OTP generated." : "Password reset OTP SMS successfully sent.");
                     setCooldownSeconds(OTP_RESEND_SECONDS);
                   }
                 } catch (otpError) {

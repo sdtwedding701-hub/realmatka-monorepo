@@ -46,6 +46,7 @@ const navItems = [
   { key: "results", label: "Result Engine" },
   { key: "bids", label: "All Bids" },
   { key: "users", label: "Users" },
+  { key: "referrals", label: "Referrals" },
   { key: "requests", label: "Withdraw History" },
   { key: "deposits", label: "Deposit History" },
   { key: "dashboard", label: "Dashboard" },
@@ -81,6 +82,7 @@ function getDefaultRouteForRole(role) {
 const routeMeta = {
   dashboard: { eyebrow: "Control Room", title: "Operational Dashboard", subtitle: "Live business totals, payout watch, alerts, and active platform health in one place." },
   users: { eyebrow: "Identity", title: "User Management", subtitle: "Review approvals, wallet exposure, lifecycle state, and operator history faster." },
+  referrals: { eyebrow: "Growth", title: "Referral Overview", subtitle: "Track who referred whom, credited referral income, and pending carry balance." },
   requests: { eyebrow: "Withdraw", title: "Withdraw History", subtitle: "Manual withdraw queue, paid entries, and operator notes in one place." },
   deposits: { eyebrow: "Deposit", title: "Deposit History", subtitle: "All deposit requests, proofs, and credit actions in one place." },
   support: { eyebrow: "Support", title: "Support Chat Desk", subtitle: "Respond to player issues quickly with a focused conversation workspace." },
@@ -243,6 +245,7 @@ export function App() {
           return <PageState title="Access restricted" subtitle="Is operator role ko ye section access nahi hai." tone="error" />;
         }
         if (route === "users") return <UsersPage {...shared} key={`users-${refreshKey}`} />;
+        if (route === "referrals") return <ReferralsPage {...shared} key={`referrals-${refreshKey}`} />;
         if (route === "requests") {
           return (
             <RequestsPage
@@ -1900,6 +1903,124 @@ function LegacyResultsPage({ apiBase, token, mode = "results" }) {
     setChartDraftRows((current) => applyEditorValuesToRows(current, chartType, label, editorDayIndex, editorJodiValue, editorOpenValue, editorCloseValue));
     setMessage("Chart cell updated locally. Save Chart to publish it everywhere.");
   }
+}
+
+function ReferralsPage({ apiBase, token }) {
+  const [state, setState] = useState({ loading: true, error: "", report: null });
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setState((current) => ({ ...current, loading: true, error: "" }));
+    fetchApi(apiBase, "/api/admin/referrals?limit=500", token)
+      .then((report) => {
+        if (active) setState({ loading: false, error: "", report });
+      })
+      .catch((error) => {
+        if (active) setState({ loading: false, error: formatApiError(error, "Referral report load nahi hua."), report: null });
+      });
+    return () => {
+      active = false;
+    };
+  }, [apiBase, token]);
+
+  if (state.loading) return <PageState title="Referrals" subtitle="Referral report load ho raha hai..." />;
+  if (state.error) return <PageState title="Referrals" subtitle={state.error} tone="error" />;
+
+  const report = state.report || { totals: {}, referrers: [], relationships: [] };
+  const normalizedQuery = query.trim().toLowerCase();
+  const referrers = (report.referrers || []).filter((item) => {
+    if (!normalizedQuery) return true;
+    return [item.name, item.phone, item.referralCode].some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
+  });
+  const relationships = (report.relationships || []).filter((item) => {
+    if (!normalizedQuery) return true;
+    return [
+      item.referrer?.name,
+      item.referrer?.phone,
+      item.referrer?.referralCode,
+      item.referred?.name,
+      item.referred?.phone,
+      item.referred?.referralCode
+    ].some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
+  });
+
+  return (
+    <>
+      <PageHeader title="Referrals" subtitle="Kis user ne kis user ko refer kiya aur referral income/carry kitna hai." />
+      <section className="panel">
+        <div className="mini-stats">
+          {[
+            miniStat("Referrers", report.totals?.referrers ?? 0),
+            miniStat("Referred Users", report.totals?.referredUsers ?? 0),
+            miniStat("Wallet Credited", formatCurrency(report.totals?.walletCredited ?? 0)),
+            miniStat("Pending Carry", formatCurrency(report.totals?.pendingCarry ?? 0)),
+            miniStat("Recorded Referral", formatCurrency(report.totals?.recordedCommission ?? 0))
+          ]}
+        </div>
+      </section>
+      <section className="panel">
+        <div className="form-grid">
+          <label className="wide">
+            <span>Search</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, phone, referral code" />
+          </label>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Referral Balance By User</h2>
+          <p>Wallet credited amount referrer ke account me add hua referral income hai. Pending carry next threshold tak hold me rahega.</p>
+        </div>
+        <div className="table-head"><span>Referrer</span><span>Referral Balance</span><span>Network</span></div>
+        <div className="table-list">
+          {referrers.length ? referrers.map((item) => (
+            <div className="data-row" key={item.id}>
+              <div className="row-main">
+                <strong>{item.name || "-"}</strong>
+                <span>{item.phone || "-"} - {item.referralCode || "-"}</span>
+              </div>
+              <div className="row-main">
+                <strong>{formatCurrency(item.walletCredited)}</strong>
+                <span>Pending carry {formatCurrency(item.pendingCarry)}</span>
+                <span>Recorded {formatCurrency(item.recordedCommission)}</span>
+              </div>
+              <div className="row-main">
+                <strong>{item.referredCount} referred</strong>
+                <span>{item.recordedCount} referral records</span>
+              </div>
+            </div>
+          )) : <div className="empty-card">Referral balance abhi available nahi hai.</div>}
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Who Referred Whom</h2>
+          <p>Yahan direct referral relation aur us pair se recorded commission dikhega.</p>
+        </div>
+        <div className="table-head"><span>Referrer</span><span>Referred User</span><span>Commission</span></div>
+        <div className="table-list">
+          {relationships.length ? relationships.map((item) => (
+            <div className="data-row" key={`${item.referrer?.id}-${item.referred?.id}`}>
+              <div className="row-main">
+                <strong>{item.referrer?.name || "-"}</strong>
+                <span>{item.referrer?.phone || "-"} - {item.referrer?.referralCode || "-"}</span>
+              </div>
+              <div className="row-main">
+                <strong>{item.referred?.name || "-"}</strong>
+                <span>{item.referred?.phone || "-"} - {item.referred?.referralCode || "-"}</span>
+                <span>Joined {formatDate(item.referred?.joinedAt)}</span>
+              </div>
+              <div className="row-main">
+                <strong>{formatCurrency(item.pairCommission)}</strong>
+                <span>{item.pairCount} records</span>
+              </div>
+            </div>
+          )) : <div className="empty-card">Abhi kisi user ne referral code se signup nahi kiya.</div>}
+        </div>
+      </section>
+    </>
+  );
 }
 
 function ReportsPage({ apiBase, token }) {

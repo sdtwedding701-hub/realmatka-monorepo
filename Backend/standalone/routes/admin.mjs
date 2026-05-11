@@ -22,6 +22,7 @@ import {
   adminOperatorSaveController,
   adminOperatorsListController
 } from "../controllers/admin-operator-controller.mjs";
+import { adminReferralSummaryController } from "../controllers/admin-referral-controller.mjs";
 import {
   adminAuditLogsController,
   adminBidsListController,
@@ -135,6 +136,10 @@ export async function operators(request) {
 
 export async function operatorSave(request) {
   return adminOperatorSaveController(request);
+}
+
+export async function referrals(request) {
+  return adminReferralSummaryController(request);
 }
 
 export async function bidsList(request) {

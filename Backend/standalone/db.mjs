@@ -1902,6 +1902,214 @@ export async function getReferralOverview(userId) {
   };
 }
 
+export async function getAdminReferralSummary(limit = 300) {
+  const normalizedLimit = Math.max(1, Math.min(1000, Number(limit || 300)));
+
+  if (isStandalonePostgresEnabled()) {
+    const pool = await getReadyPgPool();
+    const [referrersResult, relationshipsResult] = await Promise.all([
+      pool.query(
+        `WITH referred_counts AS (
+           SELECT referred_by_user_id AS referrer_user_id, COUNT(*) AS referred_count
+           FROM users
+           WHERE referred_by_user_id IS NOT NULL
+           GROUP BY referred_by_user_id
+         ),
+         wallet_referral AS (
+           SELECT user_id AS referrer_user_id, COALESCE(SUM(amount), 0) AS wallet_credited
+           FROM wallet_entries
+           WHERE type = 'REFERRAL_COMMISSION'
+             AND status = 'SUCCESS'
+           GROUP BY user_id
+         ),
+         recorded_refs AS (
+           SELECT referrer_user_id, COALESCE(SUM(amount), 0) AS recorded_commission, COUNT(*) AS recorded_count
+           FROM referral_commission_refs
+           GROUP BY referrer_user_id
+         )
+         SELECT
+           u.id,
+           u.name,
+           u.phone,
+           u.referral_code,
+           u.referral_commission_carry,
+           COALESCE(rc.referred_count, 0) AS referred_count,
+           COALESCE(wr.wallet_credited, 0) AS wallet_credited,
+           COALESCE(rr.recorded_commission, 0) AS recorded_commission,
+           COALESCE(rr.recorded_count, 0) AS recorded_count
+         FROM users u
+         LEFT JOIN referred_counts rc ON rc.referrer_user_id = u.id
+         LEFT JOIN wallet_referral wr ON wr.referrer_user_id = u.id
+         LEFT JOIN recorded_refs rr ON rr.referrer_user_id = u.id
+         WHERE COALESCE(rc.referred_count, 0) > 0
+            OR COALESCE(wr.wallet_credited, 0) > 0
+            OR COALESCE(rr.recorded_commission, 0) > 0
+         ORDER BY COALESCE(wr.wallet_credited, 0) DESC, COALESCE(rc.referred_count, 0) DESC, u.joined_at DESC
+         LIMIT $1`,
+        [normalizedLimit]
+      ),
+      pool.query(
+        `WITH pair_refs AS (
+           SELECT referrer_user_id, referred_user_id, COALESCE(SUM(amount), 0) AS pair_commission, COUNT(*) AS pair_count
+           FROM referral_commission_refs
+           GROUP BY referrer_user_id, referred_user_id
+         )
+         SELECT
+           child.id AS referred_id,
+           child.name AS referred_name,
+           child.phone AS referred_phone,
+           child.joined_at AS referred_joined_at,
+           child.referral_code AS referred_referral_code,
+           referrer.id AS referrer_id,
+           referrer.name AS referrer_name,
+           referrer.phone AS referrer_phone,
+           referrer.referral_code AS referrer_referral_code,
+           COALESCE(pr.pair_commission, 0) AS pair_commission,
+           COALESCE(pr.pair_count, 0) AS pair_count
+         FROM users child
+         JOIN users referrer ON referrer.id = child.referred_by_user_id
+         LEFT JOIN pair_refs pr
+           ON pr.referrer_user_id = referrer.id
+          AND pr.referred_user_id = child.id
+         WHERE child.referred_by_user_id IS NOT NULL
+         ORDER BY child.joined_at DESC, child.id DESC
+         LIMIT $1`,
+        [normalizedLimit]
+      )
+    ]);
+
+    const referrers = referrersResult.rows.map(mapAdminReferralReferrerRow);
+    const relationships = relationshipsResult.rows.map(mapAdminReferralRelationshipRow);
+    return buildAdminReferralSummaryPayload(referrers, relationships);
+  }
+
+  const db = getSqlite();
+  const referrers = db
+    .prepare(
+      `WITH referred_counts AS (
+         SELECT referred_by_user_id AS referrer_user_id, COUNT(*) AS referred_count
+         FROM users
+         WHERE referred_by_user_id IS NOT NULL
+         GROUP BY referred_by_user_id
+       ),
+       wallet_referral AS (
+         SELECT user_id AS referrer_user_id, COALESCE(SUM(amount), 0) AS wallet_credited
+         FROM wallet_entries
+         WHERE type = 'REFERRAL_COMMISSION'
+           AND status = 'SUCCESS'
+         GROUP BY user_id
+       ),
+       recorded_refs AS (
+         SELECT referrer_user_id, COALESCE(SUM(amount), 0) AS recorded_commission, COUNT(*) AS recorded_count
+         FROM referral_commission_refs
+         GROUP BY referrer_user_id
+       )
+       SELECT
+         u.id,
+         u.name,
+         u.phone,
+         u.referral_code,
+         u.referral_commission_carry,
+         COALESCE(rc.referred_count, 0) AS referred_count,
+         COALESCE(wr.wallet_credited, 0) AS wallet_credited,
+         COALESCE(rr.recorded_commission, 0) AS recorded_commission,
+         COALESCE(rr.recorded_count, 0) AS recorded_count
+       FROM users u
+       LEFT JOIN referred_counts rc ON rc.referrer_user_id = u.id
+       LEFT JOIN wallet_referral wr ON wr.referrer_user_id = u.id
+       LEFT JOIN recorded_refs rr ON rr.referrer_user_id = u.id
+       WHERE COALESCE(rc.referred_count, 0) > 0
+          OR COALESCE(wr.wallet_credited, 0) > 0
+          OR COALESCE(rr.recorded_commission, 0) > 0
+       ORDER BY COALESCE(wr.wallet_credited, 0) DESC, COALESCE(rc.referred_count, 0) DESC, u.joined_at DESC
+       LIMIT ?`
+    )
+    .all(normalizedLimit)
+    .map(mapAdminReferralReferrerRow);
+
+  const relationships = db
+    .prepare(
+      `WITH pair_refs AS (
+         SELECT referrer_user_id, referred_user_id, COALESCE(SUM(amount), 0) AS pair_commission, COUNT(*) AS pair_count
+         FROM referral_commission_refs
+         GROUP BY referrer_user_id, referred_user_id
+       )
+       SELECT
+         child.id AS referred_id,
+         child.name AS referred_name,
+         child.phone AS referred_phone,
+         child.joined_at AS referred_joined_at,
+         child.referral_code AS referred_referral_code,
+         referrer.id AS referrer_id,
+         referrer.name AS referrer_name,
+         referrer.phone AS referrer_phone,
+         referrer.referral_code AS referrer_referral_code,
+         COALESCE(pr.pair_commission, 0) AS pair_commission,
+         COALESCE(pr.pair_count, 0) AS pair_count
+       FROM users child
+       JOIN users referrer ON referrer.id = child.referred_by_user_id
+       LEFT JOIN pair_refs pr
+         ON pr.referrer_user_id = referrer.id
+        AND pr.referred_user_id = child.id
+       WHERE child.referred_by_user_id IS NOT NULL
+       ORDER BY child.joined_at DESC, child.id DESC
+       LIMIT ?`
+    )
+    .all(normalizedLimit)
+    .map(mapAdminReferralRelationshipRow);
+
+  return buildAdminReferralSummaryPayload(referrers, relationships);
+}
+
+function mapAdminReferralReferrerRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    referralCode: row.referral_code,
+    referredCount: Number(row.referred_count || 0),
+    walletCredited: roundMoney(row.wallet_credited || 0),
+    pendingCarry: roundMoney(row.referral_commission_carry || 0),
+    recordedCommission: roundMoney(row.recorded_commission || 0),
+    recordedCount: Number(row.recorded_count || 0)
+  };
+}
+
+function mapAdminReferralRelationshipRow(row) {
+  return {
+    referrer: {
+      id: row.referrer_id,
+      name: row.referrer_name,
+      phone: row.referrer_phone,
+      referralCode: row.referrer_referral_code
+    },
+    referred: {
+      id: row.referred_id,
+      name: row.referred_name,
+      phone: row.referred_phone,
+      referralCode: row.referred_referral_code,
+      joinedAt: toIso(row.referred_joined_at)
+    },
+    pairCommission: roundMoney(row.pair_commission || 0),
+    pairCount: Number(row.pair_count || 0)
+  };
+}
+
+function buildAdminReferralSummaryPayload(referrers, relationships) {
+  const totals = referrers.reduce(
+    (summary, item) => ({
+      referrers: summary.referrers + 1,
+      referredUsers: summary.referredUsers + Number(item.referredCount || 0),
+      walletCredited: roundMoney(summary.walletCredited + Number(item.walletCredited || 0)),
+      pendingCarry: roundMoney(summary.pendingCarry + Number(item.pendingCarry || 0)),
+      recordedCommission: roundMoney(summary.recordedCommission + Number(item.recordedCommission || 0))
+    }),
+    { referrers: 0, referredUsers: 0, walletCredited: 0, pendingCarry: 0, recordedCommission: 0 }
+  );
+
+  return { totals, referrers, relationships };
+}
+
 export async function getBidsForUser(userId, limit = 50) {
   const { getBidsForUser: getBidsForUserFromBidsDb } = await import("./db/bids-db.mjs");
   return getBidsForUserFromBidsDb(userId, limit);

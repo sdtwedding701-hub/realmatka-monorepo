@@ -17,6 +17,8 @@ const productionApiBaseUrl =
   process.env.EXPO_PUBLIC_API_BASE_URL_PRODUCTION || "https://api.realmatka.in";
 const localApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_APP_URL || "";
 const apiBaseUrl = ["preview", "production"].includes(appBuildProfile) ? productionApiBaseUrl : localApiBaseUrl;
+const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID || "";
+const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || process.env.GOOGLE_ANDROID_CLIENT_ID || "";
 
 if (["preview", "production"].includes(appBuildProfile)) {
   if (!apiBaseUrl) {
@@ -60,6 +62,8 @@ const config: ExpoConfig = {
     apiBaseUrl,
     firebaseProjectId,
     appBuildProfile,
+    googleWebClientId,
+    googleAndroidClientId,
     ...(easProjectId
       ? {
           eas: {

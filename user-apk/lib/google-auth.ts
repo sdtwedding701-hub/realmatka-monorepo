@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 type GoogleTokenResponse = {
@@ -24,7 +25,13 @@ type GoogleBrowserWindow = Window & {
   __realMatkaGoogleScriptPromise?: Promise<void>;
 };
 
-const googleWebClientId = String(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "").trim();
+const googleWebClientId = String(
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+    Constants.expoConfig?.extra?.googleWebClientId ||
+    Constants.manifest2?.extra?.expoClient?.extra?.googleWebClientId ||
+    Constants.manifest?.extra?.googleWebClientId ||
+    ""
+).trim();
 
 function getBrowserWindow() {
   if (typeof window === "undefined") {
@@ -64,7 +71,7 @@ export async function requestGoogleAccessToken() {
     throw new Error("APK me Google login ke liye native Google SDK setup required hai.");
   }
   if (!isGoogleLoginAvailable()) {
-    throw new Error("Google login ke liye EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID env add karo.");
+    throw new Error("Google login ke liye GOOGLE_WEB_CLIENT_ID env add karo.");
   }
 
   await loadGoogleScript();

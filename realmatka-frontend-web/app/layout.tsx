@@ -12,6 +12,7 @@ export const metadata = defaultMetadata;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const whatsappSupportUrl = "https://wa.me/918446012081";
+  const telegramChannelUrl = "https://t.me/realmatka";
 
   return (
     <html lang="en-IN">
@@ -35,6 +36,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </Script>
         <Header />
         <main>{children}</main>
+        <a
+          aria-label="Telegram channel"
+          className="fixed bottom-[5.5rem] right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full border border-[#38BDF8]/60 bg-[#229ED9] text-white shadow-[0_18px_30px_-16px_rgba(34,158,217,0.95)] transition hover:scale-105"
+          href={telegramChannelUrl}
+          rel="noreferrer"
+          target="_blank"
+        >
+          <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" className="h-7 w-7">
+            <path d="M21.94 4.66a1.5 1.5 0 0 0-1.7-.23L3.8 12.33a1.5 1.5 0 0 0 .17 2.78l4.15 1.42 1.56 4.98a1.5 1.5 0 0 0 2.62.48l2.34-3.02 4.14 3.05a1.5 1.5 0 0 0 2.36-.92l2.73-14.94a1.5 1.5 0 0 0-.93-1.5ZM9.18 15.98l8.92-7.88-6.95 8.92-.45 2.63-1.52-3.67Zm1.64-.3-4.92-1.69 13.68-6.56-8.76 8.25Z" />
+          </svg>
+        </a>
         <a
           aria-label="WhatsApp support"
           className="fixed bottom-5 right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full border border-[#25D366]/60 bg-[#25D366] text-white shadow-[0_18px_30px_-16px_rgba(37,211,102,0.95)] transition hover:scale-105"

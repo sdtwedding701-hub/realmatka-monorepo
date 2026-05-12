@@ -118,8 +118,8 @@ export async function sendMarketResultBroadcast(market, result) {
   const dispatch = await sendUserNotifications(
     targets.map((user) => ({
       userId: user.id,
-      title: market.name,
-      body: `Result: ${result}`,
+      title: formatResultNotificationTitle(market.name),
+      body: formatResultNotificationBody(result),
       channel: "result",
       url: "/(tabs)",
       persist: false,

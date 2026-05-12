@@ -550,6 +550,7 @@ function RootNavigator() {
             title="Enter PIN"
             message="App unlock karne ke liye 4 digit PIN enter karo."
             cancelLabel="Logout"
+            verificationMode="local"
             onCancel={() => {
               void logout();
             }}

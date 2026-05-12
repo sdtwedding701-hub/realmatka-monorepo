@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAppState } from "@/lib/app-state";
 import { formatApiError } from "@/lib/api";
+import { verifyStoredMpinValue } from "@/lib/security-storage";
 import { colors } from "@/theme/colors";
 
 type PinVerificationModalProps = {
@@ -13,6 +14,7 @@ type PinVerificationModalProps = {
   onVerified?: (pin: string) => Promise<void> | void;
   cancelLabel?: string;
   setupRequired?: boolean;
+  verificationMode?: "server" | "local";
 };
 
 export function PinVerificationModal({
@@ -22,7 +24,8 @@ export function PinVerificationModal({
   onCancel,
   onVerified,
   cancelLabel = "Cancel",
-  setupRequired = false
+  setupRequired = false,
+  verificationMode = "server"
 }: PinVerificationModalProps) {
   const { currentUser, verifyMpin } = useAppState();
   const [pin, setPin] = useState("");
@@ -54,7 +57,14 @@ export function PinVerificationModal({
     try {
       setSubmitting(true);
       setError("");
-      await verifyMpin(nextPin);
+      if (verificationMode === "local" && currentUser?.id) {
+        const verifiedLocally = await verifyStoredMpinValue(currentUser.id, nextPin);
+        if (!verifiedLocally) {
+          await verifyMpin(nextPin);
+        }
+      } else {
+        await verifyMpin(nextPin);
+      }
       setPin("");
       await onVerified?.(nextPin);
     } catch (verifyError) {

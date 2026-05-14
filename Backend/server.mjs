@@ -183,6 +183,7 @@ const standaloneRoutes = new Map([
   ["/api/payments/create-order", { loader: "payments", methods: { OPTIONS: "options", POST: "createOrder" } }],
   ["/api/payments/confirm", { loader: "payments", methods: { OPTIONS: "options", POST: "confirmOrder" } }],
   ["/api/payments/status", { loader: "payments", methods: { OPTIONS: "options", GET: "getPaymentOrderStatus", POST: "getPaymentOrderStatus" } }],
+  ["/api/payments/manual-qr", { loader: "payments", methods: { OPTIONS: "options", GET: "manualQrPage" } }],
   ["/api/payments/upi-start", { loader: "payments", methods: { OPTIONS: "options", GET: "startUpiDeposit", POST: "startUpiDeposit" } }],
   ["/api/payments/upi-report", { loader: "payments", methods: { OPTIONS: "options", GET: "reportUpiDeposit", POST: "reportUpiDeposit" } }],
   ["/api/payments/upi-status", { loader: "payments", methods: { OPTIONS: "options", GET: "getUpiDepositStatus", POST: "getUpiDepositStatus" } }],

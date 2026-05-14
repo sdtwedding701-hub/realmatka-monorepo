@@ -177,6 +177,118 @@ function buildPaymentResultHtml({ title, message, actionLabel, actionHref }) {
 </html>`;
 }
 
+function buildManualQrReference() {
+  const random = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `RM${Date.now()}${random}`;
+}
+
+function isManualQrWebCheckoutEnabled() {
+  const platform = String(process.env.DEPOSIT_RAZORPAY_PLATFORM || "").trim().toLowerCase();
+  const checkoutFlow = String(process.env.DEPOSIT_CHECKOUT_FLOW || "").trim().toLowerCase();
+  return platform === "manual_qr_web" || checkoutFlow === "manual_qr_web";
+}
+
+function buildUpiPaymentUri({ upiId, upiName, amount }) {
+  const params = new URLSearchParams({
+    pa: upiId,
+    pn: upiName || "SDT WEDDING",
+    mc: "0000",
+    am: Number(amount || 0).toFixed(2),
+    cu: "INR"
+  });
+  return `upi://pay?${params.toString()}`;
+}
+
+function buildManualQrRedirectUrl(request, { referenceId, amount }) {
+  const serverOrigin = getServerOrigin(request);
+  const url = new URL("/api/payments/manual-qr", serverOrigin);
+  url.searchParams.set("referenceId", referenceId);
+  url.searchParams.set("amount", Number(amount || 0).toFixed(2));
+  return url.toString();
+}
+
+function buildManualQrOrderResponse({ entry, redirectUrl, amount, referenceId }) {
+  return {
+    id: entry?.id || referenceId,
+    amount,
+    provider: "manual_qr",
+    reference: referenceId,
+    redirectUrl,
+    status: "INITIATED",
+    remoteStatus: "INITIATED",
+    checkoutMode: "link",
+    gatewayOrderId: null,
+    keyId: null,
+    displayName: "SDT WEDDING",
+    description: "Manual UPI QR Deposit",
+    customerName: null,
+    customerContact: null,
+    customerEmail: null
+  };
+}
+
+function renderManualQrHtml({ amount, referenceId, upiId, upiName, whatsappNumber }) {
+  const upiUri = buildUpiPaymentUri({ upiId, upiName, amount });
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=14&data=${encodeURIComponent(upiUri)}`;
+  const whatsappPhone = String(whatsappNumber || "8446012081").replace(/\D/g, "");
+  const normalizedPhone = whatsappPhone.startsWith("91") ? whatsappPhone : `91${whatsappPhone}`;
+  const whatsappText = [
+    "Wallet deposit payment proof",
+    `Amount: Rs ${Number(amount || 0).toFixed(2)}`,
+    `Reference: ${referenceId}`,
+    `UPI ID: ${upiId}`,
+    "",
+    "Payment screenshot attached. Please verify and credit my wallet."
+  ].join("\n");
+  const whatsappUrl = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(whatsappText)}`;
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manual UPI Deposit</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; font-family: Arial, sans-serif; background: linear-gradient(135deg, #fff7ed, #fef2f2); color: #171717; display: flex; align-items: center; justify-content: center; padding: 18px; }
+      .card { width: min(430px, 100%); background: #fff; border-radius: 26px; padding: 22px; box-shadow: 0 24px 70px rgba(124, 45, 18, .18); border: 1px solid #fed7aa; }
+      .brand { text-align: center; font-weight: 900; letter-spacing: .08em; color: #c2410c; font-size: 13px; text-transform: uppercase; }
+      h1 { margin: 10px 0 6px; text-align: center; font-size: 26px; }
+      .muted { color: #78716c; text-align: center; line-height: 1.45; margin: 0 0 16px; }
+      .amount { border-radius: 18px; background: #fff7ed; padding: 12px; text-align: center; margin-bottom: 14px; }
+      .amount span { display: block; color: #9a3412; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+      .amount strong { display: block; font-size: 32px; color: #7c2d12; margin-top: 2px; }
+      .qr { display: flex; justify-content: center; padding: 14px; border-radius: 22px; background: #fafafa; border: 1px solid #e7e5e4; }
+      .qr img { width: 260px; height: 260px; max-width: 100%; image-rendering: pixelated; }
+      .meta { margin: 14px 0; display: grid; gap: 8px; }
+      .row { border-radius: 14px; background: #f5f5f4; padding: 10px 12px; }
+      .row span { display: block; color: #78716c; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+      .row strong { display: block; color: #1c1917; font-size: 15px; margin-top: 2px; word-break: break-all; }
+      a.button { display: flex; align-items: center; justify-content: center; min-height: 50px; border-radius: 999px; text-decoration: none; color: #fff; background: #16a34a; font-weight: 900; margin-top: 12px; }
+      .note { margin: 12px 0 0; color: #78716c; font-size: 13px; line-height: 1.45; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="brand">${escapeHtml(upiName || "SDT WEDDING")}</div>
+      <h1>Scan QR & Pay</h1>
+      <p class="muted">Pending deposit request create ho chuki hai. Payment complete karke screenshot WhatsApp par bhejein.</p>
+      <div class="amount">
+        <span>Pay Amount</span>
+        <strong>Rs ${escapeHtml(Number(amount || 0).toFixed(2))}</strong>
+      </div>
+      <div class="qr"><img src="${escapeHtml(qrImageUrl)}" alt="UPI QR Code" /></div>
+      <div class="meta">
+        <div class="row"><span>UPI ID</span><strong>${escapeHtml(upiId)}</strong></div>
+        <div class="row"><span>Deposit Reference</span><strong>${escapeHtml(referenceId)}</strong></div>
+      </div>
+      <a class="button" href="${escapeHtml(whatsappUrl)}">Send Screenshot on WhatsApp</a>
+      <p class="note">Admin verify karne ke baad wallet balance credit hoga. Galat amount/reference par credit delay ho sakta hai.</p>
+    </main>
+  </body>
+</html>`;
+}
+
 async function getCallbackPayload(request) {
   const contentType = request.headers.get("content-type") || "";
   if (/application\/x-www-form-urlencoded/i.test(contentType) || /multipart\/form-data/i.test(contentType)) {
@@ -208,13 +320,30 @@ export async function createOrder(request) {
   const auth = await requireAuthenticatedUser(request);
   if (auth.response) return auth.response;
   const { user } = auth;
-  if (!isRazorpayEnabled()) {
-    return fail("Razorpay test mode keys are not configured", 503, request);
-  }
 
   const body = await getJsonBody(request);
   const amount = Number(body.amount ?? 0);
   const platform = String(body.platform ?? "web").trim().toLowerCase();
+
+  if (isManualQrWebCheckoutEnabled()) {
+    const referenceId = buildManualQrReference();
+    const result = await startUpiDepositEntry({
+      userId: user.id,
+      amount,
+      appName: "Manual QR Web",
+      referenceId
+    });
+    if (!result.ok) {
+      return fail(result.error, result.status, request);
+    }
+    const redirectUrl = buildManualQrRedirectUrl(request, { referenceId, amount });
+    return ok(buildManualQrOrderResponse({ entry: result.data, redirectUrl, amount, referenceId }), request);
+  }
+
+  if (!isRazorpayEnabled()) {
+    return fail("Razorpay test mode keys are not configured", 503, request);
+  }
+
   const result =
     platform === "web"
       ? await createHostedPaymentOrder({
@@ -244,6 +373,35 @@ export async function createOrder(request) {
     return fail(result.error, result.status, request);
   }
   return ok(result.data, request);
+}
+
+export async function manualQrPage(request) {
+  const url = new URL(request.url);
+  const config = getDepositConfigSnapshot();
+  const amount = Number(url.searchParams.get("amount") || 0);
+  const referenceId = String(url.searchParams.get("referenceId") || "").trim();
+
+  if (!referenceId || !Number.isFinite(amount) || amount <= 0) {
+    return renderHtml(
+      buildPaymentResultHtml({
+        title: "Invalid Deposit Link",
+        message: "Deposit QR link valid nahi hai. App me wapas jaakar dobara Pay Karo dabao.",
+        actionLabel: "Back to App",
+        actionHref: "realmatka://wallet/add-fund"
+      }),
+      400
+    );
+  }
+
+  return renderHtml(
+    renderManualQrHtml({
+      amount,
+      referenceId,
+      upiId: config.upiId,
+      upiName: config.upiName,
+      whatsappNumber: config.whatsappNumber
+    })
+  );
 }
 
 export async function confirmOrder(request) {

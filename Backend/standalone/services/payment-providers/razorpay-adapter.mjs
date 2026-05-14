@@ -10,8 +10,8 @@ function roundToPaise(amount) {
 }
 
 function buildCustomerEmail(user) {
-  const phone = String(user?.phone || "").replace(/\D/g, "");
-  return phone ? `${phone}@sdtwedding.com` : "customer@sdtwedding.com";
+  const email = String(user?.email || "").trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
 }
 
 function buildCustomerContact(user) {
@@ -20,16 +20,20 @@ function buildCustomerContact(user) {
 }
 
 function buildOrderNotes({ paymentOrderId, receipt, user }) {
-  return {
+  const notes = {
     paymentOrderId,
     payment_order_id: paymentOrderId,
     reference: receipt,
     userId: user?.id || "",
     user_id: user?.id || "",
     userPhone: String(user?.phone || ""),
-    user_name: String(user?.name || ""),
-    customer_email: buildCustomerEmail(user)
+    user_name: String(user?.name || "")
   };
+  const customerEmail = buildCustomerEmail(user);
+  if (customerEmail) {
+    notes.customer_email = customerEmail;
+  }
+  return notes;
 }
 
 function getRazorpayAuthHeader() {
@@ -98,7 +102,7 @@ export async function createRazorpayPaymentLink({ amount, receipt, paymentOrderI
       customer: {
         name: user?.name || "Customer",
         contact: buildCustomerContact(user) || undefined,
-        email: buildCustomerEmail(user)
+        email: buildCustomerEmail(user) || undefined
       },
       notes: buildOrderNotes({ paymentOrderId, receipt, user })
     })

@@ -249,9 +249,9 @@ export default function HomePage() {
               />
             </a>
             <div className="hero-actions-row mt-6">
-              <a href="#rates" className="action-primary hero-action-button">Check Game Rate</a>
+              <a href={registerUrl} className="action-primary hero-action-button">Register Now</a>
+              <a href={loginUrl} className="action-secondary hero-action-button">Login Here</a>
               <a href="/download" className="action-secondary hero-action-button">Download APK</a>
-              <a href="/online-play-satta-matka" className="action-secondary hero-action-button">How To Play Online</a>
             </div>
           </div>
         </section>

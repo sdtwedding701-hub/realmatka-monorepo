@@ -13,7 +13,7 @@ const MIN_DEPOSIT_AMOUNT = 100;
 const DEFAULT_DEPOSIT_CONFIG: DepositConfig = {
   version: 1,
   enabled: true,
-  mode: "manual_qr",
+  mode: "maintenance",
   minAmount: MIN_DEPOSIT_AMOUNT,
   upiId: (process.env.EXPO_PUBLIC_DIRECT_UPI_ID || "s7568539842258141@slc").trim(),
   upiName: (process.env.EXPO_PUBLIC_DIRECT_UPI_NAME || "slice").trim(),
@@ -152,21 +152,27 @@ export default function AddFundScreen() {
             />
           </View>
           {!hasValidAmount && amount ? <Text style={styles.errorText}>Minimum deposit Rs {minAmount} hai.</Text> : null}
-          {isManualMode ? (
+          {loadingConfig ? (
+            <View style={styles.configLoadingRow}>
+              <ActivityIndicator color={colors.primary} size="small" />
+              <Text style={styles.configLoadingText}>Deposit settings load ho rahi hain...</Text>
+            </View>
+          ) : null}
+          {!loadingConfig && isManualMode ? (
             <Pressable
-              disabled={!hasValidAmount || loadingConfig}
+              disabled={!hasValidAmount}
               onPress={() => {
                 setGeneratedAmount(numericAmount);
                 setError("");
                 setMessage(`Rs ${numericAmount} ka QR generate ho gaya. Ab payment karo aur screenshot bhejo.`);
               }}
-              style={[styles.generateButton, (!hasValidAmount || loadingConfig) && styles.disabledButton]}
+              style={[styles.generateButton, !hasValidAmount && styles.disabledButton]}
             >
-              {loadingConfig ? <ActivityIndicator color={colors.surface} size="small" /> : <Ionicons color={colors.surface} name="qr-code-outline" size={18} />}
+              <Ionicons color={colors.surface} name="qr-code-outline" size={18} />
               <Text style={styles.generateButtonText}>Generate QR</Text>
             </Pressable>
           ) : null}
-          {isRazorpayMode ? (
+          {!loadingConfig && isRazorpayMode ? (
             <Pressable
               disabled={!hasValidAmount || submitting || !sessionToken}
               onPress={() => void startGatewayPayment()}
@@ -178,7 +184,7 @@ export default function AddFundScreen() {
           ) : null}
         </SurfaceCard>
 
-        {isMaintenanceMode ? (
+        {!loadingConfig && isMaintenanceMode ? (
           <SurfaceCard style={styles.placeholderCard}>
             <Ionicons color={colors.warning} name="alert-circle-outline" size={34} />
             <Text style={styles.placeholderTitle}>{depositConfig.maintenanceTitle}</Text>
@@ -186,7 +192,7 @@ export default function AddFundScreen() {
           </SurfaceCard>
         ) : null}
 
-        {isManualMode && hasGeneratedQr ? (
+        {!loadingConfig && isManualMode && hasGeneratedQr ? (
           <SurfaceCard style={styles.qrCard}>
             <View style={styles.qrHeader}>
               <View>
@@ -235,7 +241,7 @@ export default function AddFundScreen() {
               Payment ke baad QR/payment ka screenshot lo, phir WhatsApp par proof bhejo. Admin verify karke wallet credit karega.
             </Text>
           </SurfaceCard>
-        ) : isManualMode ? (
+        ) : !loadingConfig && isManualMode ? (
           <SurfaceCard style={styles.placeholderCard}>
             <Ionicons color={colors.textMuted} name="qr-code-outline" size={34} />
             <Text style={styles.placeholderTitle}>QR abhi generate nahi hua</Text>
@@ -483,6 +489,21 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontSize: 14,
     fontWeight: "900"
+  },
+  configLoadingRow: {
+    minHeight: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    backgroundColor: colors.surfaceMuted,
+    paddingHorizontal: 14,
+    marginTop: 12
+  },
+  configLoadingText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "800"
   },
   qrCard: {
     alignItems: "stretch"

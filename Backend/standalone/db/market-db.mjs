@@ -14,6 +14,10 @@ const __dirname = path.dirname(__filename);
 const backendRoot = path.resolve(__dirname, "..", "..");
 const projectRoot = path.resolve(backendRoot, "..");
 const chartDataDir = path.join(projectRoot, "data");
+const requiredDefaultMarkets = [
+  ["seed_sridevi_morning", "sridevi-morning", "Sridevi Morning", "***-**-***", "Betting open now", "Place Bet", "10:00 AM", "11:00 AM", "main"],
+  ["seed_kalyan_morning", "kalyan-morning", "Kalyan Morning", "***-**-***", "Betting open now", "Place Bet", "11:40 AM", "12:40 PM", "main"]
+];
 
 function toChartRows(value) {
   if (Array.isArray(value)) return value;
@@ -158,7 +162,34 @@ function sortMarketsByOpenTime(markets) {
   });
 }
 
+async function ensureRequiredDefaultMarkets() {
+  if (isStandalonePostgresEnabled()) {
+    const pool = await __internalGetReadyPgPool();
+    for (const market of requiredDefaultMarkets) {
+      await pool.query(
+        `INSERT INTO markets (id, slug, name, result, status, action, open_time, close_time, category)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         ON CONFLICT (slug) DO NOTHING`,
+        market
+      );
+    }
+    return;
+  }
+
+  const sqlite = __internalGetSqlite();
+  const insert = sqlite.prepare(
+    `INSERT INTO markets (id, slug, name, result, status, action, open_time, close_time, category)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(slug) DO NOTHING`
+  );
+  for (const market of requiredDefaultMarkets) {
+    insert.run(...market);
+  }
+}
+
 export async function listMarkets() {
+  await ensureRequiredDefaultMarkets();
+
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     const result = await pool.query(

@@ -94,12 +94,12 @@ export default async function CheckoutPage({
 
               <div className="checkoutNotice">
                 {paymentSessionId
-                  ? "Secure Cashfree checkout ready hai. Amount aur reference verify karke Pay Now dabao."
+                  ? "Secure Cashfree checkout automatically open ho raha hai. Agar open na ho to niche button dabao."
                   : "Secure payment link ya approved account credit request milne ke baad hi payment karein."}
               </div>
 
               {paymentSessionId ? (
-                <CashfreePayButton mode={mode} paymentSessionId={paymentSessionId} />
+                <CashfreePayButton autoOpen mode={mode} paymentSessionId={paymentSessionId} />
               ) : (
                 <a
                   className="button buttonPrimary fullButton"

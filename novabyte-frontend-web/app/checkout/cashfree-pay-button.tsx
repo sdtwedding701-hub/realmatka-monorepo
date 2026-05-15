@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 declare global {
   interface Window {
@@ -13,11 +13,13 @@ declare global {
 type CashfreePayButtonProps = {
   paymentSessionId?: string;
   mode?: string;
+  autoOpen?: boolean;
 };
 
-export function CashfreePayButton({ paymentSessionId = "", mode = "production" }: CashfreePayButtonProps) {
+export function CashfreePayButton({ paymentSessionId = "", mode = "production", autoOpen = false }: CashfreePayButtonProps) {
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState("");
+  const didAutoOpen = useRef(false);
 
   useEffect(() => {
     if (!paymentSessionId) {
@@ -61,6 +63,19 @@ export function CashfreePayButton({ paymentSessionId = "", mode = "production" }
     }
   }
 
+  useEffect(() => {
+    if (!autoOpen || !isReady || !paymentSessionId || didAutoOpen.current) {
+      return;
+    }
+
+    didAutoOpen.current = true;
+    const timer = window.setTimeout(() => {
+      void openCheckout();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [autoOpen, isReady, paymentSessionId]);
+
   return (
     <>
       <button
@@ -69,7 +84,7 @@ export function CashfreePayButton({ paymentSessionId = "", mode = "production" }
         onClick={openCheckout}
         type="button"
       >
-        {isReady ? "Pay Now" : "Loading Payment..."}
+        {isReady ? "Open Payment Checkout" : "Loading Payment..."}
       </button>
       {error ? <p className="checkoutError">{error}</p> : null}
     </>

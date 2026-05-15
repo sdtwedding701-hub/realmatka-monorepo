@@ -388,6 +388,10 @@ h1 {
   gap: 10px;
 }
 
+.compactBox {
+  margin-bottom: 18px;
+}
+
 .invoiceRow {
   display: flex;
   justify-content: space-between;
@@ -478,6 +482,12 @@ h1 {
 .footerGrid p {
   max-width: 360px;
   line-height: 1.7;
+}
+
+.footerFineprint {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .footerBrand {

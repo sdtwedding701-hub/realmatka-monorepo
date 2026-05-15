@@ -42,9 +42,9 @@ const billingItems = [
 ];
 
 const pricingPreview = [
-  { title: "Starter Website", price: "Custom quote", body: "Landing page or small business website with essential sections and contact CTA." },
-  { title: "Admin Dashboard", price: "Scope based", body: "Internal dashboard, approval workflow, reports, records, and support tools." },
-  { title: "Monthly Care", price: "Retainer", body: "Bug fixes, updates, monitoring, support, and small improvements every month." }
+  { title: "Starter Website", price: "INR 4,999 onwards", body: "Landing page or small business website with essential sections and contact CTA." },
+  { title: "Admin Dashboard", price: "INR 19,999 onwards", body: "Internal dashboard, approval workflow, reports, records, and support tools." },
+  { title: "Monthly Care", price: "INR 2,999 / month onwards", body: "Bug fixes, updates, monitoring, support, and small improvements every month." }
 ];
 
 const industries = ["Local Businesses", "Service Providers", "Education", "Events", "Retail", "Digital Agencies"];
@@ -139,7 +139,7 @@ export default function HomePage() {
           <div className="sectionHead">
             <span className="eyebrow">Pricing</span>
             <h2 className="sectionTitle">Flexible pricing for websites, dashboards, apps, and support.</h2>
-            <p>Most services are quoted after requirement review so customers pay only for approved work.</p>
+            <p>Prices are listed in INR with final quote after requirement review, so customers pay only for approved work.</p>
           </div>
           <div className="grid3">
             {pricingPreview.map((plan) => (

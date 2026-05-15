@@ -28,6 +28,7 @@ const policyItems = [
 ];
 
 export const businessContact = {
+  legalName: "NovaByte Technologies",
   email: "novabytetechnoai@gmail.com",
   location: "Maharashtra, India",
   supportHours: "10:00 AM - 7:00 PM IST"
@@ -60,9 +61,10 @@ export function SiteFooter() {
         <div>
           <Link className="brand footerBrand" href="/">
             <span className="brandMark">NB</span>
-            <span>NovaByte Technologies</span>
+            <span>{businessContact.legalName}</span>
           </Link>
           <p>Software, websites, mobile interfaces, cloud support, digital operations, and IT enabled services.</p>
+          <p className="footerFineprint">Legal / Business Name: {businessContact.legalName}</p>
         </div>
         <div>
           <strong>Company</strong>

@@ -11,19 +11,21 @@ export default function RefundPolicyPage() {
     <>
       <SiteHeader />
       <main>
-        <PageHero
-          eyebrow="Policy"
-          title="Refund And Cancellation Policy"
-          description="This policy explains cancellation and refund handling for approved digital service work, software development, maintenance, and support billing."
-        />
+        <PageHero eyebrow="Policy" title="Refund And Cancellation Policy" description="This policy explains cancellation and refund handling for approved digital service work, software development, maintenance, and support billing." />
         <section className="shell section">
           <article className="panel policyPanel">
+            <h2>Policy Scope</h2>
+            <p>This policy applies to NovaByte Technologies services including website development, software development, mobile app UI work, admin dashboards, cloud support, maintenance retainers, consultation, and digital operations support.</p>
             <h2>Cancellation Before Work Starts</h2>
-            <p>If a customer cancels before work has started, the paid amount may be refunded after deducting payment gateway fees or administrative charges where applicable.</p>
+            <p>If a customer cancels before work has started, the paid amount may be refunded after deducting payment gateway fees, transaction charges, or administrative charges where applicable. Cancellation requests must be sent by email with the payment reference and service details.</p>
             <h2>After Work Has Started</h2>
-            <p>Once development, design, deployment, support, or maintenance work has started, refunds are evaluated based on completed work, committed resources, and project scope.</p>
+            <p>Once development, design, deployment, support, consultation, or maintenance work has started, refunds are evaluated based on completed work, committed resources, time spent, and project scope. Partial refunds may be considered only for the undelivered portion of work, if applicable.</p>
             <h2>Non-Refundable Items</h2>
             <p>Domain purchases, hosting purchases, third-party tools, paid plugins, cloud charges, completed support time, and delivered digital work are generally non-refundable.</p>
+            <h2>Maintenance And Subscription Cancellation</h2>
+            <p>Monthly maintenance or support retainers can be cancelled for the next billing cycle by emailing us before the renewal date. Amounts already paid for the active billing cycle are non-refundable once support availability or work has started.</p>
+            <h2>Duplicate Or Failed Payment</h2>
+            <p>If a duplicate payment is received or a failed transaction is later confirmed by the payment provider, the extra amount will be adjusted against the invoice or refunded after verification.</p>
             <h2>Refund Timeline</h2>
             <p>Approved refunds are processed to the original payment method where possible. Bank or gateway processing may take 5 to 10 business days.</p>
             <h2>Contact</h2>

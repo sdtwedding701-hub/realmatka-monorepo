@@ -22,6 +22,10 @@ export default function ContactPage() {
               <h2 className="sectionTitle">Contact Details</h2>
               <div className="invoiceBox">
                 <div className="invoiceRow">
+                  <span>Business Name</span>
+                  <strong>{businessContact.legalName}</strong>
+                </div>
+                <div className="invoiceRow">
                   <span>Email</span>
                   <strong>{businessContact.email}</strong>
                 </div>
@@ -39,6 +43,9 @@ export default function ContactPage() {
               <h2 className="sectionTitle">Send Requirement</h2>
               <p>
                 Email us your name, phone number, service required, preferred timeline, and any existing website/app link. We will reply with scope, estimate, and billing details.
+              </p>
+              <p>
+                For billing, cancellation, refund, or service support, include invoice number or payment reference if available.
               </p>
               <a className="button buttonPrimary fullButton" href="mailto:novabytetechnoai@gmail.com?subject=Project%20Requirement%20-%20NovaByte%20Technologies">
                 Email Project Requirement

@@ -17,7 +17,8 @@ export default function CompanyRegistrationPage() {
             <article className="panel infoPanel">
               <h2 className="sectionTitle">Current Details</h2>
               <div className="invoiceBox">
-                <div className="invoiceRow"><span>Business Name</span><strong>NovaByte Technologies</strong></div>
+                <div className="invoiceRow"><span>Legal / Business Name</span><strong>{businessContact.legalName}</strong></div>
+                <div className="invoiceRow"><span>Brand Name</span><strong>{businessContact.legalName}</strong></div>
                 <div className="invoiceRow"><span>Status</span><strong>Registration in process</strong></div>
                 <div className="invoiceRow"><span>Location</span><strong>{businessContact.location}</strong></div>
                 <div className="invoiceRow"><span>Official Phone</span><strong>To be updated after registration</strong></div>

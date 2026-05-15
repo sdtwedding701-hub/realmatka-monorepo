@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageHero, SiteFooter, SiteHeader } from "../site-shell";
+import { businessContact, PageHero, SiteFooter, SiteHeader } from "../site-shell";
 
 export const metadata: Metadata = {
   title: "About NovaByte Technologies",
@@ -20,6 +20,10 @@ export default function AboutPage() {
           <div className="billingLayout">
             <article className="panel infoPanel">
               <h2 className="sectionTitle">Who We Are</h2>
+              <div className="invoiceBox compactBox">
+                <div className="invoiceRow"><span>Legal / Business Name</span><strong>{businessContact.legalName}</strong></div>
+                <div className="invoiceRow"><span>Business Type</span><strong>Software and IT enabled services</strong></div>
+              </div>
               <p>
                 NovaByte Technologies is a technology services business from Maharashtra, India. We work on digital products, websites, mobile-ready interfaces, admin dashboards, cloud support, customer support systems, and IT enabled operations.
               </p>

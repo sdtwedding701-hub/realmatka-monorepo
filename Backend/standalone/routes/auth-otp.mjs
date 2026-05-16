@@ -578,15 +578,18 @@ export async function msg91Widget(request) {
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: Arial, sans-serif; background: #fff7ed; color: #111827; min-height: 100vh; }
-    .hero { min-height: 178px; padding: 42px 22px 30px; background: linear-gradient(135deg, #ff7a18, #ff314f); color: #fff; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .logo { width: 76px; height: 76px; border-radius: 24px; background: rgba(255,255,255,0.18); display: grid; place-items: center; font-size: 34px; font-weight: 900; box-shadow: 0 18px 34px rgba(127, 29, 29, 0.2); margin-bottom: 12px; }
-    .hero h1 { margin: 0; font-size: 26px; line-height: 1.1; }
-    .hero p { margin: 8px auto 0; max-width: 340px; color: rgba(255,255,255,0.88); line-height: 1.45; font-size: 14px; }
-    .content { width: min(100%, 480px); margin: -18px auto 0; padding: 0 16px 32px; }
+    .hero { min-height: 210px; padding: 52px 22px 48px; background: linear-gradient(135deg, #ff7a18, #ff314f); color: #fff; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .logo { width: min(78%, 280px); height: 110px; background: url('/assets/assets/images/adaptive-icon.b9a301a63caf25a13fb79f1d5f767b26.png') center/contain no-repeat; margin: 20px auto -2px; }
+    .logoText { display: none; }
+    .hero h1 { display: none; }
+    .hero p { margin: -14px auto 0; max-width: 320px; color: rgba(255,255,255,0.9); line-height: 1.45; font-size: 14px; }
+    .content { width: min(100%, 480px); margin: 0 auto; padding: 0 16px 32px; }
     .wrap { background: #fffaf5; border: 1px solid rgba(194, 65, 12, 0.15); border-radius: 24px; padding: 22px; box-shadow: 0 18px 42px rgba(124, 45, 18, 0.15); }
     h2 { margin: 0 0 6px; font-size: 24px; line-height: 1.2; }
     .hint { margin: 0 0 16px; color: #64748b; line-height: 1.45; font-size: 14px; }
-    .phoneBox { min-height: 54px; border-radius: 16px; border: 1px solid #fed7aa; background: #fff7ed; color: #111827; font-size: 19px; font-weight: 900; display: flex; align-items: center; padding: 0 16px; }
+    .phoneBox { display: none; }
+    .hiddenPhoneLabel,
+    .hiddenSend { display: none; }
     label { display: block; font-weight: 800; margin-bottom: 8px; }
     input { width: 100%; min-height: 54px; border-radius: 16px; border: 1px solid #fed7aa; background: #ffffff; color: #111827; font-size: 22px; font-weight: 900; letter-spacing: 0.22em; text-align: center; padding: 0 14px; outline: none; }
     input:focus { border-color: #fb923c; box-shadow: 0 0 0 4px rgba(251, 146, 60, 0.16); }
@@ -600,7 +603,7 @@ export async function msg91Widget(request) {
 </head>
 <body>
   <div class="hero">
-    <div class="logo">RM</div>
+    <div class="logo"><span class="logoText">RM</span></div>
     <h1>OTP Login</h1>
     <p>Phone number verify hone ke baad direct login continue ho jayega.</p>
   </div>
@@ -608,10 +611,10 @@ export async function msg91Widget(request) {
     <div class="wrap">
       <div>
         <h2>OTP Login</h2>
-        <p class="hint">Phone number verify karo, phir login continue ho jayega.</p>
-        <label>Phone Number</label>
+        <p class="hint">SMS me aaye 6 digit OTP ko verify karo.</p>
+        <label class="hiddenPhoneLabel">Phone Number</label>
         <div class="phoneBox">+91 ${phone}</div>
-        <button id="sendBtn" class="primary">Send OTP</button>
+        <button id="sendBtn" class="primary hiddenSend">Send OTP</button>
         <label for="otp">OTP</label>
         <input id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="______" />
         <button id="verifyBtn" class="primary" disabled>Verify OTP</button>
@@ -919,7 +922,7 @@ export async function msg91Widget(request) {
         s.onload = function() {
           if (typeof window.initSendOTP === 'function') {
             window.initSendOTP(configuration);
-            setStatus('OTP service ready hai. Send OTP dabao.');
+            window.setTimeout(sendOtpNow, 300);
           }
         };
         s.onerror = function() {

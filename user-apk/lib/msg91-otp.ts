@@ -45,9 +45,11 @@ type Msg91BrowserWindow = Window & {
     failure?: (error: unknown) => void,
     reqId?: string
   ) => void;
+  getWidgetData?: () => Record<string, unknown>;
   __realMatkaMsg91ScriptPromise?: Promise<void>;
   __realMatkaMsg91Initialized?: boolean;
   __realMatkaMsg91LastToken?: string;
+  __realMatkaMsg91LastReqId?: string;
   __realMatkaMsg91TokenWaiters?: Array<(token: string) => void>;
 };
 
@@ -279,23 +281,75 @@ function extractReqId(payload: Record<string, unknown>) {
   const candidates = [
     payload.reqId,
     payload.reqid,
+    payload.reqID,
     payload.req_id,
+    payload.req_Id,
+    payload.reqID,
     payload.requestId,
     payload.request_id,
     payload.requestID,
     payload.requestid,
+    payload.request,
+    payload.request_id,
+    payload["request-id"],
+    payload["req-id"],
     readNested(payload, "reqId"),
     readNested(payload, "reqid"),
+    readNested(payload, "reqID"),
     readNested(payload, "req_id"),
+    readNested(payload, "req_Id"),
     readNested(payload, "requestId"),
     readNested(payload, "request_id"),
     readNested(payload, "requestID"),
-    readNested(payload, "requestid")
+    readNested(payload, "requestid"),
+    readNested(payload, "request"),
+    readNested(payload, "request-id"),
+    readNested(payload, "req-id")
   ];
   for (const value of candidates) {
     const text = getString(value);
     if (text) {
       return text;
+    }
+  }
+  return "";
+}
+
+function getMsg91WidgetReqId() {
+  if (Platform.OS !== "web") {
+    return "";
+  }
+  try {
+    const browserWindow = getBrowserWindow();
+    if (browserWindow.__realMatkaMsg91LastReqId) {
+      return browserWindow.__realMatkaMsg91LastReqId;
+    }
+    if (typeof browserWindow.getWidgetData === "function") {
+      const widgetData = browserWindow.getWidgetData();
+      debugMsg91("widget data", widgetData);
+      return extractReqId(widgetData);
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+async function waitForMsg91WidgetReqId(timeoutMs = 2500) {
+  const existingReqId = getMsg91WidgetReqId();
+  if (existingReqId) {
+    return existingReqId;
+  }
+  if (Platform.OS !== "web") {
+    return "";
+  }
+
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => window.setTimeout(resolve, 150));
+    const reqId = getMsg91WidgetReqId();
+    if (reqId) {
+      return reqId;
     }
   }
   return "";
@@ -375,7 +429,12 @@ export async function sendMsg91NativeOtp(phone: string) {
       sendOtpMethod(`91${phone.replace(/[^0-9]/g, "")}`, resolve, rejectSdkError(reject, "OTP send nahi hua. Dobara try karo."));
     });
     debugMsg91("send response", response);
-    return normalizeSendResponse(response);
+    const normalized = normalizeSendResponse({
+      ...response,
+      reqId: extractReqId(response) || (await waitForMsg91WidgetReqId())
+    });
+    browserWindow.__realMatkaMsg91LastReqId = normalized.reqId;
+    return normalized;
   }
 
   const otpWidget = await getOtpWidget();
@@ -396,7 +455,7 @@ export async function retryMsg91NativeOtp(reqId: string) {
     });
     debugMsg91("retry response", response);
     assertSdkSuccess(response, "OTP resend nahi hua. Dobara try karo.");
-    const nextReqId = extractReqId(response) || reqId;
+    const nextReqId = extractReqId(response) || getMsg91WidgetReqId() || reqId;
     const accessToken = extractAccessToken(response);
     if (!nextReqId && !accessToken) {
       throw new Error(getString(response.message) || "MSG91 se OTP resend request id nahi mila.");

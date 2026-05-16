@@ -278,6 +278,40 @@ function assertSdkSuccess(payload: Record<string, unknown>, fallback: string) {
   }
 }
 
+function getSdkErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  if (typeof error === "string" && error.trim()) {
+    return error.trim();
+  }
+  if (error && typeof error === "object") {
+    const payload = error as Record<string, unknown>;
+    const candidates = [
+      payload.message,
+      payload.error,
+      payload.description,
+      payload.reason,
+      payload.status,
+      readNested(payload, "message"),
+      readNested(payload, "error"),
+      readNested(payload, "description"),
+      readNested(payload, "reason")
+    ];
+    for (const value of candidates) {
+      const text = getString(value);
+      if (text) {
+        return text;
+      }
+    }
+  }
+  return fallback;
+}
+
+function rejectSdkError(reject: (reason?: unknown) => void, fallback: string) {
+  return (error: unknown) => reject(new Error(getSdkErrorMessage(error, fallback)));
+}
+
 export async function sendMsg91NativeOtp(phone: string) {
   const normalizeSendResponse = (response: Record<string, unknown>) => {
     assertSdkSuccess(response, "OTP send nahi hua. Dobara try karo.");
@@ -301,7 +335,7 @@ export async function sendMsg91NativeOtp(phone: string) {
       throw new Error("MSG91 send OTP method available nahi hai.");
     }
     const response = await new Promise<Record<string, unknown>>((resolve, reject) => {
-      sendOtpMethod(`91${phone.replace(/[^0-9]/g, "")}`, resolve, reject);
+      sendOtpMethod(`91${phone.replace(/[^0-9]/g, "")}`, resolve, rejectSdkError(reject, "OTP send nahi hua. Dobara try karo."));
     });
     return normalizeSendResponse(response);
   }
@@ -320,7 +354,7 @@ export async function retryMsg91NativeOtp(reqId: string) {
       throw new Error("MSG91 resend OTP method available nahi hai.");
     }
     const response = await new Promise<Record<string, unknown>>((resolve, reject) => {
-      retryOtpMethod(null, resolve, reject, reqId);
+      retryOtpMethod(null, resolve, rejectSdkError(reject, "OTP resend nahi hua. Dobara try karo."), reqId);
     });
     assertSdkSuccess(response, "OTP resend nahi hua. Dobara try karo.");
     const nextReqId = extractReqId(response) || reqId;
@@ -359,7 +393,7 @@ export async function verifyMsg91NativeOtp(reqId: string, otp: string) {
       throw new Error("MSG91 verify OTP method available nahi hai.");
     }
     const response = await new Promise<Record<string, unknown>>((resolve, reject) => {
-      verifyOtpMethod(otp, resolve, reject, reqId);
+      verifyOtpMethod(otp, resolve, rejectSdkError(reject, "Invalid OTP. Dobara try karo."), reqId);
     });
     assertSdkSuccess(response, "Invalid OTP. Dobara try karo.");
     const accessToken = extractAccessToken(response) || (await waitForMsg91SuccessToken());

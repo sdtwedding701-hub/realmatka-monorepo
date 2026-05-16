@@ -57,6 +57,24 @@ const sdkDisabled = String(process.env.EXPO_PUBLIC_MSG91_NATIVE_SDK_DISABLED || 
 
 let initialized = false;
 
+function isMsg91DebugEnabled() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("debugOtp") === "1" || window.localStorage.getItem("realmatka.msg91.debug") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function debugMsg91(label: string, payload: unknown) {
+  if (isMsg91DebugEnabled()) {
+    console.log(`[MSG91 ${label}]`, payload);
+  }
+}
+
 export function isMsg91NativeOtpAvailable() {
   if (!widgetId || !tokenAuth) {
     return false;
@@ -166,6 +184,7 @@ async function initializeMsg91WebWidget() {
       exposeMethods: true,
       captchaRenderId: "",
       success: (data: unknown) => {
+        debugMsg91("global success", data);
         const token = extractAccessToken((data && typeof data === "object" ? data : { value: data }) as Record<string, unknown>);
         if (token) {
           browserWindow.__realMatkaMsg91LastToken = token;
@@ -174,7 +193,9 @@ async function initializeMsg91WebWidget() {
           waiters.forEach((resolve) => resolve(token));
         }
       },
-      failure: () => undefined
+      failure: (error: unknown) => {
+        debugMsg91("global failure", error);
+      }
     });
     browserWindow.__realMatkaMsg91Initialized = true;
   }
@@ -212,6 +233,16 @@ function readNested(payload: Record<string, unknown>, key: string) {
   if (data && typeof data === "object" && key in data) {
     return (data as Record<string, unknown>)[key];
   }
+  const response = payload.response;
+  if (response && typeof response === "object" && key in response) {
+    return (response as Record<string, unknown>)[key];
+  }
+  if (data && typeof data === "object") {
+    const nestedResponse = (data as Record<string, unknown>).response;
+    if (nestedResponse && typeof nestedResponse === "object" && key in nestedResponse) {
+      return (nestedResponse as Record<string, unknown>)[key];
+    }
+  }
   return undefined;
 }
 
@@ -247,13 +278,19 @@ function extractAccessToken(payload: Record<string, unknown>) {
 function extractReqId(payload: Record<string, unknown>) {
   const candidates = [
     payload.reqId,
+    payload.reqid,
     payload.req_id,
     payload.requestId,
     payload.request_id,
+    payload.requestID,
+    payload.requestid,
     readNested(payload, "reqId"),
+    readNested(payload, "reqid"),
     readNested(payload, "req_id"),
     readNested(payload, "requestId"),
-    readNested(payload, "request_id")
+    readNested(payload, "request_id"),
+    readNested(payload, "requestID"),
+    readNested(payload, "requestid")
   ];
   for (const value of candidates) {
     const text = getString(value);
@@ -337,6 +374,7 @@ export async function sendMsg91NativeOtp(phone: string) {
     const response = await new Promise<Record<string, unknown>>((resolve, reject) => {
       sendOtpMethod(`91${phone.replace(/[^0-9]/g, "")}`, resolve, rejectSdkError(reject, "OTP send nahi hua. Dobara try karo."));
     });
+    debugMsg91("send response", response);
     return normalizeSendResponse(response);
   }
 
@@ -356,6 +394,7 @@ export async function retryMsg91NativeOtp(reqId: string) {
     const response = await new Promise<Record<string, unknown>>((resolve, reject) => {
       retryOtpMethod(null, resolve, rejectSdkError(reject, "OTP resend nahi hua. Dobara try karo."), reqId);
     });
+    debugMsg91("retry response", response);
     assertSdkSuccess(response, "OTP resend nahi hua. Dobara try karo.");
     const nextReqId = extractReqId(response) || reqId;
     const accessToken = extractAccessToken(response);
@@ -395,6 +434,7 @@ export async function verifyMsg91NativeOtp(reqId: string, otp: string) {
     const response = await new Promise<Record<string, unknown>>((resolve, reject) => {
       verifyOtpMethod(otp, resolve, rejectSdkError(reject, "Invalid OTP. Dobara try karo."), reqId);
     });
+    debugMsg91("verify response", response);
     assertSdkSuccess(response, "Invalid OTP. Dobara try karo.");
     const accessToken = extractAccessToken(response) || (await waitForMsg91SuccessToken());
     if (!accessToken) {

@@ -21,6 +21,7 @@ export default function ForgotPasswordScreen() {
   const [message, setMessage] = useState("");
   const [verifiedAccessToken, setVerifiedAccessToken] = useState("");
   const [sdkReqId, setSdkReqId] = useState("");
+  const [otpMode, setOtpMode] = useState<"otp" | "widget">("otp");
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const sendingOtpRef = useRef(false);
   const normalizedPhone = phone.replace(/[^0-9]/g, "");
@@ -97,7 +98,9 @@ export default function ForgotPasswordScreen() {
                   setMessage("");
                   setVerifiedAccessToken("");
                   setSdkReqId("");
+                  setOtpMode("otp");
                   const response = await api.requestOtp(normalizedPhone, "password_reset");
+                  setOtpMode(response.mode === "widget" ? "widget" : "otp");
                   if (response.mode === "widget" && isMsg91NativeOtpAvailable()) {
                     try {
                       const sdkResponse = await sendMsg91NativeOtp(normalizedPhone);
@@ -201,7 +204,10 @@ export default function ForgotPasswordScreen() {
                   setError("");
                   setMessage("");
                   let accessToken = verifiedAccessToken;
-                  if (!accessToken && (sdkReqId || Platform.OS === "web")) {
+                  if (!accessToken && otpMode === "widget") {
+                    if (!sdkReqId) {
+                      throw new Error("OTP request id missing hai. Dobara Send OTP karo.");
+                    }
                     setMessage("OTP verify ho raha hai...");
                     const verified = await verifyMsg91NativeOtp(sdkReqId, normalizedOtp);
                     accessToken = verified.accessToken;

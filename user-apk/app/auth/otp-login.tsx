@@ -22,6 +22,7 @@ export default function OtpLoginScreen() {
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [sdkReqId, setSdkReqId] = useState("");
   const [sdkAccessToken, setSdkAccessToken] = useState("");
+  const [otpMode, setOtpMode] = useState<"otp" | "widget">("otp");
   const handledTokenRef = useRef("");
   const sendingOtpRef = useRef(false);
   const normalizedPhone = phone.replace(/[^0-9]/g, "");
@@ -122,7 +123,9 @@ export default function OtpLoginScreen() {
                   setMessage("");
                   setSdkAccessToken("");
                   setSdkReqId("");
+                  setOtpMode("otp");
                   const response = await api.requestOtp(normalizedPhone, "login");
+                  setOtpMode(response.mode === "widget" ? "widget" : "otp");
                   if (response.mode === "widget" && isMsg91NativeOtpAvailable()) {
                     try {
                       const sdkResponse = await sendMsg91NativeOtp(normalizedPhone);
@@ -208,7 +211,10 @@ export default function OtpLoginScreen() {
                 setLoggingIn(true);
                 setError("");
                 let accessToken = verifiedAccessToken;
-                if (!accessToken && (sdkReqId || Platform.OS === "web")) {
+                if (!accessToken && otpMode === "widget") {
+                  if (!sdkReqId) {
+                    throw new Error("OTP request id missing hai. Dobara Send OTP karo.");
+                  }
                   setMessage("OTP verify ho raha hai...");
                   const verified = await verifyMsg91NativeOtp(sdkReqId, normalizedOtp);
                   accessToken = verified.accessToken;

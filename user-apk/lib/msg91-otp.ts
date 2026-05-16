@@ -47,6 +47,8 @@ type Msg91BrowserWindow = Window & {
   ) => void;
   __realMatkaMsg91ScriptPromise?: Promise<void>;
   __realMatkaMsg91Initialized?: boolean;
+  __realMatkaMsg91LastToken?: string;
+  __realMatkaMsg91TokenWaiters?: Array<(token: string) => void>;
 };
 
 const widgetId = String(process.env.EXPO_PUBLIC_MSG91_WIDGET_ID || "366570677169313137313933").trim();
@@ -163,12 +165,42 @@ async function initializeMsg91WebWidget() {
       tokenAuth,
       exposeMethods: true,
       captchaRenderId: "",
-      success: () => undefined,
+      success: (data: unknown) => {
+        const token = extractAccessToken((data && typeof data === "object" ? data : { value: data }) as Record<string, unknown>);
+        if (token) {
+          browserWindow.__realMatkaMsg91LastToken = token;
+          const waiters = browserWindow.__realMatkaMsg91TokenWaiters || [];
+          browserWindow.__realMatkaMsg91TokenWaiters = [];
+          waiters.forEach((resolve) => resolve(token));
+        }
+      },
       failure: () => undefined
     });
     browserWindow.__realMatkaMsg91Initialized = true;
   }
   await waitForMsg91WebMethods();
+}
+
+function waitForMsg91SuccessToken(timeoutMs = 2500) {
+  const browserWindow = getBrowserWindow();
+  if (browserWindow.__realMatkaMsg91LastToken) {
+    const token = browserWindow.__realMatkaMsg91LastToken;
+    browserWindow.__realMatkaMsg91LastToken = "";
+    return Promise.resolve(token);
+  }
+
+  return new Promise<string>((resolve) => {
+    const timer = window.setTimeout(() => {
+      const waiters = browserWindow.__realMatkaMsg91TokenWaiters || [];
+      browserWindow.__realMatkaMsg91TokenWaiters = waiters.filter((waiter) => waiter !== resolve);
+      resolve("");
+    }, timeoutMs);
+    const wrappedResolve = (token: string) => {
+      window.clearTimeout(timer);
+      resolve(token);
+    };
+    browserWindow.__realMatkaMsg91TokenWaiters = [...(browserWindow.__realMatkaMsg91TokenWaiters || []), wrappedResolve];
+  });
 }
 
 function getString(value: unknown) {
@@ -330,7 +362,7 @@ export async function verifyMsg91NativeOtp(reqId: string, otp: string) {
       verifyOtpMethod(otp, resolve, reject, reqId);
     });
     assertSdkSuccess(response, "Invalid OTP. Dobara try karo.");
-    const accessToken = extractAccessToken(response);
+    const accessToken = extractAccessToken(response) || (await waitForMsg91SuccessToken());
     if (!accessToken) {
       throw new Error("OTP verified token receive nahi hua.");
     }

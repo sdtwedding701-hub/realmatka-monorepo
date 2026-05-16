@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import QRCode from "qrcode-terminal/vendor/QRCode";
 import QRErrorCorrectLevel from "qrcode-terminal/vendor/QRCode/QRErrorCorrectLevel";
@@ -11,6 +11,8 @@ import { readWalletBoolean, readWalletText, useWalletRemoteSettings } from "@/li
 import { colors } from "@/theme/colors";
 
 const MIN_DEPOSIT_AMOUNT = 100;
+const PAYMENT_VERIFICATION_TIMEOUT_SECONDS = 15 * 60;
+const PAYMENT_STATUS_POLL_INTERVAL_MS = 5000;
 const DEFAULT_DEPOSIT_CONFIG: DepositConfig = {
   version: 1,
   enabled: true,
@@ -71,6 +73,9 @@ export default function AddFundScreen() {
   const [checkingPayment, setCheckingPayment] = useState(false);
   const [pendingGatewayOrder, setPendingGatewayOrder] = useState<PaymentOrder | null>(null);
   const [pendingManualDeposit, setPendingManualDeposit] = useState<WalletEntry | null>(null);
+  const [paymentVerificationEndsAt, setPaymentVerificationEndsAt] = useState<number | null>(null);
+  const [paymentVerificationSecondsLeft, setPaymentVerificationSecondsLeft] = useState(0);
+  const statusCheckInFlightRef = useRef(false);
 
   const numericAmount = Number(amount || 0);
   const minAmount = Math.max(1, Number(depositConfig.minAmount || MIN_DEPOSIT_AMOUNT));
@@ -91,6 +96,7 @@ export default function AddFundScreen() {
   const qrMatrix = useMemo(() => buildQrMatrix(upiUrl), [upiUrl]);
   const moduleSize = Math.max(3, Math.floor(232 / qrMatrix.length));
   const qrSize = qrMatrix.length * moduleSize;
+  const isGatewayVerificationActive = Boolean(pendingGatewayOrder?.reference && paymentVerificationEndsAt);
 
   useEffect(() => {
     let active = true;
@@ -135,6 +141,35 @@ export default function AddFundScreen() {
       subscription.remove();
     };
   }, [pendingGatewayOrder?.reference, sessionToken]);
+
+  useEffect(() => {
+    if (!pendingGatewayOrder?.reference || !sessionToken || !paymentVerificationEndsAt) {
+      return;
+    }
+
+    const updateCountdown = () => {
+      const secondsLeft = Math.max(0, Math.ceil((paymentVerificationEndsAt - Date.now()) / 1000));
+      setPaymentVerificationSecondsLeft(secondsLeft);
+      if (secondsLeft <= 0) {
+        setPendingGatewayOrder(null);
+        setPaymentVerificationEndsAt(null);
+        setError("Payment verification time out ho gaya. Agar amount debit hua hai to wallet history check karo ya support se contact karo.");
+      }
+    };
+
+    updateCountdown();
+    const countdownTimer = setInterval(updateCountdown, 1000);
+    const statusTimer = setInterval(() => {
+      if (Date.now() < paymentVerificationEndsAt) {
+        void checkGatewayPaymentStatus(false);
+      }
+    }, PAYMENT_STATUS_POLL_INTERVAL_MS);
+
+    return () => {
+      clearInterval(countdownTimer);
+      clearInterval(statusTimer);
+    };
+  }, [pendingGatewayOrder?.reference, paymentVerificationEndsAt, sessionToken]);
 
   return (
     <View style={styles.page}>
@@ -187,15 +222,27 @@ export default function AddFundScreen() {
           ) : null}
           {!loadingConfig && isRazorpayMode ? (
             <Pressable
-              disabled={!hasValidAmount || submitting || !sessionToken}
+              disabled={!hasValidAmount || submitting || checkingPayment || isGatewayVerificationActive || !sessionToken}
               onPress={() => void startGatewayPayment()}
-              style={[styles.generateButton, (!hasValidAmount || submitting || !sessionToken) && styles.disabledButton]}
+              style={[styles.generateButton, (!hasValidAmount || submitting || checkingPayment || isGatewayVerificationActive || !sessionToken) && styles.disabledButton]}
             >
-              {submitting ? <ActivityIndicator color={colors.surface} size="small" /> : <Ionicons color={colors.surface} name="card-outline" size={18} />}
+              {submitting || checkingPayment || isGatewayVerificationActive ? <ActivityIndicator color={colors.surface} size="small" /> : <Ionicons color={colors.surface} name="card-outline" size={18} />}
               <Text style={styles.generateButtonText}>{payButtonLabel}</Text>
             </Pressable>
           ) : null}
         </SurfaceCard>
+
+        {isGatewayVerificationActive ? (
+          <SurfaceCard style={styles.gatewayStatusCard}>
+            <View style={styles.verificationHeader}>
+              <ActivityIndicator color={colors.primary} size="small" />
+              <Text style={styles.verificationTitle}>Payment verification chal rahi hai</Text>
+            </View>
+            <Text style={styles.statusLine}>Payment complete hone ke baad wallet automatic update hoga. App open rakho ya payment ke baad wapas aao.</Text>
+            <Text style={styles.verificationMetaText}>Reference: {pendingGatewayOrder?.reference}</Text>
+            <Text style={styles.verificationMetaText}>Time left: {formatCountdown(paymentVerificationSecondsLeft)}</Text>
+          </SurfaceCard>
+        ) : null}
 
         {!loadingConfig && isMaintenanceMode ? (
           <SurfaceCard style={styles.placeholderCard}>
@@ -400,6 +447,8 @@ export default function AddFundScreen() {
         return;
       }
       setPendingGatewayOrder(order);
+      setPaymentVerificationEndsAt(Date.now() + PAYMENT_VERIFICATION_TIMEOUT_SECONDS * 1000);
+      setPaymentVerificationSecondsLeft(PAYMENT_VERIFICATION_TIMEOUT_SECONDS);
       await Linking.openURL(order.redirectUrl);
     } catch (paymentError) {
       setError(formatApiError(paymentError, "Payment start nahi hua."));
@@ -412,8 +461,12 @@ export default function AddFundScreen() {
     if (!sessionToken || !pendingGatewayOrder?.reference) {
       return;
     }
+    if (statusCheckInFlightRef.current) {
+      return;
+    }
 
     try {
+      statusCheckInFlightRef.current = true;
       setCheckingPayment(true);
       setError("");
       const next = await api.getPaymentOrderStatus(sessionToken, pendingGatewayOrder.reference);
@@ -423,6 +476,8 @@ export default function AddFundScreen() {
         .toUpperCase();
 
       if (normalized === "SUCCESS" || normalized === "PAID") {
+        setPaymentVerificationEndsAt(null);
+        setPaymentVerificationSecondsLeft(0);
         await reloadSessionData({ force: true });
         await loadWalletHistory({ force: true });
         router.replace({
@@ -433,6 +488,9 @@ export default function AddFundScreen() {
       }
 
       if (normalized === "FAILED" || normalized === "CANCELLED" || normalized === "EXPIRED") {
+        setPendingGatewayOrder(null);
+        setPaymentVerificationEndsAt(null);
+        setPaymentVerificationSecondsLeft(0);
         setError(`Payment ${normalized.toLowerCase()} ho gaya. Dobara try karo.`);
         return;
       }
@@ -443,9 +501,17 @@ export default function AddFundScreen() {
     } catch (statusError) {
       setError(formatApiError(statusError, "Payment status check nahi hua."));
     } finally {
+      statusCheckInFlightRef.current = false;
       setCheckingPayment(false);
     }
   }
+}
+
+function formatCountdown(totalSeconds: number) {
+  const safeSeconds = Math.max(0, totalSeconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 const styles = StyleSheet.create({
@@ -653,6 +719,21 @@ const styles = StyleSheet.create({
   },
   gatewayStatusCard: {
     gap: 10
+  },
+  verificationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  verificationTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  verificationMetaText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "800"
   },
   statusLine: {
     color: colors.textSecondary,

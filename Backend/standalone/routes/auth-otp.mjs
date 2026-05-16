@@ -612,8 +612,42 @@ export async function msg91Widget(request) {
       return fallback;
     }
     function setReqId(data) {
+      var nestedData = data && data.data;
+      var nestedResponse = data && data.response;
       currentReqId =
-        (data && (data.reqId || data.req_id || data.requestId || data.request_id || data.data && (data.data.reqId || data.data.req_id || data.data.requestId || data.data.request_id))) ||
+        (data && (
+          data.reqId ||
+          data.req_id ||
+          data.requestId ||
+          data.request_id ||
+          data.requestID ||
+          data.request_id_string ||
+          data.messageId ||
+          data.message_id ||
+          data.id ||
+          nestedData && (
+            nestedData.reqId ||
+            nestedData.req_id ||
+            nestedData.requestId ||
+            nestedData.request_id ||
+            nestedData.requestID ||
+            nestedData.request_id_string ||
+            nestedData.messageId ||
+            nestedData.message_id ||
+            nestedData.id
+          ) ||
+          nestedResponse && (
+            nestedResponse.reqId ||
+            nestedResponse.req_id ||
+            nestedResponse.requestId ||
+            nestedResponse.request_id ||
+            nestedResponse.requestID ||
+            nestedResponse.request_id_string ||
+            nestedResponse.messageId ||
+            nestedResponse.message_id ||
+            nestedResponse.id
+          )
+        )) ||
         currentReqId ||
         '';
     }

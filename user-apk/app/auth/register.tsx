@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { AppScreen, SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
 import { api, formatApiError } from "@/lib/api";
+import { isMsg91NativeOtpAvailable, sendMsg91NativeOtp, verifyMsg91NativeOtp } from "@/lib/msg91-otp";
 import { clearStoredReferralCode, normalizeReferralCode, readStoredReferralCode, writeStoredReferralCode } from "@/lib/referral-storage";
 import { colors } from "@/theme/colors";
 
@@ -29,6 +30,9 @@ export default function RegisterScreen() {
   const [otpSent, setOtpSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [otpSubmitting, setOtpSubmitting] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [sdkReqId, setSdkReqId] = useState("");
+  const [otpMode, setOtpMode] = useState<"otp" | "widget">("otp");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const incomingReferralCode = normalizeReferralCode(params.ref ?? params.referenceCode ?? params.referralCode);
@@ -40,7 +44,7 @@ export default function RegisterScreen() {
   const hasValidPhone = normalizedPhone.length === 10;
   const hasValidPassword = password.trim().length >= 8;
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
-  const isPhoneVerified = Boolean(verifiedAccessToken) || /^[0-9]{6}$/.test(otp);
+  const isPhoneVerified = Boolean(verifiedAccessToken) || (otpMode !== "widget" && /^[0-9]{6}$/.test(otp));
   const canCreateAccount =
     !submitting &&
     hasValidFirstName &&
@@ -100,9 +104,31 @@ export default function RegisterScreen() {
       setError("");
       setSuccess("");
       setVerifiedAccessToken("");
+      setSdkReqId("");
+      setOtpMode("otp");
       setOtp("");
       const response = await api.requestOtp(normalizedPhone, "register");
+      setOtpMode(response.mode === "widget" ? "widget" : "otp");
       if (response.mode === "widget" && response.widgetUrl) {
+        if (Platform.OS === "web" && isMsg91NativeOtpAvailable()) {
+          try {
+            const sdkResponse = await sendMsg91NativeOtp(normalizedPhone);
+            if (sdkResponse.accessToken) {
+              setVerifiedAccessToken(sdkResponse.accessToken);
+              setOtpSent(true);
+              setSuccess("Mobile verification complete. Ab account details fill karke Create Account dabao.");
+              return;
+            }
+            setSdkReqId(sdkResponse.reqId);
+            setOtpSent(true);
+            setSuccess("OTP sent. Code enter karke Verify OTP dabao.");
+            return;
+          } catch {
+            setSuccess("Verification page open ho raha hai. OTP verify karke wapas aao.");
+            await Linking.openURL(response.widgetUrl);
+            return;
+          }
+        }
         setSuccess("Verification page open ho raha hai. OTP verify karke wapas aao.");
         await Linking.openURL(response.widgetUrl);
         return;
@@ -113,6 +139,33 @@ export default function RegisterScreen() {
       setError(formatApiError(otpError, "Unable to send OTP"));
     } finally {
       setOtpSubmitting(false);
+    }
+  }
+
+  async function verifyRegisterOtp() {
+    const normalizedOtp = otp.replace(/[^0-9]/g, "");
+    if (!sdkReqId) {
+      setError("Pehle OTP send karo.");
+      return;
+    }
+    if (!/^[0-9]{6}$/.test(normalizedOtp)) {
+      setError("Valid 6 digit OTP dalo.");
+      return;
+    }
+
+    try {
+      setOtpVerifying(true);
+      setError("");
+      setSuccess("OTP verify ho raha hai...");
+      const verified = await verifyMsg91NativeOtp(sdkReqId, normalizedOtp);
+      setVerifiedAccessToken(verified.accessToken);
+      setOtp("");
+      setSuccess("Mobile verification complete. Ab account details fill karke Create Account dabao.");
+    } catch (verifyError) {
+      setError(formatApiError(verifyError, "OTP verify nahi hua"));
+      setSuccess("");
+    } finally {
+      setOtpVerifying(false);
     }
   }
 
@@ -187,6 +240,8 @@ export default function RegisterScreen() {
                   onChangeText={(value) => {
                     setPhone(value.replace(/[^0-9]/g, ""));
                     setVerifiedAccessToken("");
+                    setSdkReqId("");
+                    setOtpMode("otp");
                     setOtpSent(false);
                     setOtp("");
                     setError("");
@@ -205,18 +260,29 @@ export default function RegisterScreen() {
             {otpSent && !verifiedAccessToken ? (
               <View style={styles.fieldWrap}>
                 <Text style={styles.label}>OTP</Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  onChangeText={(value) => {
-                    setOtp(value.replace(/[^0-9]/g, ""));
-                    setError("");
-                  }}
-                  placeholder="Enter 6 digit OTP"
-                  placeholderTextColor="#94a3b8"
-                  style={styles.input}
-                  value={otp}
-                />
+                <View style={styles.phoneRow}>
+                  <TextInput
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    onChangeText={(value) => {
+                      setOtp(value.replace(/[^0-9]/g, ""));
+                      setError("");
+                    }}
+                    placeholder="Enter 6 digit OTP"
+                    placeholderTextColor="#94a3b8"
+                    style={[styles.input, styles.phoneInput]}
+                    value={otp}
+                  />
+                  {otpMode === "widget" ? (
+                    <Pressable
+                      disabled={!/^[0-9]{6}$/.test(otp) || otpVerifying}
+                      onPress={() => void verifyRegisterOtp()}
+                      style={[styles.otpButton, (!/^[0-9]{6}$/.test(otp) || otpVerifying) && styles.disabled]}
+                    >
+                      {otpVerifying ? <ActivityIndicator color="#111827" size="small" /> : <Text style={styles.otpButtonText}>Verify</Text>}
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
             ) : null}
 

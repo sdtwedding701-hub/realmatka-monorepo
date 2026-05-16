@@ -32,8 +32,8 @@ type Msg91BrowserWindow = Window & {
   __realMatkaMsg91Initialized?: boolean;
 };
 
-const widgetId = String(process.env.EXPO_PUBLIC_MSG91_WIDGET_ID || "3665686f3337383235393230").trim();
-const tokenAuth = String(process.env.EXPO_PUBLIC_MSG91_WIDGET_TOKEN_AUTH || "515019TD9LSW73F69fe0873P1").trim();
+const widgetId = String(process.env.EXPO_PUBLIC_MSG91_WIDGET_ID || "366570677169313137313933").trim();
+const tokenAuth = String(process.env.EXPO_PUBLIC_MSG91_WIDGET_TOKEN_AUTH || "515019TX2NYO2A6a081380P1").trim();
 const sdkDisabled = String(process.env.EXPO_PUBLIC_MSG91_NATIVE_SDK_DISABLED || "").trim() === "1";
 
 let initialized = false;

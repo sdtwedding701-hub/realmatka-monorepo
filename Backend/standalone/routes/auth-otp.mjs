@@ -599,8 +599,9 @@ export async function msg91Widget(request) {
   <div class="wrap">
     <div class="brand"><span class="dot"></span>Real Matka</div>
     <h1>Verify Mobile</h1>
-    <p>OTP SMS bheja ja raha hai. Code enter karte hi login continue ho jayega.</p>
+    <p>Phone number confirm karo, OTP lo, phir code verify karo.</p>
     <div class="meta">Mobile: +91 ${phone}</div>
+    <button id="sendBtn" class="secondary">Send OTP</button>
     <label for="otp">Enter OTP</label>
     <input id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="______" />
     <button id="verifyBtn" class="primary" disabled>Verify OTP</button>
@@ -616,6 +617,7 @@ export async function msg91Widget(request) {
     var statusEl = document.getElementById('status');
     var errorEl = document.getElementById('error');
     var otpEl = document.getElementById('otp');
+    var sendBtn = document.getElementById('sendBtn');
     var verifyBtn = document.getElementById('verifyBtn');
     var resendBtn = document.getElementById('resendBtn');
 
@@ -812,8 +814,10 @@ export async function msg91Widget(request) {
     function sendOtpNow() {
       setError('');
       setStatus('OTP SMS bheja ja raha hai...');
+      sendBtn.disabled = true;
       if (typeof window.sendOtp !== 'function') {
         setError('OTP service load nahi hua. Dobara try karo.');
+        sendBtn.disabled = false;
         return;
       }
       window.sendOtp(
@@ -827,6 +831,7 @@ export async function msg91Widget(request) {
         function(error) {
           setStatus('');
           setError(getErrorMessage(error, 'OTP send nahi hua. Dobara try karo.'));
+          sendBtn.disabled = false;
           resendBtn.disabled = false;
           resendBtn.textContent = 'Resend OTP';
         }
@@ -873,6 +878,7 @@ export async function msg91Widget(request) {
       }
     });
     verifyBtn.addEventListener('click', verifyOtpNow);
+    sendBtn.addEventListener('click', sendOtpNow);
     resendBtn.addEventListener('click', function() {
       if (typeof window.retryOtp === 'function') {
         setError('');
@@ -901,7 +907,7 @@ export async function msg91Widget(request) {
         s.onload = function() {
           if (typeof window.initSendOTP === 'function') {
             window.initSendOTP(configuration);
-            window.setTimeout(sendOtpNow, 300);
+            setStatus('OTP service ready hai. Send OTP dabao.');
           }
         };
         s.onerror = function() {

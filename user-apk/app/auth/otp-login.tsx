@@ -23,6 +23,7 @@ export default function OtpLoginScreen() {
   const [sdkReqId, setSdkReqId] = useState("");
   const [sdkAccessToken, setSdkAccessToken] = useState("");
   const [otpMode, setOtpMode] = useState<"otp" | "widget">("otp");
+  const [otpSent, setOtpSent] = useState(false);
   const handledTokenRef = useRef("");
   const sendingOtpRef = useRef(false);
   const normalizedPhone = phone.replace(/[^0-9]/g, "");
@@ -98,6 +99,8 @@ export default function OtpLoginScreen() {
                 setPhone(value.replace(/[^0-9]/g, ""));
                 setError("");
                 setMessage("");
+                setOtpSent(false);
+                setOtp("");
               }}
               style={styles.input}
               value={phone}
@@ -124,6 +127,7 @@ export default function OtpLoginScreen() {
                   setSdkAccessToken("");
                   setSdkReqId("");
                   setOtpMode("otp");
+                  setOtpSent(false);
                   const response = await api.requestOtp(normalizedPhone, "login");
                   setOtpMode(response.mode === "widget" ? "widget" : "otp");
                   if (response.mode === "widget" && response.widgetUrl) {
@@ -156,6 +160,7 @@ export default function OtpLoginScreen() {
                   }
                   if (response.mode !== "widget") {
                     setMessage(response.provider === "local" ? "OTP generated successfully." : "OTP SMS successfully sent.");
+                    setOtpSent(true);
                     setCooldownSeconds(OTP_RESEND_SECONDS);
                   }
                 } catch (otpError) {
@@ -175,7 +180,7 @@ export default function OtpLoginScreen() {
               )}
             </Pressable>
 
-            {!verifiedAccessToken ? (
+            {!verifiedAccessToken && otpSent ? (
               <>
                 <Text style={styles.label}>OTP</Text>
                 <TextInput
@@ -196,6 +201,7 @@ export default function OtpLoginScreen() {
             {message ? <Text style={styles.success}>{message}</Text> : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
+            {verifiedAccessToken || otpSent ? (
             <Pressable
             onPress={async () => {
               if (!hasValidPhone) {
@@ -232,6 +238,7 @@ export default function OtpLoginScreen() {
             >
               {loggingIn ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>Login with OTP</Text>}
             </Pressable>
+            ) : null}
 
             <View style={styles.linkGroup}>
               <Link href="/auth/login" style={styles.link}>

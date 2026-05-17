@@ -546,11 +546,10 @@ const styles = StyleSheet.create({
     width: 78,
     height: 78,
     borderRadius: 18,
-    backgroundColor: "#ffffff",
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.65)"
+    borderWidth: 0
   },
   modalLogo: {
     width: 68,

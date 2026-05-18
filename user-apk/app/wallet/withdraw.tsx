@@ -174,21 +174,6 @@ export default function WithdrawScreen() {
               </Pressable>
             )}
 
-            <View style={styles.infoStrip}>
-              <View style={styles.infoPill}>
-                <Text style={styles.infoPillLabel}>Minimum</Text>
-                <Text style={styles.infoPillValue}>Rs {minWithdrawAmount}</Text>
-              </View>
-              <View style={styles.infoPill}>
-                <Text style={styles.infoPillLabel}>Multiple</Text>
-                <Text style={styles.infoPillValue}>Rs {withdrawMultiple}</Text>
-              </View>
-              <View style={styles.infoPillAccent}>
-                <Text style={styles.infoPillLabelAccent}>Timing</Text>
-                <Text style={styles.infoPillValueAccent}>{withdrawStartLabel} - {withdrawEndLabel}</Text>
-              </View>
-            </View>
-
             <Text style={styles.fieldLabel}>Amount</Text>
             <View style={styles.inputRow}>
                 <TextInput

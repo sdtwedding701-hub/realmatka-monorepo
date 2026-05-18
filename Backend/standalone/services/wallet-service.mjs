@@ -55,7 +55,7 @@ function parseTimeToMinutes(value, fallback) {
 
 async function getWithdrawConfig() {
   const settings = toSettingsMap(await getAppSettings());
-  const minAmount = Math.max(1, readSettingNumber(settings, "wallet_withdraw_min_amount", MIN_WITHDRAW_AMOUNT));
+  const minAmount = Math.max(MIN_WITHDRAW_AMOUNT, readSettingNumber(settings, "wallet_withdraw_min_amount", MIN_WITHDRAW_AMOUNT));
   const maxAmount = Math.max(minAmount, readSettingNumber(settings, "wallet_withdraw_max_amount", DEFAULT_WITHDRAW_MAX_AMOUNT));
   const multiple = Math.max(1, readSettingNumber(settings, "wallet_withdraw_multiple", DEFAULT_WITHDRAW_MULTIPLE));
   return {

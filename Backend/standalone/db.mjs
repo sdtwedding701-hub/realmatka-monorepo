@@ -176,7 +176,7 @@ function roundMoney(value) {
 
 const referralLossCommissionRate = Number(process.env.REFERRAL_LOSS_COMMISSION_RATE || "0.2");
 const referralCommissionThreshold = Math.max(0.01, Number(process.env.REFERRAL_COMMISSION_THRESHOLD || "10"));
-const referralDepositBonusRate = Math.max(0, Number(process.env.REFERRAL_DEPOSIT_BONUS_RATE || "10"));
+const referralDepositBonusRate = Math.max(0, Number(process.env.REFERRAL_DEPOSIT_BONUS_RATE || "2"));
 const referralDepositBonusMaxTimesPerUser = Math.max(0, Math.floor(Number(process.env.REFERRAL_DEPOSIT_BONUS_MAX_TIMES_PER_USER || "5")));
 const referralDepositBonusMaxPerDeposit = Math.max(0, Number(process.env.REFERRAL_DEPOSIT_BONUS_MAX_PER_DEPOSIT || "100"));
 

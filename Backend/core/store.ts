@@ -24,6 +24,7 @@ import {
 const now = () => new Date().toISOString();
 const dbFilePath = path.join(process.cwd(), "backend", "data", "server.db");
 const signupBonusAmount = 25;
+const minWithdrawAmount = 500;
 
 const defaultUser: User = {
   id: "user_1",
@@ -1671,6 +1672,9 @@ export async function resolveWalletApprovalRequest(entryId: string, action: "app
   }
 
   const beforeBalance = await getUserBalance(request.userId);
+  if (request.type === "WITHDRAW" && request.amount < minWithdrawAmount) {
+    throw new Error(`Minimum withdraw is Rs ${minWithdrawAmount}`);
+  }
   if (request.type === "WITHDRAW" && request.amount > beforeBalance) {
     throw new Error("User has insufficient live balance for withdraw approval");
   }

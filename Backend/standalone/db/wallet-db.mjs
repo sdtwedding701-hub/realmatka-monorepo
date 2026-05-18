@@ -24,6 +24,7 @@ function toSqlStringList(values) {
 
 const CREDIT_WALLET_ENTRY_TYPES_SQL = toSqlStringList(CREDIT_WALLET_ENTRY_TYPES);
 const DEBIT_WALLET_ENTRY_TYPES_SQL = toSqlStringList(DEBIT_WALLET_ENTRY_TYPES);
+const MIN_WITHDRAW_AMOUNT = 500;
 const WITHDRAW_PROCESSING_TIMEOUT_MS = 3 * 60 * 60 * 1000;
 const AUTO_REJECT_SWEEP_MIN_INTERVAL_MS = 60 * 1000;
 
@@ -669,6 +670,9 @@ export async function resolveWalletApprovalRequest(entryId, action) {
 
   await rebalanceWalletEntriesForUser(request.userId);
   const beforeBalance = await getUserBalance(request.userId);
+  if (request.type === "WITHDRAW" && request.amount < MIN_WITHDRAW_AMOUNT) {
+    throw new Error(`Minimum withdraw is Rs ${MIN_WITHDRAW_AMOUNT}`);
+  }
   if (request.type === "WITHDRAW" && request.amount > beforeBalance) {
     throw new Error("User has insufficient live balance for withdraw approval");
   }
@@ -728,6 +732,9 @@ export async function completeWalletRequest(entryId) {
 
   await rebalanceWalletEntriesForUser(request.userId);
   const beforeBalance = await getUserBalance(request.userId);
+  if (request.type === "WITHDRAW" && request.amount < MIN_WITHDRAW_AMOUNT) {
+    throw new Error(`Minimum withdraw is Rs ${MIN_WITHDRAW_AMOUNT}`);
+  }
   if (request.type === "WITHDRAW" && request.amount > beforeBalance) {
     throw new Error("User has insufficient live balance for withdraw completion");
   }

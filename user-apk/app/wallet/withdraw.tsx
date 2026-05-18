@@ -10,7 +10,7 @@ import { readWalletBoolean, readWalletNumber, readWalletText, useWalletRemoteSet
 import { colors } from "@/theme/colors";
 
 const MIN_WITHDRAW_AMOUNT = 500;
-const MAX_WITHDRAW_AMOUNT = 99999;
+const MAX_WITHDRAW_AMOUNT = 999999;
 const WITHDRAW_MULTIPLE = 100;
 const WEEKEND_WITHDRAW_CLOSED_MESSAGE = "Saturday aur Sunday ko withdraw service band rahegi.";
 const TIME_WITHDRAW_CLOSED_MESSAGE = "Withdraw request timing 11:00 AM se 11:00 PM tak hi available hai.";
@@ -70,8 +70,8 @@ export default function WithdrawScreen() {
   const withdrawTitle = readWalletText(walletSettings, "wallet_withdraw_title", "Withdraw Fund");
   const withdrawSubtitle = readWalletText(walletSettings, "wallet_withdraw_subtitle", "Secure request flow ke saath bank account par withdraw bhejo.");
   const withdrawDisabledMessage = readWalletText(walletSettings, "wallet_withdraw_message", "Withdraw service temporarily unavailable.");
-  const minWithdrawAmount = Math.max(1, readWalletNumber(walletSettings, "wallet_withdraw_min_amount", MIN_WITHDRAW_AMOUNT));
-  const maxWithdrawAmount = Math.max(minWithdrawAmount, readWalletNumber(walletSettings, "wallet_withdraw_max_amount", MAX_WITHDRAW_AMOUNT));
+  const minWithdrawAmount = Math.max(MIN_WITHDRAW_AMOUNT, readWalletNumber(walletSettings, "wallet_withdraw_min_amount", MIN_WITHDRAW_AMOUNT));
+  const maxWithdrawAmount = Math.max(minWithdrawAmount, MAX_WITHDRAW_AMOUNT);
   const withdrawMultiple = Math.max(1, readWalletNumber(walletSettings, "wallet_withdraw_multiple", WITHDRAW_MULTIPLE));
   const withdrawStartLabel = readWalletText(walletSettings, "wallet_withdraw_start_time", "11:00 AM");
   const withdrawEndLabel = readWalletText(walletSettings, "wallet_withdraw_end_time", "11:00 PM");

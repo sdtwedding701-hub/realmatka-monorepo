@@ -4,7 +4,7 @@ import { getAppSettings } from "../stores/admin-store.mjs";
 import { addWalletEntry, getBankAccountsForUser, getUserBalance, getWalletEntriesForUser } from "../stores/wallet-store.mjs";
 
 export const MIN_WITHDRAW_AMOUNT = 500;
-const DEFAULT_WITHDRAW_MAX_AMOUNT = 99999;
+const DEFAULT_WITHDRAW_MAX_AMOUNT = 999999;
 const DEFAULT_WITHDRAW_MULTIPLE = 100;
 const WITHDRAW_WEEKEND_CLOSED_MESSAGE = "Saturday aur Sunday ko withdraw service band rahegi.";
 const WITHDRAW_TIME_CLOSED_MESSAGE = "Withdraw request timing 11:00 AM se 11:00 PM tak hi available hai.";
@@ -56,7 +56,7 @@ function parseTimeToMinutes(value, fallback) {
 async function getWithdrawConfig() {
   const settings = toSettingsMap(await getAppSettings());
   const minAmount = Math.max(MIN_WITHDRAW_AMOUNT, readSettingNumber(settings, "wallet_withdraw_min_amount", MIN_WITHDRAW_AMOUNT));
-  const maxAmount = Math.max(minAmount, readSettingNumber(settings, "wallet_withdraw_max_amount", DEFAULT_WITHDRAW_MAX_AMOUNT));
+  const maxAmount = Math.max(minAmount, DEFAULT_WITHDRAW_MAX_AMOUNT);
   const multiple = Math.max(1, readSettingNumber(settings, "wallet_withdraw_multiple", DEFAULT_WITHDRAW_MULTIPLE));
   return {
     minAmount,

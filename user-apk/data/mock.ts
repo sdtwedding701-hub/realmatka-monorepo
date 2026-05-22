@@ -1,5 +1,5 @@
 export const gameRates = [
-  { code: "SD", label: "Single Digit", value: 10, color: "#2563eb" },
+  { code: "SD", label: "Single Digit", value: 9.8, color: "#2563eb" },
   { code: "JD", label: "Jodi Digit", value: 100, color: "#0f766e" },
   { code: "SP", label: "Single Pana", value: 160, color: "#9333ea" },
   { code: "DP", label: "Double Pana", value: 320, color: "#ea580c" },

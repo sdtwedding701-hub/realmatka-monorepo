@@ -18,8 +18,8 @@ type ParsedResult = {
 };
 
 const payoutRates: Record<string, number> = {
-  "Single Digit": 10,
-  "Single Digit Bulk": 10,
+  "Single Digit": 9.8,
+  "Single Digit Bulk": 9.8,
   "Jodi Digit": 100,
   "Jodi Digit Bulk": 100,
   "Group Jodi": 100,

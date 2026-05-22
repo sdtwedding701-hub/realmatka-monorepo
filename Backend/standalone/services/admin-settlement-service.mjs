@@ -102,7 +102,7 @@ export async function settleMarketData({ slug, mode, previousResult = "" }, deps
 
   const settlement =
     mode === "reset"
-      ? await deps.resetMarketSettlement(market)
+      ? await deps.resetMarketSettlement(market, previousResult)
       : mode === "resettle"
         ? await deps.resettleMarket(market)
         : mode === "resettle-changed"

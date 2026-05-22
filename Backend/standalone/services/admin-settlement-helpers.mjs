@@ -5,8 +5,8 @@ import { getPannaType } from "../matka-rules.mjs";
 import { sendUserNotifications } from "./notification-events-service.mjs";
 
 export const payoutRates = {
-  "Single Digit": 10,
-  "Single Digit Bulk": 10,
+  "Single Digit": 9.8,
+  "Single Digit Bulk": 9.8,
   "Jodi Digit": 100,
   "Jodi Digit Bulk": 100,
   "Group Jodi": 100,
@@ -374,26 +374,26 @@ function getEffectiveSessionType(bid) {
   return "Close";
 }
 
-function isOpenResultDependentBid(bid) {
-  if (!usesSession(bid.boardLabel)) {
-    return false;
-  }
-  return getEffectiveSessionType(bid) === "Open";
+function isOpenStageBid(bid) {
+  return usesSession(bid.boardLabel) && getEffectiveSessionType(bid) === "Open";
 }
 
-function isFullResultDependentBid(bid) {
+function isFullStageBid(bid) {
   if (!usesSession(bid.boardLabel)) {
     return true;
   }
   return getEffectiveSessionType(bid) === "Close";
 }
 
-function shouldResettleForCurrentResultStage(bid, marketResult) {
-  if (isOpenResultFormat(marketResult)) {
-    return isOpenResultDependentBid(bid);
+function shouldRestoreForResultChange(bid, previousResult, nextResult) {
+  if (isFullResultFormat(previousResult) && isOpenResultFormat(nextResult)) {
+    return isFullStageBid(bid);
   }
-  if (isFullResultFormat(marketResult)) {
-    return isFullResultDependentBid(bid);
+  if (isOpenResultFormat(nextResult)) {
+    return isOpenStageBid(bid);
+  }
+  if (isFullResultFormat(nextResult)) {
+    return isFullStageBid(bid);
   }
   return false;
 }
@@ -576,7 +576,7 @@ export async function resettleChangedMarket(market, previousResult) {
   const affectedSettled = cycle.matched.filter(
     (bid) =>
       bid.status !== "Pending" &&
-      shouldResettleForCurrentResultStage(bid, next) &&
+      shouldRestoreForResultChange(bid, previous, next) &&
       String(bid.settledResult || "").trim() !== next
   );
 
@@ -607,9 +607,24 @@ export async function resettleChangedMarket(market, previousResult) {
   };
 }
 
-export async function resetMarketSettlement(market) {
+export async function resetMarketSettlement(market, previousResult = "") {
+  const previous = String(previousResult || "").trim();
   const cycle = await getMarketCycleBids(market);
-  const settled = cycle.matched.filter((bid) => bid.status !== "Pending");
+  const settledById = new Map();
+  for (const bid of cycle.matched) {
+    if (bid.status !== "Pending") {
+      settledById.set(bid.id, bid);
+    }
+  }
+  if (previous) {
+    const allMarketBids = await getBidsForMarket(market.name);
+    for (const bid of allMarketBids) {
+      if (bid.status !== "Pending" && String(bid.settledResult || "").trim() === previous) {
+        settledById.set(bid.id, bid);
+      }
+    }
+  }
+  const settled = [...settledById.values()];
   let reversedWins = 0;
   let reversedPayout = 0;
 

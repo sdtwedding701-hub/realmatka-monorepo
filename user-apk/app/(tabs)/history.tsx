@@ -10,8 +10,8 @@ import { colors } from "@/theme/colors";
 
 const PAGE_SIZE = 25;
 const BET_RATE_MAP: Record<string, number> = {
-  "Single Digit": 10,
-  "Single Digit Bulk": 10,
+  "Single Digit": 9.8,
+  "Single Digit Bulk": 9.8,
   "Jodi Digit": 100,
   "Jodi Digit Bulk": 100,
   "Red Bracket": 100,

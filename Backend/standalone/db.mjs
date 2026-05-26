@@ -21,8 +21,8 @@ const postgresSchemaSql = readFileSync(path.join(backendRoot, "postgres-schema.s
 const sessionTtlMs = standaloneConfig.sessionTtlHours * 60 * 60 * 1000;
 const authSessionCache = new Map();
 const AUTH_SESSION_CACHE_TTL_MS = 15_000;
-const signupBonusAmount = 25;
-const signupBonusPromoAmount = 50;
+const signupBonusAmount = 20;
+const signupBonusPromoAmount = 20;
 const signupBonusPromoUserLimit = 50;
 const signupBonusPromoAwardedCountSettingKey = "signup_bonus_promo_awarded_count";
 const firstDepositBonusMinimum = 1000;
@@ -1533,7 +1533,7 @@ export async function createUserAccount({ phone, passwordHash, referenceCode, fi
           `wallet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           userId,
           grantedSignupBonusAmount,
-          qualifiesForPromo ? "Signup bonus 50 point campaign for next 50 users." : "Signup bonus credited.",
+          qualifiesForPromo ? "Signup bonus 20 point campaign for new users." : "Signup bonus credited.",
           joinedAt
         ]
       );
@@ -1609,7 +1609,7 @@ export async function createUserAccount({ phone, passwordHash, referenceCode, fi
           userId,
           grantedSignupBonusAmount,
           grantedSignupBonusAmount,
-          qualifiesForPromo ? "Signup bonus 50 point campaign for next 50 users." : "Signup bonus credited.",
+          qualifiesForPromo ? "Signup bonus 20 point campaign for new users." : "Signup bonus credited.",
           joinedAt
         );
 

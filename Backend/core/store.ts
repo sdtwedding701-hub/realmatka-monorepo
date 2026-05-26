@@ -23,7 +23,7 @@ import {
 
 const now = () => new Date().toISOString();
 const dbFilePath = path.join(process.cwd(), "backend", "data", "server.db");
-const signupBonusAmount = 25;
+const signupBonusAmount = 20;
 const minWithdrawAmount = 500;
 
 const defaultUser: User = {

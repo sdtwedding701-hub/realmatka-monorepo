@@ -9,12 +9,15 @@ body {
   scroll-behavior: smooth;
 }
 
+main {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
 body {
-  color: #f8fafc;
-  background:
-    radial-gradient(1200px 600px at 0% -10%, rgba(249, 115, 22, 0.22), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, rgba(56, 189, 248, 0.18), transparent 52%),
-    linear-gradient(180deg, #07101d 0%, #08111f 36%, #060a14 100%);
+  color: #111827;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #ffffff;
   overflow-x: hidden;
 }
 
@@ -27,20 +30,36 @@ body {
 }
 
 ::selection {
-  background: rgba(251, 146, 60, 0.28);
-  color: #fff7ed;
+  background: rgba(251, 146, 60, 0.24);
+  color: #111827;
 }
 
 .section-shell {
-  @apply rounded-[26px] border border-white/10 bg-white/[0.04] backdrop-blur-xl;
+  @apply rounded-[26px] border border-slate-200 bg-white shadow-[0_16px_50px_-36px_rgba(15,23,42,0.45)];
+}
+
+.hero-shell {
+  @apply border border-slate-200 bg-white shadow-[0_16px_50px_-36px_rgba(15,23,42,0.45)];
+}
+
+.hero-banner-link,
+.hero-side-panel,
+.offer-row {
+  border-radius: 0;
+}
+
+.hero-side-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .glass-card {
-  @apply rounded-3xl border border-white/10 bg-white/[0.05] shadow-[0_20px_60px_-30px_rgba(15,23,42,0.9)];
+  @apply rounded-3xl border border-slate-200 bg-white shadow-[0_16px_44px_-34px_rgba(15,23,42,0.45)];
 }
 
 .metric-pill {
-  @apply inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100;
+  @apply inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-800;
 }
 
 .action-button {
@@ -52,7 +71,7 @@ body {
 }
 
 .action-secondary {
-  @apply action-button border border-white/10 bg-white/5 text-slate-100 hover:border-white/20 hover:bg-white/10;
+  @apply action-button border border-slate-300 bg-white text-slate-900 hover:border-slate-500 hover:bg-slate-50;
 }
 
 .rate-card {
@@ -89,8 +108,25 @@ body {
 }
 
 .market-name-text {
+  font-size: 1.2rem;
+  line-height: 1.45rem;
+  color: #1d4ed8 !important;
+}
+
+.market-result-text {
+  color: #7c2d12 !important;
+  background: transparent !important;
   font-size: 1.55rem;
-  line-height: 1.85rem;
+  line-height: 1.9rem;
+}
+
+.section-shell article,
+.section-shell [class*="bg-white"] {
+  border-color: #e2e8f0 !important;
+}
+
+.section-shell article {
+  background: #ffffff !important;
 }
 
 .market-links-stack {
@@ -100,8 +136,24 @@ body {
   gap: 0.75rem;
 }
 
+.market-time-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.market-time-row span {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1rem;
+  padding: 0.42rem 0.58rem;
+}
+
 .market-chart-text-link {
-  color: #dbeafe;
+  color: #2563eb;
   font-size: 0.76rem;
   font-weight: 500;
   line-height: 1.1rem;
@@ -109,7 +161,61 @@ body {
 }
 
 .market-chart-text-link:hover {
-  color: #ffffff;
+  color: #1d4ed8;
+}
+
+.section-shell .text-white,
+.glass-card .text-white,
+.section-shell .text-slate-100,
+.glass-card .text-slate-100,
+.section-shell .text-orange-200,
+.glass-card .text-orange-200,
+main .text-white,
+main .text-slate-100,
+main .text-orange-100 {
+  color: #111827 !important;
+}
+
+.section-shell .text-slate-200,
+.glass-card .text-slate-200,
+main .text-slate-200 {
+  color: #334155 !important;
+}
+
+.section-shell .text-slate-300,
+.glass-card .text-slate-300,
+main .text-slate-300 {
+  color: #475569 !important;
+}
+
+.section-shell .text-slate-400,
+.glass-card .text-slate-400,
+main .text-slate-400 {
+  color: #64748b !important;
+}
+
+.section-shell .action-primary,
+.glass-card .action-primary,
+main .action-primary {
+  color: #ffffff !important;
+}
+
+.rate-card .text-orange-200,
+.market-result-text {
+  color: #7c2d12 !important;
+}
+
+main .text-orange-200 {
+  color: #9a3412 !important;
+}
+
+main .text-rose-300 {
+  color: #be123c !important;
+}
+
+.section-shell a:not(.action-primary):not(.action-secondary):not(.market-chart-text-link),
+.glass-card a:not(.action-primary):not(.action-secondary):not(.market-chart-text-link) {
+  color: #111827 !important;
 }
 
 .market-play-wrap {
@@ -132,14 +238,16 @@ body {
   }
 
   .hero-actions-row {
-    gap: 0.5rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
   }
 
   .hero-action-button {
     padding-left: 0.65rem;
     padding-right: 0.65rem;
-    font-size: 0.78rem;
-    line-height: 1rem;
+    font-size: 0.9rem;
+    line-height: 1.1rem;
   }
 
   .market-card-mobile {
@@ -154,13 +262,13 @@ body {
   }
 
   .market-name-text {
-    font-size: 1.45rem;
-    line-height: 1.7rem;
+    font-size: 1.08rem;
+    line-height: 1.35rem;
   }
 
   .market-result-text {
-    font-size: 1.42rem;
-    line-height: 1.9rem;
+    font-size: 1.38rem;
+    line-height: 1.75rem;
   }
 
   .market-card-layout {

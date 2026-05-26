@@ -29,7 +29,7 @@ const registerUrl = `${webAppBaseUrl}/auth/register`;
 const telegramChannelUrl = "https://t.me/realmatka";
 
 const rates = [
-  { name: "Single Digit", rate: "10" },
+  { name: "Single Digit", rate: "9.8" },
   { name: "Jodi Digit", rate: "100" },
   { name: "Red Bracket", rate: "100" },
   { name: "Single Pana", rate: "160" },
@@ -230,13 +230,13 @@ export default function HomePage() {
       />
       <main className="mx-auto flex w-full max-w-[1620px] flex-col gap-6 px-3 py-6 sm:px-5 sm:py-8 xl:px-6">
         <section className="section-shell relative overflow-hidden px-5 py-8 sm:px-8 sm:py-10 xl:px-10 xl:py-12">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.2),transparent_25%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_28%)]" />
+          <div className="absolute inset-0 bg-white" />
           <div className="relative">
             <a
               href={telegramChannelUrl}
               target="_blank"
               rel="noreferrer"
-              className="block overflow-hidden rounded-[24px] border border-white/10 bg-white/5 shadow-[0_20px_60px_-32px_rgba(14,165,233,0.35)] transition hover:border-sky-300/50 hover:bg-white/[0.06]"
+              className="block overflow-hidden border border-white/10 bg-white/5 shadow-[0_20px_60px_-32px_rgba(14,165,233,0.35)] transition hover:border-sky-300/50 hover:bg-white/[0.06]"
             >
               <Image
                 src="/realmatkabanner.jpg"
@@ -264,8 +264,8 @@ export default function HomePage() {
           <div className="rates-grid-mobile grid grid-cols-2 gap-3 xl:grid-cols-4">
             {rates.map((rate) => (
               <div key={rate.name} className="glass-card rate-card p-4 sm:p-5">
-                <div className="text-lg font-extrabold sm:text-xl">{rate.name}</div>
-                <div className="mt-4 text-2xl font-extrabold text-orange-200">Rs {rate.rate}</div>
+                <div className="text-sm font-bold uppercase tracking-[0.12em] text-slate-400">{rate.name}</div>
+                <div className="mt-4 text-3xl font-black text-orange-200">Rs {rate.rate}</div>
               </div>
             ))}
           </div>
@@ -274,7 +274,7 @@ export default function HomePage() {
         <section id="games" className="section-shell px-4 py-6 sm:px-6 sm:py-8 xl:px-8">
           <div className="mb-5">
             <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Available Games</div>
-            <h2 className="mt-2 text-2xl font-extrabold sm:text-3xl">Har popular game board ek hi place par</h2>
+            <h2 className="mt-2 text-2xl font-extrabold text-slate-950 sm:text-3xl">Har popular game board ek hi place par</h2>
           </div>
           <div className="popular-games-grid-mobile grid grid-cols-3 gap-3 md:grid-cols-3 xl:grid-cols-5">
             {games.map((game) => (

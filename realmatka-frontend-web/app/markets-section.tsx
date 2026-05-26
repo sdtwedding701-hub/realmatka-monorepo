@@ -130,7 +130,6 @@ export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: Market
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">All Markets</div>
-          <h2 className="mt-2 text-2xl font-extrabold sm:text-3xl">Same 33 market list jo app me dikh rahi hai</h2>
         </div>
         <a href={registerUrl} className="action-secondary w-full justify-center sm:w-auto">Register Now</a>
       </div>
@@ -142,6 +141,10 @@ export function MarketsSection({ initialMarkets, loginUrl, registerUrl }: Market
               <div className="market-card-copy">
                 <h3 className="market-name-text font-extrabold uppercase text-white">{market.name}</h3>
                 <p className="market-result-text mt-3 font-extrabold text-orange-200">{market.result || "***-**-***"}</p>
+                <div className="market-time-row mt-3">
+                  <span>Open {market.open}</span>
+                  <span>Close {market.close}</span>
+                </div>
                 <div className="market-links-stack mt-4">
                   <a href={`/jodi-chart-record/${slugifyMarket(market.name)}`} className="market-chart-text-link">Jodi Chart</a>
                   <a href={`/panel-chart-record/${slugifyMarket(market.name)}`} className="market-chart-text-link">Panel Chart</a>

@@ -5,6 +5,7 @@ import { LoginScreen } from "./LoginScreen.jsx";
 import { AdminShell } from "./AdminShell.jsx";
 import { AuditPage } from "./AuditPage.jsx";
 import { BonusPage } from "./BonusPage.jsx";
+import { CricketPage } from "./CricketPage.jsx";
 import { NotificationsPage } from "./NotificationsPage.jsx";
 import { AdminMarketPublishList, AllChartPage, ChartEditorPreviewSection, ResultEnginePage, ResultPublishSettlementSection, buildNextResultFromSlotChange, getAdminCurrentMinutes, getBracketMarkEditorValues, getClearedEditorValues, getEditorValuesFromSelectedCell, getResultSlotNavigationTarget, publishMarketResult, saveMarketChart, sortAdminMarketsByTime } from "./ResultEnginePage.jsx";
 import { SettingsPage } from "./SettingsPage.jsx";
@@ -56,6 +57,7 @@ const navItems = [
   { key: "reports", label: "Reports" },
   { key: "notifications", label: "Notifications" },
   { key: "bonus", label: "Bonus" },
+  { key: "cricket", label: "Cricket" },
   { key: "settings", label: "Settings" },
   { key: "audit", label: "Audit Logs" }
 ];
@@ -94,6 +96,7 @@ const routeMeta = {
   bids: { eyebrow: "Betting", title: "All Bets", subtitle: "" },
   notifications: { eyebrow: "Messaging", title: "Notification Center", subtitle: "Broadcast platform updates and target users from one operator screen." },
   bonus: { eyebrow: "Promotions", title: "Bonus System", subtitle: "Control deposit, referral, and limited-time bonus rules from one place." },
+  cricket: { eyebrow: "Games", title: "Cricket Games", subtitle: "Create over markets and settle cricket prediction bets." },
   settings: { eyebrow: "Configuration", title: "Platform Settings", subtitle: "Control notices, support info, and promotional text from one panel." },
   audit: { eyebrow: "Compliance", title: "Audit Trail", subtitle: "Review sensitive actions, exports, and recovery operations with confidence." }
 };
@@ -315,6 +318,18 @@ export function App() {
               apiBase={apiBase}
               fetchApi={fetchApi}
               key={`bonus-${refreshKey}`}
+              PageHeader={PageHeader}
+              PageState={PageState}
+              token={token}
+            />
+          );
+        }
+        if (route === "cricket") {
+          return (
+            <CricketPage
+              apiBase={apiBase}
+              fetchApi={fetchApi}
+              key={`cricket-${refreshKey}`}
               PageHeader={PageHeader}
               PageState={PageState}
               token={token}

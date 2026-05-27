@@ -125,6 +125,7 @@ const routeModuleLoaders = {
   notifications: () => import("./standalone/routes/notifications.mjs"),
   payments: () => import("./standalone/routes/payments.mjs"),
   markets: () => import("./standalone/routes/markets.mjs"),
+  cricket: () => import("./standalone/routes/cricket.mjs"),
   chat: () => import("./standalone/routes/chat.mjs"),
   admin: () => import("./standalone/routes/admin.mjs")
 };
@@ -172,6 +173,9 @@ const standaloneRoutes = new Map([
   ["/api/bids/history", { loader: "bids", methods: { OPTIONS: "options", GET: "history" } }],
   ["/api/bids/place", { loader: "bidsPlace", methods: { OPTIONS: "options", POST: "place" } }],
   ["/api/bids/board-helper", { loader: "bidsPlace", methods: { OPTIONS: "options", GET: "boardHelper" } }],
+  ["/api/cricket/matches", { loader: "cricket", methods: { OPTIONS: "options", GET: "matches" } }],
+  ["/api/cricket/history", { loader: "cricket", methods: { OPTIONS: "options", GET: "history" } }],
+  ["/api/cricket/place", { loader: "cricket", methods: { OPTIONS: "options", POST: "place" } }],
   ["/api/bank/list", { loader: "bank", methods: { OPTIONS: "options", GET: "list" } }],
   ["/api/bank/add", { loader: "bank", methods: { OPTIONS: "options", POST: "add" } }],
   ["/api/markets/list", { loader: "markets", methods: { OPTIONS: "options", GET: "list" } }],
@@ -208,6 +212,9 @@ const standaloneRoutes = new Map([
   ["/api/admin/settings", { loader: "admin", methods: { OPTIONS: "options", GET: "settingsGet", POST: "settingsUpdate" } }],
   ["/api/admin/operators", { loader: "admin", methods: { OPTIONS: "options", GET: "operators", POST: "operatorSave" } }],
   ["/api/admin/referrals", { loader: "admin", methods: { OPTIONS: "options", GET: "referrals" } }],
+  ["/api/admin/cricket/matches", { loader: "cricket", methods: { OPTIONS: "options", GET: "adminMatches", POST: "adminSaveMatch" } }],
+  ["/api/admin/cricket/bets", { loader: "cricket", methods: { OPTIONS: "options", GET: "adminBets" } }],
+  ["/api/admin/cricket/settle", { loader: "cricket", methods: { OPTIONS: "options", POST: "adminSettle" } }],
   ["/api/admin/chart-update", { loader: "admin", methods: { OPTIONS: "options", POST: "chartUpdate" } }],
   ["/api/admin/market-update", { loader: "admin", methods: { OPTIONS: "options", POST: "marketUpdate" } }],
   ["/api/admin/settle-market", { loader: "admin", methods: { OPTIONS: "options", POST: "settleMarket" } }],

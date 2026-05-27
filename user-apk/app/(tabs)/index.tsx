@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, Image, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Animated, Easing, Image, Modal, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { marketCatalog } from "../../data/mock";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatApiError, type CricketMatch, type CricketMatchesPayload } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
 import {
   getCachedChart,
@@ -87,7 +87,7 @@ function getMarketDisplayMeta(market: Pick<MarketItem, "status" | "action" | "ph
 }
 
 export default function HomeScreen() {
-  const { walletBalance } = useAppState();
+  const { walletBalance, sessionToken, reloadSessionData } = useAppState();
   const { height } = useWindowDimensions();
   const [markets, setMarkets] = useState<MarketItem[]>(() => getCachedMarkets() ?? FALLBACK_MARKETS);
   const lastGoodMarketsRef = useRef<MarketItem[]>([]);
@@ -101,6 +101,12 @@ export default function HomeScreen() {
   const [noticeTextWidth, setNoticeTextWidth] = useState(0);
   const [noticeReady, setNoticeReady] = useState(false);
   const [selectedChartMarket, setSelectedChartMarket] = useState<Pick<MarketItem, "slug" | "name"> | null>(null);
+  const [homeMode, setHomeMode] = useState<"matka" | "cricket">("matka");
+  const [cricketData, setCricketData] = useState<CricketMatchesPayload>({ rates: {}, matches: [] });
+  const [cricketLoading, setCricketLoading] = useState(false);
+  const [cricketError, setCricketError] = useState("");
+  const [cricketAmount, setCricketAmount] = useState("100");
+  const [cricketMessage, setCricketMessage] = useState("");
   const estimatedNoticeTextWidth = Math.max(noticeTextWidth, noticeText.length * 12);
   useEffect(() => {
     const cachedMarkets = getCachedMarkets();
@@ -131,7 +137,7 @@ export default function HomeScreen() {
         }
       }
 
-      await Promise.allSettled([loadMarkets(false), loadSettings()]);
+      await Promise.allSettled([loadMarkets(false), loadSettings(), loadCricket(false)]);
     })();
   }, []);
 
@@ -207,10 +213,6 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.page}>
-      <AppHeader
-        title="Real Matka"
-        rightLabel={`Rs ${walletBalance}`}
-      />
       <View style={styles.noticeStrip}>
         <Ionicons color={colors.warning} name="alert-circle-outline" size={16} />
         <View
@@ -243,6 +245,28 @@ export default function HomeScreen() {
           </Animated.Text>
         </View>
       </View>
+      <AppHeader
+        title="Real Matka"
+        rightLabel={`Rs ${walletBalance}`}
+      />
+      <View style={styles.stickyModeWrap}>
+        <View style={styles.modeSwitch}>
+          <Pressable onPress={() => setHomeMode("matka")} style={[styles.modeButton, homeMode === "matka" && styles.modeButtonActive]}>
+            <Ionicons color={homeMode === "matka" ? colors.surface : colors.textSecondary} name="apps-outline" size={17} />
+            <Text style={[styles.modeButtonText, homeMode === "matka" && styles.modeButtonTextActive]}>Matka</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setHomeMode("cricket");
+              void loadCricket(false);
+            }}
+            style={[styles.modeButton, homeMode === "cricket" && styles.modeButtonActive]}
+          >
+            <Ionicons color={homeMode === "cricket" ? colors.surface : colors.textSecondary} name="baseball-outline" size={17} />
+            <Text style={[styles.modeButtonText, homeMode === "cricket" && styles.modeButtonTextActive]}>Play Cricket</Text>
+          </Pressable>
+        </View>
+      </View>
 
       <AppScreen
         padded={false}
@@ -257,16 +281,18 @@ export default function HomeScreen() {
             style={styles.heroBannerImage}
           />
         </View>
-        <Pressable
-          onPress={() => {
-            void Linking.openURL("https://wa.me/918446012081");
-          }}
-          style={styles.whatsappStrip}
-        >
-          <Ionicons color="#16a34a" name="logo-whatsapp" size={18} />
-          <Text style={styles.whatsappText}>+91 8446012081</Text>
-        </Pressable>
-        {loading && !listedMarkets.length ? (
+        {homeMode === "cricket" ? (
+          <CricketHomeSection
+            amount={cricketAmount}
+            data={cricketData}
+            error={cricketError}
+            loading={cricketLoading}
+            message={cricketMessage}
+            onAmountChange={setCricketAmount}
+            onPlaceBet={placeCricketQuickBet}
+            onRefresh={() => loadCricket(true)}
+          />
+        ) : loading && !listedMarkets.length ? (
           <SurfaceCard>
             <ActivityIndicator color={colors.primary} size="large" />
             <Text style={styles.stateText}>Markets load ho rahe hain...</Text>
@@ -409,7 +435,7 @@ export default function HomeScreen() {
       if (showPullRefresh) {
         setRefreshing(true);
       }
-      await Promise.allSettled([loadMarkets(false)]);
+      await Promise.allSettled([loadMarkets(false), loadCricket(false)]);
     } finally {
       if (showPullRefresh) {
         setRefreshing(false);
@@ -484,6 +510,43 @@ export default function HomeScreen() {
     }
   }
 
+  async function loadCricket(showLoader = true) {
+    try {
+      if (showLoader) {
+        setCricketLoading(true);
+      }
+      setCricketError("");
+      const data = await api.cricketMatches();
+      setCricketData(data);
+    } catch (loadError) {
+      setCricketError(formatApiError(loadError, "Cricket games load nahi hue"));
+    } finally {
+      if (showLoader) {
+        setCricketLoading(false);
+      }
+    }
+  }
+
+  async function placeCricketQuickBet(match: CricketMatch, betType: string, selection: string) {
+    if (!sessionToken) {
+      setCricketMessage("Login required.");
+      return;
+    }
+    const amount = Number(cricketAmount || 0);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setCricketMessage("Valid amount enter karo.");
+      return;
+    }
+    try {
+      setCricketMessage("");
+      await api.placeCricketBet(sessionToken, { matchId: match.id, betType, selection, amount });
+      setCricketMessage(`${match.title}: ${selection} bet placed.`);
+      await Promise.allSettled([reloadSessionData({ force: true }), loadCricket(false)]);
+    } catch (placeError) {
+      setCricketMessage(formatApiError(placeError, "Cricket bet place nahi hui"));
+    }
+  }
+
   async function prefetchChartPreview(items: MarketItem[]) {
     const uncachedMarkets = items.filter(
       (item) => !getCachedChart(item.slug, "jodi", 15 * 60_000) || !getCachedChart(item.slug, "panna", 15 * 60_000)
@@ -518,6 +581,121 @@ export default function HomeScreen() {
     }
   }
 
+}
+
+function CricketHomeSection({
+  amount,
+  data,
+  error,
+  loading,
+  message,
+  onAmountChange,
+  onPlaceBet,
+  onRefresh
+}: {
+  amount: string;
+  data: CricketMatchesPayload;
+  error: string;
+  loading: boolean;
+  message: string;
+  onAmountChange: (value: string) => void;
+  onPlaceBet: (match: CricketMatch, betType: string, selection: string) => void;
+  onRefresh: () => void;
+}) {
+  const matches = data.matches || [];
+  const rates = data.rates || {};
+  return (
+    <View style={styles.cricketWrap}>
+      <View style={styles.cricketHero}>
+        <View style={styles.cricketHeroText}>
+          <Text style={styles.cricketEyebrow}>Live Cricket Games</Text>
+          <Text style={styles.cricketTitle}>Over prediction lagaao</Text>
+          <Text style={styles.cricketSubtitle}>Runs, Odd/Even, Wicket aur Boundary par quick bet.</Text>
+        </View>
+        <Pressable onPress={onRefresh} style={styles.cricketRefresh}>
+          <Ionicons color={colors.surface} name="refresh" size={18} />
+        </Pressable>
+      </View>
+
+      <View style={styles.cricketAmountRow}>
+        <Text style={styles.cricketAmountLabel}>Bet Amount</Text>
+        <TextInput
+          keyboardType="numeric"
+          onChangeText={(value) => onAmountChange(value.replace(/[^0-9]/g, ""))}
+          placeholder="100"
+          style={styles.cricketAmountInput}
+          value={amount}
+        />
+      </View>
+
+      {message ? <Text style={styles.cricketMessage}>{message}</Text> : null}
+      {error ? <Text style={styles.cricketError}>{error}</Text> : null}
+
+      {loading && !matches.length ? (
+        <SurfaceCard>
+          <ActivityIndicator color={colors.primary} size="large" />
+          <Text style={styles.stateText}>Cricket games load ho rahe hain...</Text>
+        </SurfaceCard>
+      ) : matches.length ? (
+        matches.map((match) => (
+          <View key={match.id} style={styles.cricketCard}>
+            <View style={styles.cricketCardTop}>
+              <View>
+                <Text style={styles.cricketMatchTitle}>{match.title}</Text>
+                <Text style={styles.cricketTeams}>{match.teamA} vs {match.teamB}</Text>
+              </View>
+              <View style={[styles.cricketStatusPill, match.bettingOpen ? styles.cricketStatusLive : styles.cricketStatusClosed]}>
+                <Text style={styles.cricketStatusText}>{match.bettingOpen ? "LIVE" : "CLOSED"}</Text>
+              </View>
+            </View>
+            <Text style={styles.cricketOverText}>Over {match.activeOver} market</Text>
+            <CricketBetGroup match={match} onPlaceBet={onPlaceBet} rates={rates.runs || {}} title="Over Runs" type="runs" />
+            <CricketBetGroup match={match} onPlaceBet={onPlaceBet} rates={rates.odd_even || {}} title="Odd / Even" type="odd_even" />
+            <CricketBetGroup match={match} onPlaceBet={onPlaceBet} rates={rates.wicket || {}} title="Wicket" type="wicket" />
+            <CricketBetGroup match={match} onPlaceBet={onPlaceBet} rates={rates.boundary || {}} title="Boundary" type="boundary" />
+          </View>
+        ))
+      ) : (
+        <SurfaceCard>
+          <Text style={styles.errorTitle}>Cricket match available nahi hai</Text>
+          <Text style={styles.errorText}>Admin panel se pehla cricket match create karo.</Text>
+        </SurfaceCard>
+      )}
+    </View>
+  );
+}
+
+function CricketBetGroup({
+  match,
+  onPlaceBet,
+  rates,
+  title,
+  type
+}: {
+  match: CricketMatch;
+  onPlaceBet: (match: CricketMatch, betType: string, selection: string) => void;
+  rates: Record<string, number>;
+  title: string;
+  type: string;
+}) {
+  return (
+    <View style={styles.cricketBetGroup}>
+      <Text style={styles.cricketBetTitle}>{title}</Text>
+      <View style={styles.cricketOptions}>
+        {Object.entries(rates).map(([selection, rate]) => (
+          <Pressable
+            disabled={!match.bettingOpen}
+            key={`${type}-${selection}`}
+            onPress={() => onPlaceBet(match, type, selection)}
+            style={[styles.cricketOption, !match.bettingOpen && styles.cricketOptionDisabled]}
+          >
+            <Text style={styles.cricketOptionText}>{selection}</Text>
+            <Text style={styles.cricketRateText}>{rate}x</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -573,21 +751,209 @@ const styles = StyleSheet.create({
       height: 144,
       backgroundColor: "#ffffff"
     },
-  whatsappStrip: {
+  stickyModeWrap: {
+    backgroundColor: colors.background,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 8,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderColor: colors.border
+  },
+  modeSwitch: {
+    flexDirection: "row",
+    gap: 8,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 6
+  },
+  modeButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 7
+  },
+  modeButtonActive: {
+    backgroundColor: colors.primary
+  },
+  modeButtonText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  modeButtonTextActive: {
+    color: colors.surface
+  },
+  cricketWrap: {
+    gap: 14,
+    paddingBottom: 8
+  },
+  cricketHero: {
+    borderRadius: 18,
+    backgroundColor: "#064e3b",
+    padding: 16,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    borderRadius: 14,
-    backgroundColor: "#ecfdf3",
-    borderWidth: 1,
-    borderColor: "#bbf7d0",
-    marginBottom: 14
+    justifyContent: "space-between",
+    gap: 12
   },
-  whatsappText: {
-    color: "#166534",
+  cricketHeroText: {
+    flex: 1,
+    gap: 3
+  },
+  cricketEyebrow: {
+    color: "#a7f3d0",
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase"
+  },
+  cricketTitle: {
+    color: colors.surface,
+    fontSize: 20,
+    fontWeight: "900"
+  },
+  cricketSubtitle: {
+    color: "#d1fae5",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 17
+  },
+  cricketRefresh: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#10b981"
+  },
+  cricketAmountRow: {
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  cricketAmountLabel: {
+    color: colors.textPrimary,
     fontSize: 13,
+    fontWeight: "900"
+  },
+  cricketAmountInput: {
+    width: 120,
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    paddingHorizontal: 12,
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "900",
+    textAlign: "right"
+  },
+  cricketMessage: {
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  cricketError: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  cricketCard: {
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    gap: 12,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3
+  },
+  cricketCardTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  cricketMatchTitle: {
+    color: colors.textPrimary,
+    fontSize: 17,
+    fontWeight: "900"
+  },
+  cricketTeams: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2
+  },
+  cricketStatusPill: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  cricketStatusLive: {
+    backgroundColor: "#dcfce7"
+  },
+  cricketStatusClosed: {
+    backgroundColor: colors.dangerSoft
+  },
+  cricketStatusText: {
+    color: "#166534",
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  cricketOverText: {
+    color: "#047857",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  cricketBetGroup: {
+    gap: 8
+  },
+  cricketBetTitle: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  cricketOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  cricketOption: {
+    minWidth: 74,
+    minHeight: 44,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#bbf7d0"
+  },
+  cricketOptionDisabled: {
+    opacity: 0.45
+  },
+  cricketOptionText: {
+    color: "#064e3b",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  cricketRateText: {
+    color: "#059669",
+    fontSize: 11,
     fontWeight: "800"
   },
   noticeStrip: {

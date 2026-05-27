@@ -1,4 +1,4 @@
-import { applyReferralLossCommission, addWalletEntry, getUserBalance, getUsersList } from "../stores/admin-store.mjs";
+import { applyReferralLossCommission, addWalletEntry, getUserBalance, getUsersList, getWalletEntriesForUser } from "../stores/admin-store.mjs";
 import { getBidsForMarket, updateBidSettlement } from "../stores/bids-store.mjs";
 import { getChartRecord, upsertChartRecord } from "../stores/market-store.mjs";
 import { getPannaType } from "../matka-rules.mjs";
@@ -29,6 +29,102 @@ export { getMarketDayKey };
 
 function roundAmount(value) {
   return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function createBidWinReferenceId(bidId) {
+  return `bid-win:${bidId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createBidWinReversalReferenceId(winReferenceId) {
+  return `bid-win-reversal:${winReferenceId}`;
+}
+
+function createLegacyBidWinReversalReferenceId(bid) {
+  return `bid-win-reversal:legacy:${bid.id}:${String(bid.settledResult || "unknown").trim() || "unknown"}`;
+}
+
+function isSuccessfulWalletEntry(entry, type) {
+  return entry?.type === type && entry?.status === "SUCCESS";
+}
+
+function isReferencedBidWinForBid(entry, bidId) {
+  return isSuccessfulWalletEntry(entry, "BID_WIN") && String(entry.referenceId || "").startsWith(`bid-win:${bidId}:`);
+}
+
+async function addBidWinWalletEntry({ bid, market, payout }) {
+  const beforeBalance = await getUserBalance(bid.userId);
+  await addWalletEntry({
+    userId: bid.userId,
+    type: "BID_WIN",
+    status: "SUCCESS",
+    amount: payout,
+    beforeBalance,
+    afterBalance: roundAmount(beforeBalance + payout),
+    referenceId: createBidWinReferenceId(bid.id),
+    note: `${market.name} result ${market.result} | Bid ${bid.id}`
+  });
+}
+
+async function reverseActiveBidWinWalletEntries(bid, note) {
+  const entries = await getWalletEntriesForUser(bid.userId, 5000);
+  const reversalReferences = new Set(
+    entries
+      .filter((entry) => isSuccessfulWalletEntry(entry, "BID_WIN_REVERSAL"))
+      .map((entry) => String(entry.referenceId || ""))
+      .filter(Boolean)
+  );
+  const referencedWins = entries.filter((entry) => isReferencedBidWinForBid(entry, bid.id));
+  const activeWins = referencedWins.filter((entry) => !reversalReferences.has(createBidWinReversalReferenceId(entry.referenceId)));
+
+  let reversedCount = 0;
+  let reversedAmount = 0;
+
+  for (const winEntry of activeWins) {
+    const amount = roundAmount(winEntry.amount);
+    const beforeBalance = await getUserBalance(bid.userId);
+    const afterBalance = roundAmount(beforeBalance - amount);
+    await addWalletEntry({
+      userId: bid.userId,
+      type: "BID_WIN_REVERSAL",
+      status: "SUCCESS",
+      amount,
+      beforeBalance,
+      afterBalance,
+      referenceId: createBidWinReversalReferenceId(winEntry.referenceId),
+      note
+    });
+    reversedCount += 1;
+    reversedAmount += amount;
+  }
+
+  if (activeWins.length > 0) {
+    return { reversedCount, reversedAmount: roundAmount(reversedAmount) };
+  }
+
+  if (referencedWins.length > 0) {
+    return { reversedCount: 0, reversedAmount: 0 };
+  }
+
+  const legacyReferenceId = createLegacyBidWinReversalReferenceId(bid);
+  if (reversalReferences.has(legacyReferenceId)) {
+    return { reversedCount: 0, reversedAmount: 0 };
+  }
+
+  const beforeBalance = await getUserBalance(bid.userId);
+  const amount = roundAmount(bid.payout);
+  const afterBalance = roundAmount(beforeBalance - amount);
+  await addWalletEntry({
+    userId: bid.userId,
+    type: "BID_WIN_REVERSAL",
+    status: "SUCCESS",
+    amount,
+    beforeBalance,
+    afterBalance,
+    referenceId: legacyReferenceId,
+    note
+  });
+
+  return { reversedCount: 1, reversedAmount: amount };
 }
 
 function formatResultNotificationBody(result) {
@@ -506,16 +602,7 @@ export async function settlePendingBidsForMarket(market) {
     const notificationState = impactedUsers.get(updated.userId) || { userId: updated.userId, wins: 0, losses: 0, payout: 0 };
 
       if (outcome.status === "Won" && outcome.payout > 0) {
-        const beforeBalance = await getUserBalance(updated.userId);
-        await addWalletEntry({
-          userId: updated.userId,
-          type: "BID_WIN",
-          status: "SUCCESS",
-          amount: outcome.payout,
-          beforeBalance,
-          afterBalance: beforeBalance + outcome.payout,
-          note: `${market.name} result ${market.result}`
-        });
+        await addBidWinWalletEntry({ bid: updated, market, payout: outcome.payout });
         won += 1;
         totalPayout += outcome.payout;
         notificationState.wins += 1;
@@ -547,17 +634,10 @@ export async function resettleMarket(market) {
   const settled = cycle.matched.filter((bid) => bid.status !== "Pending");
   for (const bid of settled) {
     if (bid.status === "Won" && bid.payout > 0) {
-      const beforeBalance = await getUserBalance(bid.userId);
-      const afterBalance = Math.max(0, beforeBalance - bid.payout);
-      await addWalletEntry({
-        userId: bid.userId,
-        type: "BID_WIN_REVERSAL",
-        status: "SUCCESS",
-        amount: bid.payout,
-        beforeBalance,
-        afterBalance,
-        note: `Previous ${bid.market} win reversed from result ${bid.settledResult || "unknown"} before resettle to ${market.result}`
-      });
+      await reverseActiveBidWinWalletEntries(
+        bid,
+        `Previous ${bid.market} win reversed from result ${bid.settledResult || "unknown"} before resettle to ${market.result}`
+      );
     }
     await updateBidSettlement(bid.id, "Pending", 0, "");
   }
@@ -582,17 +662,10 @@ export async function resettleChangedMarket(market, previousResult) {
 
   for (const bid of affectedSettled) {
     if (bid.status === "Won" && bid.payout > 0) {
-      const beforeBalance = await getUserBalance(bid.userId);
-      const afterBalance = Math.max(0, beforeBalance - bid.payout);
-      await addWalletEntry({
-        userId: bid.userId,
-        type: "BID_WIN_REVERSAL",
-        status: "SUCCESS",
-        amount: bid.payout,
-        beforeBalance,
-        afterBalance,
-        note: `Corrected ${bid.market} result from ${previous || "unknown"} to ${next || "unknown"}`
-      });
+      await reverseActiveBidWinWalletEntries(
+        bid,
+        `Corrected ${bid.market} result from ${previous || "unknown"} to ${next || "unknown"}`
+      );
     }
     await updateBidSettlement(bid.id, "Pending", 0, "");
   }
@@ -630,19 +703,9 @@ export async function resetMarketSettlement(market, previousResult = "") {
 
   for (const bid of settled) {
     if (bid.status === "Won" && bid.payout > 0) {
-      const beforeBalance = await getUserBalance(bid.userId);
-      const afterBalance = Math.max(0, beforeBalance - bid.payout);
-      await addWalletEntry({
-        userId: bid.userId,
-        type: "BID_WIN_REVERSAL",
-        status: "SUCCESS",
-        amount: bid.payout,
-        beforeBalance,
-        afterBalance,
-        note: `Result corrected to placeholder for ${market.name}`
-      });
-      reversedWins += 1;
-      reversedPayout += bid.payout;
+      const reversal = await reverseActiveBidWinWalletEntries(bid, `Result corrected to placeholder for ${market.name}`);
+      reversedWins += reversal.reversedCount;
+      reversedPayout += reversal.reversedAmount;
     }
     await updateBidSettlement(bid.id, "Pending", 0, "");
   }

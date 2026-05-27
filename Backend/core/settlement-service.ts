@@ -65,7 +65,7 @@ export async function resettleMarket(market: Market): Promise<SettlementSummary>
         status: "SUCCESS",
         amount: bid.payout,
         beforeBalance,
-        afterBalance: Math.max(0, beforeBalance - bid.payout)
+        afterBalance: beforeBalance - bid.payout
       });
     }
 

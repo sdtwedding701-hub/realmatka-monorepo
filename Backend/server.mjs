@@ -13,6 +13,7 @@ const require = createRequire(import.meta.url);
 const backendRoot = __dirname;
 const workspaceRoot = path.resolve(backendRoot, "..");
 const startedAt = Date.now();
+const HISTORY_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 async function loadEnvFile(filePath, { override = false } = {}) {
   try {
@@ -524,6 +525,22 @@ server.listen(port, "0.0.0.0", () => {
     envWarnings: envValidation.warnings
   });
 });
+
+async function runHistoryCleanup(reason) {
+  try {
+    const { cleanupOldHistory } = await import("./standalone/db/history-retention-db.mjs");
+    const result = await cleanupOldHistory();
+    logger.info("Old history cleanup complete", { reason, ...result });
+  } catch (error) {
+    logger.error("Old history cleanup failed", { reason, error });
+  }
+}
+
+void runHistoryCleanup("startup");
+const historyCleanupTimer = setInterval(() => {
+  void runHistoryCleanup("scheduled");
+}, HISTORY_CLEANUP_INTERVAL_MS);
+historyCleanupTimer.unref?.();
 
 process.on("unhandledRejection", (error) => {
   logger.error("Unhandled promise rejection", { error });

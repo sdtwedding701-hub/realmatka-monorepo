@@ -59,6 +59,8 @@ const allowedPublicSettingKeys = new Set([
   "wallet_withdraw_end_time",
   "wallet_withdraw_weekend_closed",
   "wallet_withdraw_weekend_message",
+  "wallet_withdraw_holiday_dates",
+  "wallet_withdraw_holiday_message",
   "wallet_withdraw_time_message",
   "wallet_withdraw_button_label",
   "wallet_withdraw_info_visible",

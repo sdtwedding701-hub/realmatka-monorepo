@@ -27,7 +27,9 @@ export function SettingsPage({ apiBase, token, fetchApi, PageHeader, PageState }
     latest_app_apk_url: "",
     latest_app_update_required: "false",
     latest_app_update_title: "",
-    latest_app_update_message: ""
+    latest_app_update_message: "",
+    wallet_withdraw_holiday_dates: "",
+    wallet_withdraw_holiday_message: ""
   });
   const [message, setMessage] = useState("");
   const [operatorForm, setOperatorForm] = useState(emptyOperatorForm);
@@ -50,7 +52,9 @@ export function SettingsPage({ apiBase, token, fetchApi, PageHeader, PageState }
           latest_app_apk_url: map.latest_app_apk_url || "",
           latest_app_update_required: map.latest_app_update_required || "false",
           latest_app_update_title: map.latest_app_update_title || "New update available",
-          latest_app_update_message: map.latest_app_update_message || "Please download the latest APK to continue."
+          latest_app_update_message: map.latest_app_update_message || "Please download the latest APK to continue.",
+          wallet_withdraw_holiday_dates: map.wallet_withdraw_holiday_dates || "",
+          wallet_withdraw_holiday_message: map.wallet_withdraw_holiday_message || "Holiday ki wajah se aaj withdraw service band rahegi."
         });
       })
       .catch((error) => setState({ loading: false, error: error.message, settings: [], operators: [] }));
@@ -110,6 +114,8 @@ export function SettingsPage({ apiBase, token, fetchApi, PageHeader, PageState }
           <label><span>Force Update</span><select value={form.latest_app_update_required} onChange={(e) => setForm({ ...form, latest_app_update_required: e.target.value })}><option value="false">No</option><option value="true">Yes</option></select></label>
           <label className="wide"><span>Update Popup Title</span><input value={form.latest_app_update_title} onChange={(e) => setForm({ ...form, latest_app_update_title: e.target.value })} /></label>
           <label className="wide"><span>Update Popup Message</span><textarea rows={3} value={form.latest_app_update_message} onChange={(e) => setForm({ ...form, latest_app_update_message: e.target.value })} /></label>
+          <label className="wide"><span>Withdraw Holiday Dates</span><textarea rows={3} placeholder="2026-05-28, 2026-08-15" value={form.wallet_withdraw_holiday_dates} onChange={(e) => setForm({ ...form, wallet_withdraw_holiday_dates: e.target.value })} /></label>
+          <label className="wide"><span>Withdraw Holiday Message</span><input value={form.wallet_withdraw_holiday_message} onChange={(e) => setForm({ ...form, wallet_withdraw_holiday_message: e.target.value })} /></label>
         </div>
         <div className="actions"><button className="primary" onClick={save}>Save Settings</button></div>
         <p className="message success">{message}</p>

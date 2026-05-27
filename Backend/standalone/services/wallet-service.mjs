@@ -1,5 +1,6 @@
 import { issueOtp, verifyOtp } from "../routes/auth-otp.mjs";
 import { findUserByPhone, verifyCredential } from "../db.mjs";
+import { getHistoryRetentionCutoffIso } from "../db/history-retention-db.mjs";
 import { getAppSettings } from "../stores/admin-store.mjs";
 import { addWalletEntry, getBankAccountsForUser, getUserBalance, getWalletEntriesForUser } from "../stores/wallet-store.mjs";
 
@@ -7,6 +8,7 @@ export const MIN_WITHDRAW_AMOUNT = 500;
 const DEFAULT_WITHDRAW_MAX_AMOUNT = 999999;
 const DEFAULT_WITHDRAW_MULTIPLE = 100;
 const WITHDRAW_WEEKEND_CLOSED_MESSAGE = "Saturday aur Sunday ko withdraw service band rahegi.";
+const WITHDRAW_HOLIDAY_CLOSED_MESSAGE = "Holiday ki wajah se aaj withdraw service band rahegi.";
 const WITHDRAW_TIME_CLOSED_MESSAGE = "Withdraw request timing 11:00 AM se 11:00 PM tak hi available hai.";
 const WITHDRAW_START_MINUTES = 11 * 60;
 const WITHDRAW_END_MINUTES = 23 * 60;
@@ -37,6 +39,15 @@ function readSettingText(settings, key, fallback) {
   return value || fallback;
 }
 
+function readSettingDateList(settings, key) {
+  const raw = String(settings.get(key) ?? "").trim();
+  if (!raw) return [];
+  return raw
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item));
+}
+
 function parseTimeToMinutes(value, fallback) {
   const match = String(value || "").trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
   if (!match) {
@@ -63,9 +74,11 @@ async function getWithdrawConfig() {
     maxAmount,
     multiple,
     weekendClosed: readSettingBoolean(settings, "wallet_withdraw_weekend_closed", true),
+    holidayDates: readSettingDateList(settings, "wallet_withdraw_holiday_dates"),
     startMinutes: parseTimeToMinutes(settings.get("wallet_withdraw_start_time"), WITHDRAW_START_MINUTES),
     endMinutes: parseTimeToMinutes(settings.get("wallet_withdraw_end_time"), WITHDRAW_END_MINUTES),
     weekendMessage: readSettingText(settings, "wallet_withdraw_weekend_message", WITHDRAW_WEEKEND_CLOSED_MESSAGE),
+    holidayMessage: readSettingText(settings, "wallet_withdraw_holiday_message", WITHDRAW_HOLIDAY_CLOSED_MESSAGE),
     timeMessage: readSettingText(settings, "wallet_withdraw_time_message", WITHDRAW_TIME_CLOSED_MESSAGE)
   };
 }
@@ -94,6 +107,11 @@ function isWithdrawWeekendClosed(date = new Date()) {
   return weekday === "Saturday" || weekday === "Sunday";
 }
 
+function isWithdrawHolidayClosed(config, date = new Date()) {
+  const today = getIndiaDateKey(date);
+  return Array.isArray(config.holidayDates) && config.holidayDates.includes(today);
+}
+
 function isWithdrawTimeClosed(config, date = new Date()) {
   const currentMinutes = getIndiaMinutes(date);
   return currentMinutes < config.startMinutes || currentMinutes >= config.endMinutes;
@@ -117,6 +135,9 @@ function validateWithdrawAmount(amount, config) {
 
 async function ensureWithdrawAllowed(userId, amount) {
   const config = await getWithdrawConfig();
+  if (isWithdrawHolidayClosed(config)) {
+    return { ok: false, status: 400, error: config.holidayMessage };
+  }
   if (config.weekendClosed && isWithdrawWeekendClosed()) {
     return { ok: false, status: 400, error: config.weekendMessage };
   }
@@ -151,7 +172,11 @@ async function ensureWithdrawAllowed(userId, amount) {
 }
 
 export async function getWalletHistory(userId, limit = 5000) {
-  return getWalletEntriesForUser(userId, limit);
+  const cutoffIso = getHistoryRetentionCutoffIso();
+  return (await getWalletEntriesForUser(userId, limit)).filter((entry) => {
+    const createdAt = String(entry?.createdAt || "");
+    return createdAt && createdAt >= cutoffIso;
+  });
 }
 
 export async function getWalletBalance(userId) {

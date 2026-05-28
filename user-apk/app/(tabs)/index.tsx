@@ -1,20 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, Image, Modal, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { marketCatalog } from "../../data/mock";
-import { api, formatApiError, type CricketMatch, type CricketMatchesPayload } from "@/lib/api";
+import { api, formatApiError, type CricketMatchesPayload } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
 import {
   getCachedChart,
   getCachedMarkets,
-  getCachedSettings,
   hydrateCachedMarkets,
-  hydrateCachedSettings,
   setCachedChart,
-  setCachedMarkets,
-  setCachedSettings
+  setCachedMarkets
 } from "@/lib/content-cache";
 import { colors } from "@/theme/colors";
 
@@ -35,8 +32,6 @@ type MarketItem = {
 };
 
 const HOME_SOFT_REFRESH_INTERVAL_MS = 60_000;
-const DEFAULT_NOTICE_TEXT =
-  "Abhi market aur betting running hai. Aap app me bet place kar sakte ho. First deposit bonus: Rs 1000 par 50 points aur Rs 2000 par 100 points milenge. Bonus sirf first deposit par milega.";
 const FALLBACK_MARKETS: MarketItem[] = marketCatalog.map((fallback) => ({
   id: fallback.slug,
   slug: fallback.slug,
@@ -87,7 +82,7 @@ function getMarketDisplayMeta(market: Pick<MarketItem, "status" | "action" | "ph
 }
 
 export default function HomeScreen() {
-  const { walletBalance, sessionToken, reloadSessionData } = useAppState();
+  const { walletBalance } = useAppState();
   const { height } = useWindowDimensions();
   const [markets, setMarkets] = useState<MarketItem[]>(() => getCachedMarkets() ?? FALLBACK_MARKETS);
   const lastGoodMarketsRef = useRef<MarketItem[]>([]);
@@ -95,32 +90,16 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [noticeText, setNoticeText] = useState(DEFAULT_NOTICE_TEXT);
-  const noticeScrollX = useRef(new Animated.Value(0)).current;
-  const [noticeContainerWidth, setNoticeContainerWidth] = useState(0);
-  const [noticeTextWidth, setNoticeTextWidth] = useState(0);
-  const [noticeReady, setNoticeReady] = useState(false);
   const [selectedChartMarket, setSelectedChartMarket] = useState<Pick<MarketItem, "slug" | "name"> | null>(null);
   const [homeMode, setHomeMode] = useState<"matka" | "cricket">("matka");
   const [cricketData, setCricketData] = useState<CricketMatchesPayload>({ rates: {}, matches: [] });
   const [cricketLoading, setCricketLoading] = useState(false);
   const [cricketError, setCricketError] = useState("");
-  const [cricketAmount, setCricketAmount] = useState("100");
-  const [cricketMessage, setCricketMessage] = useState("");
-  const estimatedNoticeTextWidth = Math.max(noticeTextWidth, noticeText.length * 12);
   useEffect(() => {
     const cachedMarkets = getCachedMarkets();
     const initialMarkets = cachedMarkets?.length ? cachedMarkets : FALLBACK_MARKETS;
     lastGoodMarketsRef.current = initialMarkets;
     setMarkets(initialMarkets);
-
-    const cachedSettings = getCachedSettings();
-    if (cachedSettings?.length) {
-      const map = Object.fromEntries(cachedSettings.map((item) => [item.key, item.value]));
-      if (map.notice_text?.trim()) {
-        setNoticeText(map.notice_text.trim());
-      }
-    }
 
     void (async () => {
       const persistedMarkets = await hydrateCachedMarkets();
@@ -129,15 +108,7 @@ export default function HomeScreen() {
         setMarkets(persistedMarkets);
       }
 
-      const persistedSettings = await hydrateCachedSettings();
-      if (persistedSettings?.length) {
-        const map = Object.fromEntries(persistedSettings.map((item) => [item.key, item.value]));
-        if (map.notice_text?.trim()) {
-          setNoticeText(map.notice_text.trim());
-        }
-      }
-
-      await Promise.allSettled([loadMarkets(false), loadSettings(), loadCricket(false)]);
+      await Promise.allSettled([loadMarkets(false), loadCricket(false)]);
     })();
   }, []);
 
@@ -165,42 +136,6 @@ export default function HomeScreen() {
     }, [])
   );
 
-  useEffect(() => {
-    const measuredNoticeTextWidth = Math.max(estimatedNoticeTextWidth, noticeContainerWidth + 48);
-    noticeScrollX.stopAnimation();
-    if (!noticeContainerWidth || !measuredNoticeTextWidth || !noticeReady) {
-      noticeScrollX.setValue(0);
-      return;
-    }
-
-    const shouldScroll = measuredNoticeTextWidth > noticeContainerWidth - 8 || noticeText.length > 42;
-    if (!shouldScroll) {
-      noticeScrollX.setValue(0);
-      return;
-    }
-
-    const travelDistance = measuredNoticeTextWidth + noticeContainerWidth + 24;
-    noticeScrollX.setValue(noticeContainerWidth);
-    const animation = Animated.loop(
-      Animated.timing(noticeScrollX, {
-        toValue: -measuredNoticeTextWidth - 24,
-        duration: Math.max(9000, travelDistance * 42),
-        easing: Easing.linear,
-        useNativeDriver: true
-      })
-    );
-    animation.start();
-
-    return () => {
-      animation.stop();
-    };
-  }, [estimatedNoticeTextWidth, noticeContainerWidth, noticeReady, noticeScrollX, noticeText]);
-
-  useEffect(() => {
-    setNoticeReady(false);
-    setNoticeTextWidth(0);
-  }, [noticeText]);
-
   const listedMarkets = markets;
   const isCompactScreen = height < 760;
   const showHardError = listedMarkets.length === 0 && Boolean(error);
@@ -213,38 +148,6 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.page}>
-      <View style={styles.noticeStrip}>
-        <Ionicons color={colors.warning} name="alert-circle-outline" size={16} />
-        <View
-          onLayout={(event) => setNoticeContainerWidth(event.nativeEvent.layout.width)}
-          style={styles.noticeMarqueeWindow}
-        >
-          <Text
-            onLayout={(event) => {
-              const width = Math.ceil(event.nativeEvent.layout.width);
-              if (width > 0) {
-                setNoticeTextWidth(width);
-                setNoticeReady(true);
-              }
-            }}
-            numberOfLines={1}
-            style={styles.noticeMeasureText}
-          >
-            {noticeText}
-          </Text>
-          <Animated.Text
-            ellipsizeMode="clip"
-            numberOfLines={1}
-            style={[
-              styles.noticeText,
-              noticeReady ? styles.noticeTextVisible : styles.noticeTextHidden,
-              { width: Math.max(estimatedNoticeTextWidth, noticeContainerWidth), transform: [{ translateX: noticeScrollX }] }
-            ]}
-          >
-            {noticeText}
-          </Animated.Text>
-        </View>
-      </View>
       <AppHeader
         title="Real Matka"
         rightLabel={`Rs ${walletBalance}`}
@@ -283,13 +186,9 @@ export default function HomeScreen() {
         </View>
         {homeMode === "cricket" ? (
           <CricketHomeSection
-            amount={cricketAmount}
             data={cricketData}
             error={cricketError}
             loading={cricketLoading}
-            message={cricketMessage}
-            onAmountChange={setCricketAmount}
-            onPlaceBet={placeCricketQuickBet}
             onRefresh={() => loadCricket(true)}
           />
         ) : loading && !listedMarkets.length ? (
@@ -527,26 +426,6 @@ export default function HomeScreen() {
     }
   }
 
-  async function placeCricketQuickBet(match: CricketMatch, betType: string, selection: string) {
-    if (!sessionToken) {
-      setCricketMessage("Login required.");
-      return;
-    }
-    const amount = Number(cricketAmount || 0);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setCricketMessage("Valid amount enter karo.");
-      return;
-    }
-    try {
-      setCricketMessage("");
-      await api.placeCricketBet(sessionToken, { matchId: match.id, betType, selection, amount });
-      setCricketMessage(`${match.title}: ${selection} bet placed.`);
-      await Promise.allSettled([reloadSessionData({ force: true }), loadCricket(false)]);
-    } catch (placeError) {
-      setCricketMessage(formatApiError(placeError, "Cricket bet place nahi hui"));
-    }
-  }
-
   async function prefetchChartPreview(items: MarketItem[]) {
     const uncachedMarkets = items.filter(
       (item) => !getCachedChart(item.slug, "jodi", 15 * 60_000) || !getCachedChart(item.slug, "panna", 15 * 60_000)
@@ -568,67 +447,33 @@ export default function HomeScreen() {
     }
   }
 
-  async function loadSettings() {
-    try {
-      const settings = await api.getSettings();
-      setCachedSettings(settings);
-      const map = Object.fromEntries(settings.map((item) => [item.key, item.value]));
-      if (map.notice_text?.trim()) {
-        setNoticeText(map.notice_text.trim());
-      }
-    } catch {
-      // Keep fallback text when settings are unavailable.
-    }
-  }
-
 }
 
 function CricketHomeSection({
-  amount,
   data,
   error,
   loading,
-  message,
-  onAmountChange,
-  onPlaceBet,
   onRefresh
 }: {
-  amount: string;
   data: CricketMatchesPayload;
   error: string;
   loading: boolean;
-  message: string;
-  onAmountChange: (value: string) => void;
-  onPlaceBet: (match: CricketMatch, betType: string, selection: string) => void;
   onRefresh: () => void;
 }) {
   const matches = data.matches || [];
-  const rates = data.rates || {};
   return (
     <View style={styles.cricketWrap}>
       <View style={styles.cricketHero}>
         <View style={styles.cricketHeroText}>
           <Text style={styles.cricketEyebrow}>Live Cricket Games</Text>
-          <Text style={styles.cricketTitle}>Over prediction lagaao</Text>
-          <Text style={styles.cricketSubtitle}>Runs, Odd/Even, Wicket aur Boundary par quick bet.</Text>
+          <Text style={styles.cricketTitle}>Toss aur match winner</Text>
+          <Text style={styles.cricketSubtitle}>Team winner par simple 1.8x cricket bet.</Text>
         </View>
         <Pressable onPress={onRefresh} style={styles.cricketRefresh}>
           <Ionicons color={colors.surface} name="refresh" size={18} />
         </Pressable>
       </View>
 
-      <View style={styles.cricketAmountRow}>
-        <Text style={styles.cricketAmountLabel}>Bet Amount</Text>
-        <TextInput
-          keyboardType="numeric"
-          onChangeText={(value) => onAmountChange(value.replace(/[^0-9]/g, ""))}
-          placeholder="100"
-          style={styles.cricketAmountInput}
-          value={amount}
-        />
-      </View>
-
-      {message ? <Text style={styles.cricketMessage}>{message}</Text> : null}
       {error ? <Text style={styles.cricketError}>{error}</Text> : null}
 
       {loading && !matches.length ? (
@@ -638,22 +483,30 @@ function CricketHomeSection({
         </SurfaceCard>
       ) : matches.length ? (
         matches.map((match) => (
-          <View key={match.id} style={styles.cricketCard}>
-            <View style={styles.cricketCardTop}>
-              <View>
-                <Text style={styles.cricketMatchTitle}>{match.title}</Text>
-                <Text style={styles.cricketTeams}>{match.teamA} vs {match.teamB}</Text>
+          <Pressable
+            key={match.id}
+            onPress={() => {
+              router.push({
+                pathname: "/cricket/[match]",
+                params: { match: match.id, title: match.title }
+              });
+            }}
+            style={styles.cricketPosterCard}
+          >
+            <View style={styles.cricketPosterContent}>
+              <View style={styles.cricketPosterIcon}>
+                <Ionicons color={colors.surface} name="baseball" size={24} />
               </View>
-              <View style={[styles.cricketStatusPill, match.bettingOpen ? styles.cricketStatusLive : styles.cricketStatusClosed]}>
-                <Text style={styles.cricketStatusText}>{match.bettingOpen ? "LIVE" : "CLOSED"}</Text>
+              <View style={styles.cricketPosterText}>
+                <Text style={styles.cricketPosterTitle}>{match.teamA} vs {match.teamB}</Text>
+                <Text style={styles.cricketPosterSubtitle}>{match.title}</Text>
+                <Text style={styles.cricketPosterMeta}>{formatCricketStart(match.startAt)}</Text>
               </View>
             </View>
-            <Text style={styles.cricketOverText}>Over {match.activeOver} market</Text>
-            <CricketBetGroup match={match} onPlaceBet={onPlaceBet} rates={rates.runs || {}} title="Over Runs" type="runs" />
-            <CricketBetGroup match={match} onPlaceBet={onPlaceBet} rates={rates.odd_even || {}} title="Odd / Even" type="odd_even" />
-            <CricketBetGroup match={match} onPlaceBet={onPlaceBet} rates={rates.wicket || {}} title="Wicket" type="wicket" />
-            <CricketBetGroup match={match} onPlaceBet={onPlaceBet} rates={rates.boundary || {}} title="Boundary" type="boundary" />
-          </View>
+            <View style={[styles.cricketStatusPill, match.matchBettingOpen || match.tossBettingOpen ? styles.cricketStatusLive : styles.cricketStatusClosed]}>
+              <Text style={styles.cricketStatusText}>{match.matchBettingOpen || match.tossBettingOpen ? "OPEN" : "CLOSED"}</Text>
+            </View>
+          </Pressable>
         ))
       ) : (
         <SurfaceCard>
@@ -665,37 +518,11 @@ function CricketHomeSection({
   );
 }
 
-function CricketBetGroup({
-  match,
-  onPlaceBet,
-  rates,
-  title,
-  type
-}: {
-  match: CricketMatch;
-  onPlaceBet: (match: CricketMatch, betType: string, selection: string) => void;
-  rates: Record<string, number>;
-  title: string;
-  type: string;
-}) {
-  return (
-    <View style={styles.cricketBetGroup}>
-      <Text style={styles.cricketBetTitle}>{title}</Text>
-      <View style={styles.cricketOptions}>
-        {Object.entries(rates).map(([selection, rate]) => (
-          <Pressable
-            disabled={!match.bettingOpen}
-            key={`${type}-${selection}`}
-            onPress={() => onPlaceBet(match, type, selection)}
-            style={[styles.cricketOption, !match.bettingOpen && styles.cricketOptionDisabled]}
-          >
-            <Text style={styles.cricketOptionText}>{selection}</Text>
-            <Text style={styles.cricketRateText}>{rate}x</Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
+function formatCricketStart(value: string | null) {
+  if (!value) return "Winner markets";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Winner markets";
+  return date.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 const styles = StyleSheet.create({
@@ -752,30 +579,31 @@ const styles = StyleSheet.create({
       backgroundColor: "#ffffff"
     },
   stickyModeWrap: {
-    backgroundColor: colors.background,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 10,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
     borderBottomWidth: 1,
     borderColor: colors.border
   },
   modeSwitch: {
     flexDirection: "row",
-    gap: 8,
-    borderRadius: 16,
+    gap: 0,
+    borderRadius: 0,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 6
+    borderWidth: 0,
+    padding: 0
   },
   modeButton: {
     flex: 1,
-    minHeight: 44,
-    borderRadius: 12,
+    minHeight: 38,
+    borderRadius: 0,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    gap: 7
+    gap: 7,
+    borderRightWidth: 1,
+    borderRightColor: colors.border
   },
   modeButtonActive: {
     backgroundColor: colors.primary
@@ -830,34 +658,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#10b981"
   },
-  cricketAmountRow: {
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12
-  },
-  cricketAmountLabel: {
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: "900"
-  },
-  cricketAmountInput: {
-    width: 120,
-    minHeight: 42,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    paddingHorizontal: 12,
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: "900",
-    textAlign: "right"
-  },
   cricketMessage: {
     color: colors.success,
     fontSize: 12,
@@ -868,35 +668,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800"
   },
-  cricketCard: {
+  cricketPosterCard: {
+    minHeight: 118,
     borderRadius: 18,
-    backgroundColor: colors.surface,
+    backgroundColor: "#064e3b",
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: "#10b981",
     padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 12,
     shadowColor: colors.shadow,
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 3
+    elevation: 4
   },
-  cricketCardTop: {
+  cricketPosterContent: {
+    flex: 1,
     flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 10
+    alignItems: "center",
+    gap: 12
   },
-  cricketMatchTitle: {
-    color: colors.textPrimary,
-    fontSize: 17,
+  cricketPosterIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#10b981"
+  },
+  cricketPosterText: {
+    flex: 1,
+    gap: 3
+  },
+  cricketPosterTitle: {
+    color: colors.surface,
+    fontSize: 19,
     fontWeight: "900"
   },
-  cricketTeams: {
-    color: colors.textSecondary,
+  cricketPosterSubtitle: {
+    color: "#d1fae5",
     fontSize: 12,
-    fontWeight: "700",
-    marginTop: 2
+    fontWeight: "800"
+  },
+  cricketPosterMeta: {
+    color: "#a7f3d0",
+    fontSize: 12,
+    fontWeight: "900"
   },
   cricketStatusPill: {
     borderRadius: 999,
@@ -913,90 +733,6 @@ const styles = StyleSheet.create({
     color: "#166534",
     fontSize: 11,
     fontWeight: "900"
-  },
-  cricketOverText: {
-    color: "#047857",
-    fontSize: 13,
-    fontWeight: "900"
-  },
-  cricketBetGroup: {
-    gap: 8
-  },
-  cricketBetTitle: {
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: "900"
-  },
-  cricketOptions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  cricketOption: {
-    minWidth: 74,
-    minHeight: 44,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#ecfdf5",
-    borderWidth: 1,
-    borderColor: "#bbf7d0"
-  },
-  cricketOptionDisabled: {
-    opacity: 0.45
-  },
-  cricketOptionText: {
-    color: "#064e3b",
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  cricketRateText: {
-    color: "#059669",
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  noticeStrip: {
-    backgroundColor: colors.warningSoft,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: colors.borderStrong,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8
-  },
-  noticeMarqueeWindow: {
-    flex: 1,
-    minHeight: 20,
-    overflow: "hidden"
-  },
-  noticeMeasureText: {
-    position: "absolute",
-    left: -9999,
-    top: -9999,
-    opacity: 0,
-    color: colors.warning,
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 17
-  },
-  noticeText: {
-    alignSelf: "flex-start",
-    color: colors.warning,
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 17,
-    paddingRight: 24,
-    minWidth: "100%",
-    flexShrink: 0
-  },
-  noticeTextHidden: {
-    opacity: 0
-  },
-  noticeTextVisible: {
-    opacity: 1
   },
   errorTitle: {
     color: colors.textPrimary,

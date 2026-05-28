@@ -6,90 +6,130 @@ import {
   listCricketBetsForMatch,
   listCricketBetsForUser,
   listCricketMatches,
-  saveCricketResult,
+  saveCricketMarketResult,
   updateCricketBetSettlement,
   upsertCricketMatch
 } from "../db/cricket-db.mjs";
 
+const CRICKET_RATE = 1.8;
+const MARKET_TYPES = new Set(["toss_winner", "match_winner"]);
+
 const CRICKET_RATES = {
-  runs: {
-    "0-5": 3.5,
-    "6-10": 2.5,
-    "11-15": 3,
-    "16+": 4
-  },
-  odd_even: {
-    Odd: 1.9,
-    Even: 1.9
-  },
-  wicket: {
-    Yes: 3,
-    No: 1.4
-  },
-  boundary: {
-    Yes: 1.8,
-    No: 2.2
-  }
+  toss_winner: CRICKET_RATE,
+  match_winner: CRICKET_RATE
 };
 
 export function getCricketRates() {
   return CRICKET_RATES;
 }
 
-function normalizeBetType(value) {
+function normalizeMarketType(value) {
   const normalized = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-  if (normalized === "runs" || normalized === "over_runs") return "runs";
-  if (normalized === "odd_even" || normalized === "odd/even") return "odd_even";
-  if (normalized === "wicket") return "wicket";
-  if (normalized === "boundary") return "boundary";
+  if (normalized === "toss" || normalized === "toss_winner") return "toss_winner";
+  if (normalized === "match" || normalized === "winner" || normalized === "match_winner") return "match_winner";
   return "";
 }
 
-function getRate(betType, selection) {
-  return Number(CRICKET_RATES[betType]?.[selection] || 0);
+function normalizeSelection(value) {
+  const normalized = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (normalized === "team_a" || normalized === "a") return "team_a";
+  if (normalized === "team_b" || normalized === "b") return "team_b";
+  if (normalized === "cancel" || normalized === "refund" || normalized === "no_result") return "cancel";
+  return "";
 }
 
-function getResultLabel({ runs, wicket, boundary }) {
-  return `Runs ${runs} | Wicket ${wicket ? "Yes" : "No"} | Boundary ${boundary ? "Yes" : "No"}`;
+function getTeamLabel(match, selection) {
+  if (selection === "team_a") return match.teamA;
+  if (selection === "team_b") return match.teamB;
+  if (selection === "cancel") return "Cancelled / Refund";
+  return selection;
 }
 
-function isRunsSelectionWin(selection, runs) {
-  if (selection === "0-5") return runs >= 0 && runs <= 5;
-  if (selection === "6-10") return runs >= 6 && runs <= 10;
-  if (selection === "11-15") return runs >= 11 && runs <= 15;
-  if (selection === "16+") return runs >= 16;
-  return false;
+function getMarketLabel(marketType) {
+  return marketType === "toss_winner" ? "Toss Winner" : "Match Winner";
 }
 
-function evaluateCricketBet(bet, result) {
-  const runs = Number(result.runs);
-  if (bet.betType === "runs") return isRunsSelectionWin(bet.selection, runs);
-  if (bet.betType === "odd_even") return runs % 2 === 0 ? bet.selection === "Even" : bet.selection === "Odd";
-  if (bet.betType === "wicket") return result.wicket ? bet.selection === "Yes" : bet.selection === "No";
-  if (bet.betType === "boundary") return result.boundary ? bet.selection === "Yes" : bet.selection === "No";
-  return false;
+function isAfterClose(closeAt) {
+  if (!closeAt) return false;
+  const closeTime = new Date(closeAt).getTime();
+  if (Number.isNaN(closeTime)) return false;
+  return Date.now() >= closeTime;
+}
+
+function getMarketOpenState(match, marketType) {
+  if (String(match.status || "").toLowerCase() !== "live") {
+    return { open: false, reason: "Cricket match is closed" };
+  }
+  if (marketType === "toss_winner") {
+    if (match.tossWinner) return { open: false, reason: "Toss result already published" };
+    if (!match.tossBettingOpen) return { open: false, reason: "Toss betting is closed" };
+    if (isAfterClose(match.tossCloseAt)) return { open: false, reason: "Toss betting time is over" };
+    return { open: true, reason: "" };
+  }
+  if (match.matchWinner) return { open: false, reason: "Match result already published" };
+  if (!match.matchBettingOpen) return { open: false, reason: "Match winner betting is closed" };
+  if (isAfterClose(match.matchCloseAt)) return { open: false, reason: "Match winner betting time is over" };
+  return { open: true, reason: "" };
+}
+
+function decorateMatch(match) {
+  if (!match) return null;
+  return {
+    ...match,
+    markets: {
+      toss_winner: {
+        label: "Toss Winner",
+        rate: CRICKET_RATE,
+        open: getMarketOpenState(match, "toss_winner").open,
+        closeAt: match.tossCloseAt,
+        winner: match.tossWinner
+      },
+      match_winner: {
+        label: "Match Winner",
+        rate: CRICKET_RATE,
+        open: getMarketOpenState(match, "match_winner").open,
+        closeAt: match.matchCloseAt,
+        winner: match.matchWinner
+      }
+    }
+  };
 }
 
 export async function getCricketMatches({ admin = false } = {}) {
   const matches = await listCricketMatches({ admin });
   return {
     rates: CRICKET_RATES,
-    matches
+    matches: matches.map(decorateMatch)
+  };
+}
+
+function defaultCloseTimes(startAt) {
+  const start = new Date(String(startAt || ""));
+  if (Number.isNaN(start.getTime())) {
+    return { tossCloseAt: null, matchCloseAt: null };
+  }
+  return {
+    tossCloseAt: new Date(start.getTime() - 35 * 60 * 1000).toISOString(),
+    matchCloseAt: new Date(start.getTime() - 5 * 60 * 1000).toISOString()
   };
 }
 
 export async function saveAdminCricketMatch(body) {
   try {
+    const defaults = defaultCloseTimes(body.startAt);
     const match = await upsertCricketMatch({
       id: body.id,
       title: body.title,
       teamA: body.teamA,
       teamB: body.teamB,
       status: body.status || "Live",
-      activeOver: body.activeOver || 1,
-      bettingOpen: body.bettingOpen
+      startAt: body.startAt,
+      tossBettingOpen: body.tossBettingOpen,
+      matchBettingOpen: body.matchBettingOpen,
+      tossCloseAt: body.tossCloseAt || defaults.tossCloseAt,
+      matchCloseAt: body.matchCloseAt || defaults.matchCloseAt
     });
-    return { ok: true, data: match };
+    return { ok: true, data: decorateMatch(match) };
   } catch (error) {
     return { ok: false, status: 400, error: error?.message || "Unable to save cricket match" };
   }
@@ -97,24 +137,25 @@ export async function saveAdminCricketMatch(body) {
 
 export async function placeCricketBet(user, body) {
   const matchId = String(body.matchId || "").trim();
-  const betType = normalizeBetType(body.betType);
-  const selection = String(body.selection || "").trim();
+  const marketType = normalizeMarketType(body.marketType || body.betType);
+  const selection = normalizeSelection(body.selection);
   const amount = Number(body.amount || 0);
-  if (!matchId || !betType || !selection) {
-    return { ok: false, status: 400, error: "Match, bet type, and selection are required" };
+  if (!matchId || !marketType || !selection || selection === "cancel") {
+    return { ok: false, status: 400, error: "Match, market, and team selection are required" };
+  }
+  if (!MARKET_TYPES.has(marketType)) {
+    return { ok: false, status: 400, error: "Invalid cricket market" };
   }
   if (!Number.isFinite(amount) || amount <= 0) {
     return { ok: false, status: 400, error: "Valid bet amount is required" };
   }
-  const rate = getRate(betType, selection);
-  if (!rate) {
-    return { ok: false, status: 400, error: "Invalid cricket bet selection" };
-  }
 
   const match = await findCricketMatch(matchId);
   if (!match) return { ok: false, status: 404, error: "Cricket match not found" };
-  if (String(match.status || "").toLowerCase() !== "live" || !match.bettingOpen) {
-    return { ok: false, status: 400, error: "Cricket betting is closed for this match" };
+
+  const openState = getMarketOpenState(match, marketType);
+  if (!openState.open) {
+    return { ok: false, status: 400, error: openState.reason || "Cricket betting is closed" };
   }
 
   const beforeBalance = await getUserBalance(user.id);
@@ -122,7 +163,7 @@ export async function placeCricketBet(user, body) {
     return { ok: false, status: 400, error: "Insufficient balance" };
   }
 
-  const bet = await addCricketBet({ userId: user.id, match, betType, selection, amount, rate });
+  const bet = await addCricketBet({ userId: user.id, match, marketType, selection, amount, rate: CRICKET_RATE });
   await addWalletEntry({
     userId: user.id,
     type: "BID_PLACED",
@@ -131,7 +172,7 @@ export async function placeCricketBet(user, body) {
     beforeBalance,
     afterBalance: beforeBalance - amount,
     referenceId: `cricket-bet:${bet.id}`,
-    note: `Cricket bet placed: ${match.title} Over ${match.activeOver} ${betType} ${selection}`
+    note: `Cricket bet placed: ${match.title} ${getMarketLabel(marketType)} ${getTeamLabel(match, selection)}`
   });
 
   return { ok: true, data: bet };
@@ -147,50 +188,53 @@ export async function getAdminCricketBets(matchId) {
 
 export async function settleAdminCricketResult(body) {
   const matchId = String(body.matchId || "").trim();
-  const runs = Number(body.runs);
-  const wicket = body.wicket === true || String(body.wicket).toLowerCase() === "yes" || String(body.wicket).toLowerCase() === "true";
-  const boundary = body.boundary === true || String(body.boundary).toLowerCase() === "yes" || String(body.boundary).toLowerCase() === "true";
+  const marketType = normalizeMarketType(body.marketType || body.betType);
+  const winner = normalizeSelection(body.winner || body.selection);
   if (!matchId) return { ok: false, status: 400, error: "matchId is required" };
-  if (!Number.isInteger(runs) || runs < 0) return { ok: false, status: 400, error: "Valid over runs are required" };
+  if (!MARKET_TYPES.has(marketType)) return { ok: false, status: 400, error: "Valid market type is required" };
+  if (!winner) return { ok: false, status: 400, error: "Winner team is required" };
 
   const match = await findCricketMatch(matchId);
   if (!match) return { ok: false, status: 404, error: "Cricket match not found" };
 
-  const pendingBets = (await listCricketBetsForMatch(matchId)).filter((bet) => bet.status === "Pending" && bet.overNumber === match.activeOver);
-  const resultLabel = getResultLabel({ runs, wicket, boundary });
+  const pendingBets = (await listCricketBetsForMatch(matchId)).filter((bet) => bet.status === "Pending" && bet.marketType === marketType);
+  const resultLabel = `${getMarketLabel(marketType)}: ${getTeamLabel(match, winner)}`;
   let won = 0;
   let lost = 0;
+  let refunded = 0;
   let totalPayout = 0;
 
   for (const bet of pendingBets) {
-    const isWin = evaluateCricketBet(bet, { runs, wicket, boundary });
-    const payout = isWin ? Math.round(Number(bet.amount) * Number(bet.rate) * 100) / 100 : 0;
-    const updated = await updateCricketBetSettlement(bet.id, isWin ? "Won" : "Lost", payout, resultLabel);
-    if (isWin && payout > 0) {
+    const isRefund = winner === "cancel";
+    const isWin = !isRefund && bet.selection === winner;
+    const payout = isRefund ? Number(bet.amount || 0) : isWin ? Math.round(Number(bet.amount) * Number(bet.rate) * 100) / 100 : 0;
+    const status = isRefund ? "Refunded" : isWin ? "Won" : "Lost";
+    const updated = await updateCricketBetSettlement(bet.id, status, payout, resultLabel);
+    if (payout > 0) {
       const beforeBalance = await getUserBalance(updated.userId);
       await addWalletEntry({
         userId: updated.userId,
-        type: "BID_WIN",
+        type: isRefund ? "BID_REFUND" : "BID_WIN",
         status: "SUCCESS",
         amount: payout,
         beforeBalance,
         afterBalance: beforeBalance + payout,
-        referenceId: `cricket-win:${updated.id}`,
-        note: `Cricket win: ${match.title} Over ${match.activeOver}`
+        referenceId: `${isRefund ? "cricket-refund" : "cricket-win"}:${updated.id}`,
+        note: `${isRefund ? "Cricket refund" : "Cricket win"}: ${match.title} ${getMarketLabel(marketType)}`
       });
-      won += 1;
       totalPayout += payout;
-    } else {
-      lost += 1;
     }
+    if (isRefund) refunded += 1;
+    else if (isWin) won += 1;
+    else lost += 1;
   }
 
-  const savedMatch = await saveCricketResult(matchId, { runs, wicket, boundary });
+  const savedMatch = await saveCricketMarketResult(matchId, marketType, winner);
   return {
     ok: true,
     data: {
-      match: savedMatch,
-      settlement: { processed: pendingBets.length, won, lost, totalPayout }
+      match: decorateMatch(savedMatch),
+      settlement: { processed: pendingBets.length, won, lost, refunded, totalPayout }
     }
   };
 }

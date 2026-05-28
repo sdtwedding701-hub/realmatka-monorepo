@@ -117,11 +117,21 @@ function formatBoardName(label: string) {
   return label.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function formatCricketSelection(selection: string) {
+  if (selection === "team_a") return "Team A";
+  if (selection === "team_b") return "Team B";
+  if (selection === "cancel") return "Refund";
+  return selection;
+}
+
 function formatSessionLabel(sessionType: "Open" | "Close" | "NA") {
   return sessionType === "NA" ? "NA" : sessionType.toUpperCase();
 }
 
 function formatRate(gameType: string) {
+  if (String(gameType || "").toLowerCase().includes("cricket")) {
+    return "1.8";
+  }
   const rate = BET_RATE_MAP[gameType] ?? BET_RATE_MAP[formatBoardName(gameType)] ?? 0;
   return rate > 0 ? String(rate) : "-";
 }
@@ -157,12 +167,13 @@ function formatWalletTitle(type: string) {
 
 export default function HistoryScreen() {
   const params = useLocalSearchParams<{ payment?: string; reference?: string; amount?: string; status?: string }>();
-  const { bids, walletEntries, loadBidHistory, loadWalletHistory } = useAppState();
+  const { bids, cricketBets, walletEntries, loadBidHistory, loadCricketHistory, loadWalletHistory } = useAppState();
   const [isFilterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedBetId, setSelectedBetId] = useState<string | null>(null);
   const [activeRange, setActiveRange] = useState<{ from: string; to: string } | null>(null);
+  const [historyMode, setHistoryMode] = useState<"matka" | "cricket">("matka");
   const [pendingFromDate, setPendingFromDate] = useState("");
   const [pendingToDate, setPendingToDate] = useState(currentDateInput);
   const marketMap = useMemo(() => {
@@ -191,16 +202,16 @@ export default function HistoryScreen() {
   const refreshData = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([loadBidHistory({ force: true }), loadWalletHistory({ force: true })]);
+      await Promise.all([loadBidHistory({ force: true }), loadCricketHistory({ force: true }), loadWalletHistory({ force: true })]);
     } finally {
       setRefreshing(false);
     }
-  }, [loadBidHistory, loadWalletHistory]);
+  }, [loadBidHistory, loadCricketHistory, loadWalletHistory]);
 
   useFocusEffect(
     useCallback(() => {
-      void Promise.all([loadBidHistory(), loadWalletHistory()]);
-    }, [loadBidHistory, loadWalletHistory])
+      void Promise.all([loadBidHistory(), loadCricketHistory(), loadWalletHistory()]);
+    }, [loadBidHistory, loadCricketHistory, loadWalletHistory])
   );
 
   const filteredBidItems = useMemo(() => {
@@ -257,6 +268,27 @@ export default function HistoryScreen() {
     }));
   }, [activeRange, bids, marketMap]);
 
+  const filteredCricketItems = useMemo(() => {
+    const filtered = activeRange
+      ? cricketBets.filter((bid) => isWithinRange(bid.createdAt, activeRange.from, activeRange.to))
+      : cricketBets.filter((bid) => isToday(bid.createdAt));
+
+    return filtered.map((bid) => ({
+      id: bid.id,
+      title: bid.matchTitle,
+      subtitle: "Cricket",
+      sessionType: "NA" as const,
+      payout: Number(bid.payout || 0),
+      gameType: `Cricket ${String(bid.marketType || "").replace(/_/g, " ")}`,
+      gameTime: bid.settledResult || "Pending",
+      createdAt: bid.createdAt,
+      digit: formatCricketSelection(bid.selection),
+      points: Number(bid.amount || 0),
+      items: [{ digit: formatCricketSelection(bid.selection), points: Number(bid.amount || 0) }],
+      source: "CRICKET" as const
+    }));
+  }, [activeRange, cricketBets]);
+
   const filteredWalletItems = useMemo(() => {
     const filtered = activeRange
       ? walletEntries.filter((entry) => isWithinRange(entry.createdAt, activeRange.from, activeRange.to))
@@ -275,10 +307,14 @@ export default function HistoryScreen() {
   }, [activeRange, walletEntries]);
 
   const filteredItems = useMemo(
-    () =>
-      [...filteredWalletItems.map((item) => ({ ...item, historyType: "wallet" as const })), ...filteredBidItems.map((item) => ({ ...item, historyType: "bet" as const }))]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [filteredBidItems, filteredWalletItems]
+    () => {
+      const betItems = historyMode === "cricket"
+        ? filteredCricketItems.map((item) => ({ ...item, historyType: "bet" as const }))
+        : filteredBidItems.map((item) => ({ ...item, historyType: "bet" as const, source: "MATKA" as const }));
+      return [...filteredWalletItems.map((item) => ({ ...item, historyType: "wallet" as const })), ...betItems]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    },
+    [filteredBidItems, filteredCricketItems, filteredWalletItems, historyMode]
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
@@ -324,6 +360,15 @@ export default function HistoryScreen() {
             <Text style={[styles.paymentBannerText, paymentBanner.tone === "failed" && styles.paymentBannerFailedText]}>{paymentBanner.text}</Text>
           </SurfaceCard>
         ) : null}
+
+        <View style={styles.historyModeSwitch}>
+          <Pressable onPress={() => { setHistoryMode("matka"); setPage(0); }} style={[styles.historyModeButton, historyMode === "matka" && styles.historyModeActive]}>
+            <Text style={[styles.historyModeText, historyMode === "matka" && styles.historyModeTextActive]}>Matka</Text>
+          </Pressable>
+          <Pressable onPress={() => { setHistoryMode("cricket"); setPage(0); }} style={[styles.historyModeButton, historyMode === "cricket" && styles.historyModeActive]}>
+            <Text style={[styles.historyModeText, historyMode === "cricket" && styles.historyModeTextActive]}>Cricket</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.toolbar}>
           <Text style={styles.toolbarValue}>{activeRange ? `${activeRange.from} to ${activeRange.to}` : "Today only"}</Text>
@@ -406,7 +451,7 @@ export default function HistoryScreen() {
                     <>
                   <View style={styles.cardTopRow}>
                     <Text style={styles.dateText}>{formatBidDate(item.createdAt)}</Text>
-                    <Text style={styles.betKindText}>MATKA</Text>
+                    <Text style={styles.betKindText}>{item.source === "CRICKET" ? "CRICKET" : "MATKA"}</Text>
                   </View>
                       <View style={styles.betInfoStack}>
                         <View style={styles.betInfoRow}>
@@ -523,6 +568,31 @@ const styles = StyleSheet.create({
   },
   paymentBannerFailedText: {
     color: colors.danger
+  },
+  historyModeSwitch: {
+    flexDirection: "row",
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden"
+  },
+  historyModeButton: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  historyModeActive: {
+    backgroundColor: colors.primary
+  },
+  historyModeText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  historyModeTextActive: {
+    color: colors.surface
   },
   toolbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   toolbarValue: { color: "#475467", fontSize: 14, fontWeight: "800" },

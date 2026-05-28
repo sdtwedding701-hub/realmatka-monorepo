@@ -6,14 +6,38 @@ const emptyForm = {
   teamA: "",
   teamB: "",
   status: "Live",
-  activeOver: "1",
-  bettingOpen: "true"
+  startAt: "",
+  tossCloseAt: "",
+  matchCloseAt: "",
+  tossBettingOpen: "true",
+  matchBettingOpen: "true"
 };
+
+function toDateTimeInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function toIso(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+}
 
 export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState }) {
   const [state, setState] = useState({ loading: true, error: "", matches: [], rates: {} });
   const [form, setForm] = useState(emptyForm);
-  const [resultForm, setResultForm] = useState({ matchId: "", runs: "", wicket: "false", boundary: "false" });
+  const [resultForm, setResultForm] = useState({ matchId: "", marketType: "toss_winner", winner: "team_a" });
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -37,8 +61,11 @@ export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState })
         method: "POST",
         body: {
           ...form,
-          activeOver: Number(form.activeOver || 1),
-          bettingOpen: form.bettingOpen === "true"
+          startAt: toIso(form.startAt),
+          tossCloseAt: toIso(form.tossCloseAt),
+          matchCloseAt: toIso(form.matchCloseAt),
+          tossBettingOpen: form.tossBettingOpen === "true",
+          matchBettingOpen: form.matchBettingOpen === "true"
         }
       });
       setForm(emptyForm);
@@ -49,22 +76,21 @@ export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState })
     }
   }
 
-  async function settleResult() {
+  async function publishResult() {
     setMessage("");
     try {
       const data = await fetchApi(apiBase, "/api/admin/cricket/settle", token, {
         method: "POST",
         body: {
           matchId: resultForm.matchId,
-          runs: Number(resultForm.runs || 0),
-          wicket: resultForm.wicket === "true",
-          boundary: resultForm.boundary === "true"
+          marketType: resultForm.marketType,
+          winner: resultForm.winner
         }
       });
-      setMessage(`Result settled. Processed ${data.settlement.processed}, Won ${data.settlement.won}, Lost ${data.settlement.lost}.`);
+      setMessage(`Result published. Processed ${data.settlement.processed}, Won ${data.settlement.won}, Lost ${data.settlement.lost}, Refund ${data.settlement.refunded || 0}.`);
       await load();
     } catch (error) {
-      setMessage(error?.message || "Result settle failed.");
+      setMessage(error?.message || "Result publish failed.");
     }
   }
 
@@ -75,30 +101,38 @@ export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState })
       teamA: match.teamA || "",
       teamB: match.teamB || "",
       status: match.status || "Live",
-      activeOver: String(match.activeOver || 1),
-      bettingOpen: match.bettingOpen ? "true" : "false"
+      startAt: toDateTimeInput(match.startAt),
+      tossCloseAt: toDateTimeInput(match.tossCloseAt),
+      matchCloseAt: toDateTimeInput(match.matchCloseAt),
+      tossBettingOpen: match.tossBettingOpen ? "true" : "false",
+      matchBettingOpen: match.matchBettingOpen ? "true" : "false"
     });
     setResultForm((current) => ({ ...current, matchId: match.id }));
   }
+
+  const selectedResultMatch = state.matches.find((match) => match.id === resultForm.matchId);
 
   if (state.loading) return <PageState title="Cricket" subtitle="Loading cricket games..." />;
   if (state.error) return <PageState title="Cricket" subtitle={state.error} tone="error" />;
 
   return (
     <>
-      <PageHeader title="Cricket Games" subtitle="Create over markets and settle cricket prediction bets." />
+      <PageHeader title="Cricket Games" subtitle="Create scheduled Toss Winner and Match Winner markets." />
       <section className="panel">
         <div className="panel-head">
           <h2>{form.id ? "Update Match" : "Create Match"}</h2>
-          <p>Live match app ke Play Cricket section me show hoga.</p>
+          <p>Match ko pehle se schedule karo. Toss 35 min pehle aur match winner 5 min pehle auto close ho sakta hai.</p>
         </div>
         <div className="form-grid">
-          <label><span>Match Title</span><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="IND vs AUS T20" /></label>
-          <label><span>Team A</span><input value={form.teamA} onChange={(e) => setForm({ ...form, teamA: e.target.value })} /></label>
-          <label><span>Team B</span><input value={form.teamB} onChange={(e) => setForm({ ...form, teamB: e.target.value })} /></label>
+          <label><span>Match Title</span><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="RCB vs CSK Final" /></label>
+          <label><span>Team A</span><input value={form.teamA} onChange={(e) => setForm({ ...form, teamA: e.target.value })} placeholder="RCB" /></label>
+          <label><span>Team B</span><input value={form.teamB} onChange={(e) => setForm({ ...form, teamB: e.target.value })} placeholder="CSK" /></label>
           <label><span>Status</span><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Live</option><option>Closed</option><option>Hidden</option></select></label>
-          <label><span>Active Over</span><input inputMode="numeric" value={form.activeOver} onChange={(e) => setForm({ ...form, activeOver: e.target.value })} /></label>
-          <label><span>Betting</span><select value={form.bettingOpen} onChange={(e) => setForm({ ...form, bettingOpen: e.target.value })}><option value="true">Open</option><option value="false">Closed</option></select></label>
+          <label><span>Match Start Time</span><input type="datetime-local" value={form.startAt} onChange={(e) => setForm({ ...form, startAt: e.target.value })} /></label>
+          <label><span>Toss Auto Close</span><input type="datetime-local" value={form.tossCloseAt} onChange={(e) => setForm({ ...form, tossCloseAt: e.target.value })} /></label>
+          <label><span>Match Winner Auto Close</span><input type="datetime-local" value={form.matchCloseAt} onChange={(e) => setForm({ ...form, matchCloseAt: e.target.value })} /></label>
+          <label><span>Toss Betting</span><select value={form.tossBettingOpen} onChange={(e) => setForm({ ...form, tossBettingOpen: e.target.value })}><option value="true">Open</option><option value="false">Closed</option></select></label>
+          <label><span>Match Winner Betting</span><select value={form.matchBettingOpen} onChange={(e) => setForm({ ...form, matchBettingOpen: e.target.value })}><option value="true">Open</option><option value="false">Closed</option></select></label>
         </div>
         <div className="actions">
           <button className="primary" onClick={saveMatch}>{form.id ? "Update Match" : "Create Match"}</button>
@@ -108,33 +142,32 @@ export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState })
 
       <section className="panel">
         <div className="panel-head">
-          <h2>Settle Over Result</h2>
-          <p>Runs, wicket aur boundary result enter karte hi pending bets settle hongi.</p>
+          <h2>Publish Result</h2>
+          <p>Toss winner ya match winner publish karte hi pending bets settle hongi.</p>
         </div>
         <div className="form-grid">
-          <label><span>Match</span><select value={resultForm.matchId} onChange={(e) => setResultForm({ ...resultForm, matchId: e.target.value })}><option value="">Select match</option>{state.matches.map((match) => <option key={match.id} value={match.id}>{match.title} - Over {match.activeOver}</option>)}</select></label>
-          <label><span>Over Runs</span><input inputMode="numeric" value={resultForm.runs} onChange={(e) => setResultForm({ ...resultForm, runs: e.target.value })} /></label>
-          <label><span>Wicket</span><select value={resultForm.wicket} onChange={(e) => setResultForm({ ...resultForm, wicket: e.target.value })}><option value="false">No</option><option value="true">Yes</option></select></label>
-          <label><span>Boundary</span><select value={resultForm.boundary} onChange={(e) => setResultForm({ ...resultForm, boundary: e.target.value })}><option value="false">No</option><option value="true">Yes</option></select></label>
+          <label><span>Match</span><select value={resultForm.matchId} onChange={(e) => setResultForm({ ...resultForm, matchId: e.target.value })}><option value="">Select match</option>{state.matches.map((match) => <option key={match.id} value={match.id}>{match.title}</option>)}</select></label>
+          <label><span>Market</span><select value={resultForm.marketType} onChange={(e) => setResultForm({ ...resultForm, marketType: e.target.value })}><option value="toss_winner">Toss Winner</option><option value="match_winner">Match Winner</option></select></label>
+          <label><span>Winner</span><select value={resultForm.winner} onChange={(e) => setResultForm({ ...resultForm, winner: e.target.value })}><option value="team_a">{selectedResultMatch?.teamA || "Team A"}</option><option value="team_b">{selectedResultMatch?.teamB || "Team B"}</option><option value="cancel">Cancel / Refund</option></select></label>
         </div>
-        <div className="actions"><button className="primary" onClick={settleResult}>Settle Result</button></div>
+        <div className="actions"><button className="primary" onClick={publishResult}>Publish Result</button></div>
         {message ? <p className={`message ${message.includes("failed") ? "error" : "success"}`}>{message}</p> : null}
       </section>
 
       <section className="panel">
-        <div className="panel-head"><h2>Matches</h2><p>Current cricket markets.</p></div>
+        <div className="panel-head"><h2>Matches</h2><p>Current cricket winner markets.</p></div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Match</th><th>Teams</th><th>Over</th><th>Status</th><th>Betting</th><th>Result</th><th>Action</th></tr></thead>
+            <thead><tr><th>Match</th><th>Teams</th><th>Start</th><th>Toss</th><th>Match Winner</th><th>Result</th><th>Action</th></tr></thead>
             <tbody>
               {state.matches.length ? state.matches.map((match) => (
                 <tr key={match.id}>
                   <td>{match.title}</td>
                   <td>{match.teamA} vs {match.teamB}</td>
-                  <td>{match.activeOver}</td>
-                  <td>{match.status}</td>
-                  <td>{match.bettingOpen ? "Open" : "Closed"}</td>
-                  <td>{match.resultRuns == null ? "-" : `${match.resultRuns} runs`}</td>
+                  <td>{formatDate(match.startAt)}</td>
+                  <td>{match.tossBettingOpen ? "Open" : "Closed"}<br /><small>Close: {formatDate(match.tossCloseAt)}</small></td>
+                  <td>{match.matchBettingOpen ? "Open" : "Closed"}<br /><small>Close: {formatDate(match.matchCloseAt)}</small></td>
+                  <td>Toss: {match.tossWinner || "-"}<br />Match: {match.matchWinner || "-"}</td>
                   <td><button className="secondary" onClick={() => edit(match)}>Edit</button></td>
                 </tr>
               )) : <tr><td colSpan={7}>No cricket matches yet.</td></tr>}

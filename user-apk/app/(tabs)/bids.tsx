@@ -77,9 +77,17 @@ function formatBoardLabel(label: string) {
   return label.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function formatStatus(status: "Pending" | "Won" | "Lost") {
+function formatCricketSelection(selection: string) {
+  if (selection === "team_a") return "Team A";
+  if (selection === "team_b") return "Team B";
+  if (selection === "cancel") return "Refund";
+  return selection;
+}
+
+function formatStatus(status: "Pending" | "Won" | "Lost" | "Refunded") {
   if (status === "Won") return "WIN";
   if (status === "Lost") return "LOSS";
+  if (status === "Refunded") return "REFUND";
   return "BET";
 }
 
@@ -103,30 +111,31 @@ function compareBidsByHistoryOrder(left: { id: string; createdAt: string }, righ
 }
 
 export default function BidsScreen() {
-  const { bids, loadBidHistory } = useAppState();
+  const { bids, cricketBets, loadBidHistory, loadCricketHistory } = useAppState();
   const [isFilterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [activeRange, setActiveRange] = useState<{ from: string; to: string } | null>(null);
+  const [bidMode, setBidMode] = useState<"matka" | "cricket">("matka");
   const [pendingFromDate, setPendingFromDate] = useState("");
   const [pendingToDate, setPendingToDate] = useState(currentDateInput);
 
   const refreshData = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadBidHistory({ force: true });
+      await Promise.all([loadBidHistory({ force: true }), loadCricketHistory({ force: true })]);
     } finally {
       setRefreshing(false);
     }
-  }, [loadBidHistory]);
+  }, [loadBidHistory, loadCricketHistory]);
 
   useFocusEffect(
     useCallback(() => {
-      void loadBidHistory();
-    }, [loadBidHistory])
+      void Promise.all([loadBidHistory(), loadCricketHistory()]);
+    }, [loadBidHistory, loadCricketHistory])
   );
 
-  const filteredItems = useMemo(() => {
+  const filteredMatkaItems = useMemo(() => {
     return (activeRange
       ? bids.filter((bid) => isWithinRange(bid.createdAt, activeRange.from, activeRange.to))
       : bids.filter((bid) => isToday(bid.createdAt))
@@ -139,6 +148,28 @@ export default function BidsScreen() {
         boardLine: formatBoardLabel(bid.boardLabel).toUpperCase()
       }));
   }, [activeRange, bids]);
+
+  const filteredCricketItems = useMemo(() => {
+    return (activeRange
+      ? cricketBets.filter((bid) => isWithinRange(bid.createdAt, activeRange.from, activeRange.to))
+      : cricketBets.filter((bid) => isToday(bid.createdAt))
+    )
+      .slice()
+      .sort(compareBidsByHistoryOrder)
+      .map((bid) => ({
+        id: bid.id,
+        createdAt: bid.createdAt,
+        status: bid.status,
+        payout: Number(bid.payout || 0),
+        sessionType: "NA" as const,
+        digit: formatCricketSelection(bid.selection),
+        points: Number(bid.amount || 0),
+        marketLine: String(bid.matchTitle || "Cricket Match").toUpperCase(),
+        boardLine: `CRICKET ${formatBoardLabel(String(bid.marketType || ""))}`.toUpperCase()
+      }));
+  }, [activeRange, cricketBets]);
+
+  const filteredItems = bidMode === "cricket" ? filteredCricketItems : filteredMatkaItems;
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
@@ -171,6 +202,15 @@ export default function BidsScreen() {
           <Text style={styles.toolbarValue}>{activeRange ? `${activeRange.from} to ${activeRange.to}` : "Today only"}</Text>
           <Pressable onPress={() => setFilterOpen(true)} style={styles.calendarButton}>
             <Ionicons color={colors.surface} name="calendar-outline" size={18} />
+          </Pressable>
+        </View>
+
+        <View style={styles.bidModeSwitch}>
+          <Pressable onPress={() => { setBidMode("matka"); setPage(0); }} style={[styles.bidModeButton, bidMode === "matka" && styles.bidModeActive]}>
+            <Text style={[styles.bidModeText, bidMode === "matka" && styles.bidModeTextActive]}>Matka</Text>
+          </Pressable>
+          <Pressable onPress={() => { setBidMode("cricket"); setPage(0); }} style={[styles.bidModeButton, bidMode === "cricket" && styles.bidModeActive]}>
+            <Text style={[styles.bidModeText, bidMode === "cricket" && styles.bidModeTextActive]}>Cricket</Text>
           </Pressable>
         </View>
 
@@ -247,6 +287,23 @@ const styles = StyleSheet.create({
   toolbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   toolbarValue: { color: "#475467", fontSize: 14, fontWeight: "800" },
   calendarButton: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
+  bidModeSwitch: {
+    flexDirection: "row",
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden"
+  },
+  bidModeButton: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  bidModeActive: { backgroundColor: colors.primary },
+  bidModeText: { color: colors.textSecondary, fontSize: 13, fontWeight: "900" },
+  bidModeTextActive: { color: colors.surface },
   paginationRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   paginationLabel: { color: "#344054", fontSize: 13, fontWeight: "700" },
   paginationActions: { flexDirection: "row", gap: 8 },

@@ -85,12 +85,16 @@ export type CricketMatch = {
   teamA: string;
   teamB: string;
   status: string;
-  activeOver: number;
-  bettingOpen: boolean;
-  resultRuns: number | null;
-  resultWicket: boolean | null;
-  resultBoundary: boolean | null;
-  resultSettledAt: string | null;
+  startAt: string | null;
+  tossBettingOpen: boolean;
+  matchBettingOpen: boolean;
+  tossCloseAt: string | null;
+  matchCloseAt: string | null;
+  tossWinner: string | null;
+  matchWinner: string | null;
+  tossSettledAt: string | null;
+  matchSettledAt: string | null;
+  markets?: Record<string, { label: string; rate: number; open: boolean; closeAt: string | null; winner: string | null }>;
   createdAt: string;
 };
 
@@ -99,12 +103,11 @@ export type CricketBet = {
   userId: string;
   matchId: string;
   matchTitle: string;
-  overNumber: number;
-  betType: string;
+  marketType: string;
   selection: string;
   amount: number;
   rate: number;
-  status: "Pending" | "Won" | "Lost";
+  status: "Pending" | "Won" | "Lost" | "Refunded";
   payout: number;
   settledAt: string | null;
   settledResult: string;
@@ -112,7 +115,7 @@ export type CricketBet = {
 };
 
 export type CricketMatchesPayload = {
-  rates: Record<string, Record<string, number>>;
+  rates: Record<string, number>;
   matches: CricketMatch[];
 };
 
@@ -578,7 +581,7 @@ export const api = {
     return request<CricketBet[]>(`/api/cricket/history${queryString({ limit: String(limit) })}`, { token });
   },
 
-  placeCricketBet(token: string, payload: { matchId: string; betType: string; selection: string; amount: number }) {
+  placeCricketBet(token: string, payload: { matchId: string; marketType: string; selection: string; amount: number }) {
     return request<CricketBet>("/api/cricket/place", {
       method: "POST",
       token,

@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
-import { ApiError, api, setAuthFailureListener, type BankAccount, type BidEntry, type GoogleAuthResponse, type OtpRequestResponse, type SessionUser, type WalletEntry } from "@/lib/api";
+import { ApiError, api, setAuthFailureListener, type BankAccount, type BidEntry, type CricketBet, type GoogleAuthResponse, type OtpRequestResponse, type SessionUser, type WalletEntry } from "@/lib/api";
 import { readStoredMpinConfigured, writeStoredMpinValue, writeStoredMpinConfigured } from "@/lib/security-storage";
 import {
   getCachedBidHistory,
@@ -34,6 +34,7 @@ type AppStateValue = {
   walletBalance: number;
   walletEntries: WalletEntry[];
   bids: BidEntry[];
+  cricketBets: CricketBet[];
   bankAccounts: BankAccount[];
   draftBid: DraftBid | null;
   login: (phone: string, password: string) => Promise<void>;
@@ -53,6 +54,7 @@ type AppStateValue = {
   reloadSessionData: (options?: { force?: boolean }) => Promise<void>;
   loadWalletHistory: (options?: { force?: boolean }) => Promise<void>;
   loadBidHistory: (options?: { force?: boolean }) => Promise<void>;
+  loadCricketHistory: (options?: { force?: boolean }) => Promise<void>;
   loadBankAccounts: (options?: { force?: boolean }) => Promise<void>;
   updatePassword: (currentPassword: string, password: string, confirmPassword: string) => Promise<void>;
   updateMpin: (pin: string, confirmPin: string) => Promise<void>;
@@ -108,6 +110,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletEntries, setWalletEntries] = useState<WalletEntry[]>([]);
   const [bids, setBids] = useState<BidEntry[]>([]);
+  const [cricketBets, setCricketBets] = useState<CricketBet[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [draftBid, setDraftBid] = useState<DraftBid | null>(null);
   const activeSessionTokenRef = useRef("");
@@ -153,6 +156,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setWalletBalance(0);
     setWalletEntries([]);
     setBids([]);
+    setCricketBets([]);
     setBankAccounts([]);
     setDraftBid(null);
     lastSessionReloadAtRef.current = 0;
@@ -484,6 +488,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return bidReloadPromiseRef.current;
   }, [clearSession, sessionToken]);
 
+  const loadCricketHistory = useCallback(async (_options?: { force?: boolean }) => {
+    if (!sessionToken) {
+      return;
+    }
+    try {
+      setCricketBets(await api.cricketHistory(sessionToken));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await clearSession();
+      }
+    }
+  }, [clearSession, sessionToken]);
+
   const refreshLiveUserState = useCallback(async (options?: { force?: boolean; includeHistory?: boolean }) => {
     if (!sessionToken) {
       return;
@@ -497,9 +514,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
     await Promise.allSettled([
       loadWalletHistory({ force: true }),
-      loadBidHistory({ force: true })
+      loadBidHistory({ force: true }),
+      loadCricketHistory({ force: true })
     ]);
-  }, [loadBidHistory, loadWalletHistory, reloadSessionData, sessionToken]);
+  }, [loadBidHistory, loadCricketHistory, loadWalletHistory, reloadSessionData, sessionToken]);
 
   useEffect(() => {
     if (!sessionToken) {
@@ -740,6 +758,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     walletBalance,
     walletEntries,
     bids,
+    cricketBets,
     bankAccounts,
     draftBid,
     login,
@@ -751,6 +770,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     reloadSessionData,
     loadWalletHistory,
     loadBidHistory,
+    loadCricketHistory,
     loadBankAccounts,
     updatePassword,
     updateMpin,
@@ -764,11 +784,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     addBankAccount,
     bankAccounts,
     bids,
+    cricketBets,
     confirmWithdraw,
     currentUser,
     draftBid,
     loadBankAccounts,
     loadBidHistory,
+    loadCricketHistory,
     loadWalletHistory,
     loading,
     login,

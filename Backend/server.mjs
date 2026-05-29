@@ -215,6 +215,7 @@ const standaloneRoutes = new Map([
   ["/api/admin/cricket/matches", { loader: "cricket", methods: { OPTIONS: "options", GET: "adminMatches", POST: "adminSaveMatch" } }],
   ["/api/admin/cricket/bets", { loader: "cricket", methods: { OPTIONS: "options", GET: "adminBets" } }],
   ["/api/admin/cricket/settle", { loader: "cricket", methods: { OPTIONS: "options", POST: "adminSettle" } }],
+  ["/api/admin/cricket/cancel", { loader: "cricket", methods: { OPTIONS: "options", POST: "adminCancel" } }],
   ["/api/admin/chart-update", { loader: "admin", methods: { OPTIONS: "options", POST: "chartUpdate" } }],
   ["/api/admin/market-update", { loader: "admin", methods: { OPTIONS: "options", POST: "marketUpdate" } }],
   ["/api/admin/settle-market", { loader: "admin", methods: { OPTIONS: "options", POST: "settleMarket" } }],

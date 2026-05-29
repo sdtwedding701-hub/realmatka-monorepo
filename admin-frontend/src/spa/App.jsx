@@ -58,7 +58,11 @@ const navItems = [
   { key: "reports", label: "Reports" },
   { key: "notifications", label: "Notifications" },
   { key: "bonus", label: "Bonus" },
-  { key: "cricket", label: "Cricket" },
+  { key: "cricket", label: "Cricket Overview" },
+  { key: "cricket-add", label: "Add Cricket Match" },
+  { key: "cricket-matches", label: "Live Cricket Matches" },
+  { key: "cricket-results", label: "Cricket Result" },
+  { key: "cricket-bets", label: "Cricket Bets" },
   { key: "settings", label: "Settings" },
   { key: "audit", label: "Audit Logs" }
 ];
@@ -78,7 +82,7 @@ function getNavItemsForRole(role) {
     return navItems.filter((item) => item.key === "support");
   }
   if (CRICKET_OPERATOR_ROLES.has(normalized)) {
-    return navItems.filter((item) => item.key === "cricket");
+    return navItems.filter((item) => item.key.startsWith("cricket"));
   }
   return [];
 }
@@ -100,7 +104,11 @@ const routeMeta = {
   bids: { eyebrow: "Betting", title: "All Bets", subtitle: "" },
   notifications: { eyebrow: "Messaging", title: "Notification Center", subtitle: "Broadcast platform updates and target users from one operator screen." },
   bonus: { eyebrow: "Promotions", title: "Bonus System", subtitle: "Control deposit, referral, and limited-time bonus rules from one place." },
-  cricket: { eyebrow: "Games", title: "Cricket Games", subtitle: "Create over markets and settle cricket prediction bets." },
+  cricket: { eyebrow: "Cricket", title: "Cricket Overview", subtitle: "Live cricket totals, scheduled matches, and pending bet exposure." },
+  "cricket-add": { eyebrow: "Cricket", title: "Add Cricket Match", subtitle: "Create or update scheduled cricket matches and betting close times." },
+  "cricket-matches": { eyebrow: "Cricket", title: "Live Cricket Matches", subtitle: "Monitor scheduled matches, market close times, and published results." },
+  "cricket-results": { eyebrow: "Cricket", title: "Cricket Result", subtitle: "Publish toss, match winner, and over-runs results." },
+  "cricket-bets": { eyebrow: "Cricket", title: "Cricket Bets", subtitle: "Review live and settled cricket bet history." },
   settings: { eyebrow: "Configuration", title: "Platform Settings", subtitle: "Control notices, support info, and promotional text from one panel." },
   audit: { eyebrow: "Compliance", title: "Audit Trail", subtitle: "Review sensitive actions, exports, and recovery operations with confidence." }
 };
@@ -328,12 +336,13 @@ export function App() {
             />
           );
         }
-        if (route === "cricket") {
+        if (route === "cricket" || route === "cricket-add" || route === "cricket-matches" || route === "cricket-results" || route === "cricket-bets") {
           return (
             <CricketPage
               apiBase={apiBase}
               fetchApi={fetchApi}
               key={`cricket-${refreshKey}`}
+              mode={route}
               PageHeader={PageHeader}
               PageState={PageState}
               token={token}

@@ -52,7 +52,7 @@ function formatSelection(value) {
   return String(value || "").replace(/_/g, "-").replace("-plus", "+");
 }
 
-export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState }) {
+export function CricketPage({ apiBase, token, fetchApi, mode = "cricket", PageHeader, PageState }) {
   const [state, setState] = useState({ loading: true, error: "", matches: [], rates: {}, bets: [] });
   const [form, setForm] = useState(emptyForm);
   const [resultForm, setResultForm] = useState({ matchId: "", marketType: "toss_winner", winner: "team_a" });
@@ -101,6 +101,19 @@ export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState })
   async function publishResult() {
     setMessage("");
     try {
+      const preview = buildSettlementPreview(state.bets, resultForm.matchId, resultForm.marketType, resultForm.winner);
+      const matchTitle = selectedResultMatch?.title || "selected match";
+      const winnerLabel = resultForm.winner === "team_a"
+        ? selectedResultMatch?.teamA || "Team A"
+        : resultForm.winner === "team_b"
+          ? selectedResultMatch?.teamB || "Team B"
+          : resultForm.winner === "cancel"
+            ? "Cancel / Refund"
+            : formatSelection(resultForm.winner);
+      const confirmed = window.confirm(
+        `Publish result for ${matchTitle}?\n\nMarket: ${cricketMarkets.find((item) => item.value === resultForm.marketType)?.label || resultForm.marketType}\nWinner: ${winnerLabel}\nPending bets: ${preview.processed}\nExpected payout/refund: Rs ${Math.round(preview.totalPayout)}\n\nConfirm karne ke baad pending bets settle hongi.`
+      );
+      if (!confirmed) return;
       const data = await fetchApi(apiBase, "/api/admin/cricket/settle", token, {
         method: "POST",
         body: {
@@ -113,6 +126,28 @@ export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState })
       await load();
     } catch (error) {
       setMessage(error?.message || "Result publish failed.");
+    }
+  }
+
+  async function cancelMatch(match) {
+    const pendingCount = state.bets.filter((bet) => bet.matchId === match.id && bet.status === "Pending").length;
+    const pendingAmount = state.bets
+      .filter((bet) => bet.matchId === match.id && bet.status === "Pending")
+      .reduce((sum, bet) => sum + Number(bet.amount || 0), 0);
+    const confirmed = window.confirm(
+      `Cancel / refund ${match.title}?\n\nPending bets: ${pendingCount}\nRefund amount: Rs ${Math.round(pendingAmount)}\n\nYe action pending cricket bets ko refund karega aur match close karega.`
+    );
+    if (!confirmed) return;
+    setMessage("");
+    try {
+      const data = await fetchApi(apiBase, "/api/admin/cricket/cancel", token, {
+        method: "POST",
+        body: { matchId: match.id }
+      });
+      setMessage(`Match cancelled. Refunded ${data.settlement.refunded || 0} bets, total Rs ${Math.round(data.settlement.totalPayout || 0)}.`);
+      await load();
+    } catch (error) {
+      setMessage(error?.message || "Match cancel/refund failed.");
     }
   }
 
@@ -139,20 +174,29 @@ export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState })
   const pendingBets = state.bets.filter((bet) => bet.status === "Pending").length;
   const totalStake = state.bets.reduce((sum, bet) => sum + Number(bet.amount || 0), 0);
   const totalPayout = state.bets.reduce((sum, bet) => sum + Number(bet.payout || 0), 0);
+  const exposureRows = buildExposureRows(state.matches, state.bets);
+  const pageCopy = getCricketPageCopy(mode);
+  const showStats = mode === "cricket";
+  const showForm = mode === "cricket" || mode === "cricket-add";
+  const showResult = mode === "cricket" || mode === "cricket-results";
+  const showBets = mode === "cricket" || mode === "cricket-bets";
+  const showMatches = mode === "cricket" || mode === "cricket-add" || mode === "cricket-matches" || mode === "cricket-results";
+  const showExposure = mode === "cricket" || mode === "cricket-matches" || mode === "cricket-results";
 
   if (state.loading) return <PageState title="Cricket" subtitle="Loading cricket games..." />;
   if (state.error) return <PageState title="Cricket" subtitle={state.error} tone="error" />;
 
   return (
     <>
-      <PageHeader title="Cricket Games" subtitle="Create scheduled cricket markets with auto close time." />
-      <section className="stats-grid">
+      <PageHeader title={pageCopy.title} subtitle={pageCopy.subtitle} />
+      {message ? <p className={`message ${message.includes("failed") ? "error" : "success"}`}>{message}</p> : null}
+      {showStats ? <section className="stats-grid">
         <article className="stat-card"><span>Live Matches</span><strong>{liveMatches}</strong></article>
         <article className="stat-card"><span>Pending Bets</span><strong>{pendingBets}</strong></article>
         <article className="stat-card"><span>Total Stake</span><strong>Rs {Math.round(totalStake)}</strong></article>
         <article className="stat-card"><span>Total Payout</span><strong>Rs {Math.round(totalPayout)}</strong></article>
-      </section>
-      <section className="panel">
+      </section> : null}
+      {showForm ? <section className="panel">
         <div className="panel-head">
           <h2>{form.id ? "Update Match" : "Create Match"}</h2>
           <p>Match ko pehle se schedule karo. Toss 35 min pehle aur baaki cricket markets match start time par auto close honge.</p>
@@ -172,9 +216,9 @@ export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState })
           <button className="primary" onClick={saveMatch}>{form.id ? "Update Match" : "Create Match"}</button>
           {form.id ? <button className="secondary" onClick={() => setForm(emptyForm)}>Cancel</button> : null}
         </div>
-      </section>
+      </section> : null}
 
-      <section className="panel">
+      {showResult ? <section className="panel">
         <div className="panel-head">
           <h2>Publish Result</h2>
           <p>Toss, match winner, aur runs market result publish karte hi pending bets settle hongi.</p>
@@ -191,10 +235,33 @@ export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState })
           </select></label>
         </div>
         <div className="actions"><button className="primary" onClick={publishResult}>Publish Result</button></div>
-        {message ? <p className={`message ${message.includes("failed") ? "error" : "success"}`}>{message}</p> : null}
-      </section>
+      </section> : null}
 
-      <section className="panel">
+      {showExposure ? <section className="panel">
+        <div className="panel-head">
+          <h2>Market Exposure</h2>
+          <p>Pending cricket bets ka market-wise stake aur possible payout yahan dekho.</p>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Match</th><th>Market</th><th>Selection</th><th>Bets</th><th>Stake</th><th>Possible Payout</th></tr></thead>
+            <tbody>
+              {exposureRows.length ? exposureRows.map((row) => (
+                <tr key={`${row.matchId}:${row.marketType}:${row.selection}`}>
+                  <td>{row.matchTitle}</td>
+                  <td>{row.marketLabel}</td>
+                  <td>{row.selectionLabel}</td>
+                  <td>{row.count}</td>
+                  <td>Rs {Math.round(row.stake)}</td>
+                  <td>Rs {Math.round(row.potentialPayout)}</td>
+                </tr>
+              )) : <tr><td colSpan={6}>No pending cricket exposure.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section> : null}
+
+      {showBets ? <section className="panel">
         <div className="panel-head">
           <h2>Cricket Bets History</h2>
           <p>Live aur settled cricket bets yahin se monitor karo. Match filter se specific match ki history dekho.</p>
@@ -228,9 +295,9 @@ export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState })
             </tbody>
           </table>
         </div>
-      </section>
+      </section> : null}
 
-      <section className="panel">
+      {showMatches ? <section className="panel">
         <div className="panel-head"><h2>Matches</h2><p>Current scheduled cricket markets.</p></div>
         <div className="table-wrap">
           <table>
@@ -244,13 +311,84 @@ export function CricketPage({ apiBase, token, fetchApi, PageHeader, PageState })
                   <td>{match.tossBettingOpen ? "Open" : "Closed"}<br /><small>Close: {formatDate(match.tossCloseAt)}</small></td>
                   <td>{match.matchBettingOpen ? "Open" : "Closed"}<br /><small>Close: {formatDate(match.matchCloseAt || match.startAt)}</small></td>
                   <td>Toss: {match.tossWinner || "-"}<br />Match: {match.matchWinner || "-"}<br /><small>Run markets result publish section se dekho.</small></td>
-                  <td><button className="secondary" onClick={() => edit(match)}>Edit</button></td>
+                  <td>
+                    <button className="secondary" onClick={() => edit(match)}>Edit</button>
+                    <button className="secondary" onClick={() => cancelMatch(match)} style={{ marginLeft: 8, borderColor: "#fecaca", color: "#b91c1c" }}>Cancel / Refund</button>
+                  </td>
                 </tr>
               )) : <tr><td colSpan={7}>No cricket matches yet.</td></tr>}
             </tbody>
           </table>
         </div>
-      </section>
+      </section> : null}
     </>
   );
+}
+
+function getCricketPageCopy(mode) {
+  if (mode === "cricket-add") {
+    return { title: "Add Cricket Match", subtitle: "Schedule match, teams, and betting close time." };
+  }
+  if (mode === "cricket-matches") {
+    return { title: "Live Cricket Matches", subtitle: "All scheduled cricket matches and result state." };
+  }
+  if (mode === "cricket-results") {
+    return { title: "Cricket Result", subtitle: "Publish result and settle cricket bets." };
+  }
+  if (mode === "cricket-bets") {
+    return { title: "Cricket Bets", subtitle: "Live and settled cricket bet history." };
+  }
+  return { title: "Cricket Overview", subtitle: "Cricket match summary, pending bets, and quick controls." };
+}
+
+function buildSettlementPreview(bets, matchId, marketType, winner) {
+  return (bets || [])
+    .filter((bet) => bet.matchId === matchId && bet.marketType === marketType && bet.status === "Pending")
+    .reduce(
+      (summary, bet) => {
+        const isRefund = winner === "cancel";
+        const isWin = !isRefund && bet.selection === winner;
+        const payout = isRefund ? Number(bet.amount || 0) : isWin ? Number(bet.amount || 0) * Number(bet.rate || 0) : 0;
+        summary.processed += 1;
+        summary.totalPayout += payout;
+        if (isRefund) summary.refunded += 1;
+        else if (isWin) summary.won += 1;
+        else summary.lost += 1;
+        return summary;
+      },
+      { processed: 0, won: 0, lost: 0, refunded: 0, totalPayout: 0 }
+    );
+}
+
+function buildExposureRows(matches, bets) {
+  const matchMap = new Map((matches || []).map((match) => [match.id, match]));
+  const exposure = new Map();
+  for (const bet of bets || []) {
+    if (bet.status !== "Pending") continue;
+    const key = `${bet.matchId}:${bet.marketType}:${bet.selection}`;
+    const match = matchMap.get(bet.matchId);
+    const entry = exposure.get(key) || {
+      matchId: bet.matchId,
+      matchTitle: bet.matchTitle || match?.title || "-",
+      marketType: bet.marketType,
+      marketLabel: cricketMarkets.find((item) => item.value === bet.marketType)?.label || bet.marketType,
+      selection: bet.selection,
+      selectionLabel: formatSelectionForMatch(match, bet.selection),
+      count: 0,
+      stake: 0,
+      potentialPayout: 0
+    };
+    entry.count += 1;
+    entry.stake += Number(bet.amount || 0);
+    entry.potentialPayout += Number(bet.amount || 0) * Number(bet.rate || 0);
+    exposure.set(key, entry);
+  }
+  return Array.from(exposure.values()).sort((a, b) => b.potentialPayout - a.potentialPayout);
+}
+
+function formatSelectionForMatch(match, selection) {
+  if (selection === "team_a") return match?.teamA || "Team A";
+  if (selection === "team_b") return match?.teamB || "Team B";
+  if (selection === "cancel") return "Cancel / Refund";
+  return formatSelection(selection);
 }

@@ -274,3 +274,61 @@ export async function settleAdminCricketResult(body) {
     }
   };
 }
+
+export async function cancelAdminCricketMatch(body) {
+  const matchId = String(body.matchId || "").trim();
+  if (!matchId) return { ok: false, status: 400, error: "matchId is required" };
+
+  const match = await findCricketMatch(matchId);
+  if (!match) return { ok: false, status: 404, error: "Cricket match not found" };
+
+  const pendingBets = (await listCricketBetsForMatch(matchId)).filter((bet) => bet.status === "Pending");
+  let refunded = 0;
+  let totalPayout = 0;
+
+  for (const bet of pendingBets) {
+    const payout = Number(bet.amount || 0);
+    const resultLabel = `${getMarketLabel(bet.marketType)}: Cancelled / Refund`;
+    const updated = await updateCricketBetSettlement(bet.id, "Refunded", payout, resultLabel);
+    if (payout > 0) {
+      const beforeBalance = await getUserBalance(updated.userId);
+      await addWalletEntry({
+        userId: updated.userId,
+        type: "BID_REFUND",
+        status: "SUCCESS",
+        amount: payout,
+        beforeBalance,
+        afterBalance: beforeBalance + payout,
+        referenceId: `cricket-refund:${updated.id}`,
+        note: `Cricket match cancelled refund: ${match.title} ${getMarketLabel(updated.marketType)}`
+      });
+      totalPayout += payout;
+    }
+    refunded += 1;
+  }
+
+  for (const marketType of MARKET_TYPES) {
+    await saveCricketMarketResult(matchId, marketType, "cancel");
+  }
+
+  const savedMatch = await upsertCricketMatch({
+    id: match.id,
+    title: match.title,
+    teamA: match.teamA,
+    teamB: match.teamB,
+    status: "Closed",
+    startAt: match.startAt,
+    tossBettingOpen: false,
+    matchBettingOpen: false,
+    tossCloseAt: match.tossCloseAt,
+    matchCloseAt: match.matchCloseAt
+  });
+
+  return {
+    ok: true,
+    data: {
+      match: decorateMatch(savedMatch),
+      settlement: { processed: pendingBets.length, won: 0, lost: 0, refunded, totalPayout }
+    }
+  };
+}

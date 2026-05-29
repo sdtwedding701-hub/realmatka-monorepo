@@ -2,6 +2,7 @@ import { corsPreflight, fail, getJsonBody, ok } from "../http.mjs";
 import { requireAdminOrCricketOperator, requireAuthenticatedUser } from "../middleware/auth-middleware.mjs";
 import {
   getAdminCricketBets,
+  cancelAdminCricketMatch,
   getCricketHistory,
   getCricketMatches,
   placeCricketBet,
@@ -58,6 +59,14 @@ export async function adminSettle(request) {
   const admin = await requireAdminOrCricketOperator(request);
   if (admin.response) return admin.response;
   const result = await settleAdminCricketResult(await getJsonBody(request));
+  if (!result.ok) return fail(result.error, result.status, request);
+  return ok(result.data, request);
+}
+
+export async function adminCancel(request) {
+  const admin = await requireAdminOrCricketOperator(request);
+  if (admin.response) return admin.response;
+  const result = await cancelAdminCricketMatch(await getJsonBody(request));
   if (!result.ok) return fail(result.error, result.status, request);
   return ok(result.data, request);
 }

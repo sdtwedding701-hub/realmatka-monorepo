@@ -72,7 +72,7 @@ export default function WithdrawScreen() {
   const withdrawDisabledMessage = readWalletText(walletSettings, "wallet_withdraw_message", "Withdraw service temporarily unavailable.");
   const minWithdrawAmount = Math.max(MIN_WITHDRAW_AMOUNT, readWalletNumber(walletSettings, "wallet_withdraw_min_amount", MIN_WITHDRAW_AMOUNT));
   const maxWithdrawAmount = Math.max(minWithdrawAmount, MAX_WITHDRAW_AMOUNT);
-  const withdrawMultiple = Math.max(1, readWalletNumber(walletSettings, "wallet_withdraw_multiple", WITHDRAW_MULTIPLE));
+  const withdrawMultiple = Math.max(WITHDRAW_MULTIPLE, readWalletNumber(walletSettings, "wallet_withdraw_multiple", WITHDRAW_MULTIPLE));
   const withdrawStartLabel = readWalletText(walletSettings, "wallet_withdraw_start_time", "11:00 AM");
   const withdrawEndLabel = readWalletText(walletSettings, "wallet_withdraw_end_time", "11:00 PM");
   const withdrawWeekendClosed = readWalletBoolean(walletSettings, "wallet_withdraw_weekend_closed", true);

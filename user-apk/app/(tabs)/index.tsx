@@ -487,8 +487,10 @@ function CricketHomeSection({
             style={styles.cricketPosterCard}
           >
             <View style={styles.cricketPosterContent}>
-              <View style={styles.cricketPosterIcon}>
-                <Ionicons color={colors.surface} name="baseball" size={24} />
+              <View style={styles.cricketTeamLogos}>
+                <CricketTeamLogo name={match.teamA} url={match.teamALogoUrl} />
+                <Text style={styles.cricketVs}>VS</Text>
+                <CricketTeamLogo name={match.teamB} url={match.teamBLogoUrl} />
               </View>
               <View style={styles.cricketPosterText}>
                 <Text style={styles.cricketPosterTitle}>{match.teamA} vs {match.teamB}</Text>
@@ -509,6 +511,25 @@ function CricketHomeSection({
       )}
     </View>
   );
+}
+
+function CricketTeamLogo({ name, url }: { name: string; url?: string }) {
+  const initials = getTeamInitials(name);
+  const safeUrl = String(url || "").trim();
+  return (
+    <View style={styles.cricketLogoBadge}>
+      {safeUrl ? (
+        <Image resizeMode="cover" source={{ uri: safeUrl }} style={styles.cricketLogoImage} />
+      ) : (
+        <Text style={styles.cricketLogoText}>{initials}</Text>
+      )}
+    </View>
+  );
+}
+
+function getTeamInitials(name: string) {
+  const parts = String(name || "?").trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  return parts.map((part) => part[0]).join("").toUpperCase() || "?";
 }
 
 function formatCricketStart(value: string | null) {
@@ -662,13 +683,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12
   },
-  cricketPosterIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  cricketTeamLogos: {
+    width: 94,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#10b981"
+    gap: 4
+  },
+  cricketLogoBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#dcfce7",
+    borderWidth: 1,
+    borderColor: "#86efac"
+  },
+  cricketLogoImage: {
+    width: "100%",
+    height: "100%"
+  },
+  cricketLogoText: {
+    color: "#065f46",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  cricketVs: {
+    color: "#a7f3d0",
+    fontSize: 9,
+    fontWeight: "900"
   },
   cricketPosterText: {
     flex: 1,

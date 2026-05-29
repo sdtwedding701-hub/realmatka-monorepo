@@ -84,6 +84,8 @@ export type CricketMatch = {
   title: string;
   teamA: string;
   teamB: string;
+  teamALogoUrl?: string;
+  teamBLogoUrl?: string;
   status: string;
   startAt: string | null;
   tossBettingOpen: boolean;

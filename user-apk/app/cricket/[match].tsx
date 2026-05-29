@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackHeader, SurfaceCard } from "@/components/ui";
 import { api, formatApiError, type CricketMatch, type CricketMatchesPayload } from "@/lib/api";
@@ -105,6 +105,11 @@ export default function CricketMatchScreen() {
           <>
             <View style={styles.matchHero}>
               <View style={styles.matchHeroCopy}>
+                <View style={styles.matchLogoRow}>
+                  <CricketTeamLogo name={match.teamA} url={match.teamALogoUrl} />
+                  <Text style={styles.matchVs}>VS</Text>
+                  <CricketTeamLogo name={match.teamB} url={match.teamBLogoUrl} />
+                </View>
                 <Text style={styles.matchTitle}>{match.teamA} vs {match.teamB}</Text>
                 <Text style={styles.matchSub}>{match.title}</Text>
                 <Text style={styles.matchOver}>{formatStart(match.startAt)}</Text>
@@ -218,6 +223,23 @@ function CricketMarketGroup({
   );
 }
 
+function CricketTeamLogo({ name, url }: { name: string; url?: string }) {
+  const safeUrl = String(url || "").trim();
+  return (
+    <View style={styles.matchLogoBadge}>
+      {safeUrl ? (
+        <Image resizeMode="cover" source={{ uri: safeUrl }} style={styles.matchLogoImage} />
+      ) : (
+        <Text style={styles.matchLogoText}>{getTeamInitials(name)}</Text>
+      )}
+    </View>
+  );
+}
+
+function getTeamInitials(name: string) {
+  return String(name || "?").trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
+}
+
 function formatSelectionLabel(match: CricketMatch, selection: string, marketType = "") {
   if (selection === "team_a") return marketType ? `${match.teamA} Win` : match.teamA;
   if (selection === "team_b") return marketType ? `${match.teamB} Win` : match.teamB;
@@ -247,6 +269,21 @@ const styles = StyleSheet.create({
     gap: 12
   },
   matchHeroCopy: { flex: 1 },
+  matchLogoRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  matchLogoBadge: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#dcfce7",
+    borderWidth: 1,
+    borderColor: "#86efac"
+  },
+  matchLogoImage: { width: "100%", height: "100%" },
+  matchLogoText: { color: "#065f46", fontSize: 13, fontWeight: "900" },
+  matchVs: { color: "#a7f3d0", fontSize: 11, fontWeight: "900" },
   matchTitle: { color: colors.surface, fontSize: 24, fontWeight: "900" },
   matchSub: { color: "#d1fae5", fontSize: 13, fontWeight: "800", marginTop: 4 },
   matchOver: { color: "#a7f3d0", fontSize: 13, fontWeight: "900", marginTop: 8 },

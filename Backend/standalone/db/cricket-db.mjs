@@ -18,6 +18,8 @@ function mapMatch(row) {
     title: row.title,
     teamA: row.team_a,
     teamB: row.team_b,
+    teamALogoUrl: row.team_a_logo_url || "",
+    teamBLogoUrl: row.team_b_logo_url || "",
     status: row.status,
     startAt: row.start_at || null,
     tossBettingOpen: boolValue(row.toss_betting_open),
@@ -97,6 +99,8 @@ async function ensureCricketTables() {
         ADD COLUMN IF NOT EXISTS match_betting_open BOOLEAN NOT NULL DEFAULT TRUE,
         ADD COLUMN IF NOT EXISTS toss_close_at TIMESTAMPTZ,
         ADD COLUMN IF NOT EXISTS match_close_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS team_a_logo_url TEXT,
+        ADD COLUMN IF NOT EXISTS team_b_logo_url TEXT,
         ADD COLUMN IF NOT EXISTS toss_winner TEXT,
         ADD COLUMN IF NOT EXISTS match_winner TEXT,
         ADD COLUMN IF NOT EXISTS toss_settled_at TIMESTAMPTZ,
@@ -157,6 +161,8 @@ async function ensureCricketTables() {
       ["match_betting_open", "INTEGER NOT NULL DEFAULT 1"],
       ["toss_close_at", "TEXT"],
       ["match_close_at", "TEXT"],
+      ["team_a_logo_url", "TEXT"],
+      ["team_b_logo_url", "TEXT"],
       ["toss_winner", "TEXT"],
       ["match_winner", "TEXT"],
       ["toss_settled_at", "TEXT"],
@@ -243,6 +249,8 @@ export async function upsertCricketMatch(input) {
   const title = String(input.title || "").trim();
   const teamA = String(input.teamA || "").trim();
   const teamB = String(input.teamB || "").trim();
+  const teamALogoUrl = String(input.teamALogoUrl || input.teamALogo || "").trim();
+  const teamBLogoUrl = String(input.teamBLogoUrl || input.teamBLogo || "").trim();
   const status = String(input.status || "Live").trim() || "Live";
   const startAt = normalizeIso(input.startAt);
   const tossCloseAt = normalizeIso(input.tossCloseAt);
@@ -257,13 +265,15 @@ export async function upsertCricketMatch(input) {
     const pool = await __internalGetReadyPgPool();
     const result = await pool.query(
       `INSERT INTO cricket_matches (
-         id, title, team_a, team_b, status, start_at, toss_betting_open, match_betting_open, toss_close_at, match_close_at, created_at
+         id, title, team_a, team_b, team_a_logo_url, team_b_logo_url, status, start_at, toss_betting_open, match_betting_open, toss_close_at, match_close_at, created_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        ON CONFLICT (id) DO UPDATE SET
          title = EXCLUDED.title,
          team_a = EXCLUDED.team_a,
          team_b = EXCLUDED.team_b,
+         team_a_logo_url = EXCLUDED.team_a_logo_url,
+         team_b_logo_url = EXCLUDED.team_b_logo_url,
          status = EXCLUDED.status,
          start_at = EXCLUDED.start_at,
          toss_betting_open = EXCLUDED.toss_betting_open,
@@ -271,7 +281,7 @@ export async function upsertCricketMatch(input) {
          toss_close_at = EXCLUDED.toss_close_at,
          match_close_at = EXCLUDED.match_close_at
        RETURNING *`,
-      [id, title, teamA, teamB, status, startAt, tossBettingOpen, matchBettingOpen, tossCloseAt, matchCloseAt, now]
+      [id, title, teamA, teamB, teamALogoUrl, teamBLogoUrl, status, startAt, tossBettingOpen, matchBettingOpen, tossCloseAt, matchCloseAt, now]
     );
     return mapMatch(result.rows[0]);
   }
@@ -279,13 +289,15 @@ export async function upsertCricketMatch(input) {
   __internalGetSqlite()
     .prepare(
       `INSERT INTO cricket_matches (
-         id, title, team_a, team_b, status, start_at, toss_betting_open, match_betting_open, toss_close_at, match_close_at, created_at
+         id, title, team_a, team_b, team_a_logo_url, team_b_logo_url, status, start_at, toss_betting_open, match_betting_open, toss_close_at, match_close_at, created_at
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          title = excluded.title,
          team_a = excluded.team_a,
          team_b = excluded.team_b,
+         team_a_logo_url = excluded.team_a_logo_url,
+         team_b_logo_url = excluded.team_b_logo_url,
          status = excluded.status,
          start_at = excluded.start_at,
          toss_betting_open = excluded.toss_betting_open,
@@ -293,7 +305,7 @@ export async function upsertCricketMatch(input) {
          toss_close_at = excluded.toss_close_at,
          match_close_at = excluded.match_close_at`
     )
-    .run(id, title, teamA, teamB, status, startAt, tossBettingOpen ? 1 : 0, matchBettingOpen ? 1 : 0, tossCloseAt, matchCloseAt, now);
+    .run(id, title, teamA, teamB, teamALogoUrl, teamBLogoUrl, status, startAt, tossBettingOpen ? 1 : 0, matchBettingOpen ? 1 : 0, tossCloseAt, matchCloseAt, now);
   return findCricketMatch(id);
 }
 

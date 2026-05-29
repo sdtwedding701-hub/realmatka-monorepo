@@ -5,6 +5,8 @@ const emptyForm = {
   title: "",
   teamA: "",
   teamB: "",
+  teamALogoUrl: "",
+  teamBLogoUrl: "",
   status: "Live",
   startAt: "",
   tossCloseAt: "",
@@ -50,6 +52,22 @@ function formatDate(value) {
 
 function formatSelection(value) {
   return String(value || "").replace(/_/g, "-").replace("-plus", "+");
+}
+
+function TeamLogo({ name, url }) {
+  const initials = String(name || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+  const safeUrl = String(url || "").trim();
+  return (
+    <span style={{ width: 44, height: 44, borderRadius: 14, overflow: "hidden", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #fff7ed, #fed7aa)", border: "1px solid #fdba74", color: "#9a3412", fontWeight: 900 }}>
+      {safeUrl ? <img alt={name || "Team"} src={safeUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials}
+    </span>
+  );
 }
 
 export function CricketPage({ apiBase, token, fetchApi, mode = "cricket", PageHeader, PageState }) {
@@ -157,6 +175,8 @@ export function CricketPage({ apiBase, token, fetchApi, mode = "cricket", PageHe
       title: match.title || "",
       teamA: match.teamA || "",
       teamB: match.teamB || "",
+      teamALogoUrl: match.teamALogoUrl || "",
+      teamBLogoUrl: match.teamBLogoUrl || "",
       status: match.status || "Live",
       startAt: toDateTimeInput(match.startAt),
       tossCloseAt: toDateTimeInput(match.tossCloseAt),
@@ -190,7 +210,7 @@ export function CricketPage({ apiBase, token, fetchApi, mode = "cricket", PageHe
     <>
       <PageHeader title={pageCopy.title} subtitle={pageCopy.subtitle} />
       {message ? <p className={`message ${message.includes("failed") ? "error" : "success"}`}>{message}</p> : null}
-      {showStats ? <section className="stats-grid">
+      {showStats ? <section className="stats-grid" style={{ marginBottom: 16 }}>
         <article className="stat-card"><span>Live Matches</span><strong>{liveMatches}</strong></article>
         <article className="stat-card"><span>Pending Bets</span><strong>{pendingBets}</strong></article>
         <article className="stat-card"><span>Total Stake</span><strong>Rs {Math.round(totalStake)}</strong></article>
@@ -205,6 +225,8 @@ export function CricketPage({ apiBase, token, fetchApi, mode = "cricket", PageHe
           <label><span>Match Title</span><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="RCB vs CSK Final" /></label>
           <label><span>Team A</span><input value={form.teamA} onChange={(e) => setForm({ ...form, teamA: e.target.value })} placeholder="RCB" /></label>
           <label><span>Team B</span><input value={form.teamB} onChange={(e) => setForm({ ...form, teamB: e.target.value })} placeholder="CSK" /></label>
+          <label><span>Team A Logo URL</span><input value={form.teamALogoUrl} onChange={(e) => setForm({ ...form, teamALogoUrl: e.target.value })} placeholder="https://..." /></label>
+          <label><span>Team B Logo URL</span><input value={form.teamBLogoUrl} onChange={(e) => setForm({ ...form, teamBLogoUrl: e.target.value })} placeholder="https://..." /></label>
           <label><span>Status</span><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Live</option><option>Closed</option><option>Hidden</option></select></label>
           <label><span>Match Start Time</span><input type="datetime-local" value={form.startAt} onChange={(e) => setForm({ ...form, startAt: e.target.value })} /></label>
           <label><span>Toss Auto Close</span><input type="datetime-local" value={form.tossCloseAt} onChange={(e) => setForm({ ...form, tossCloseAt: e.target.value })} /></label>
@@ -299,6 +321,30 @@ export function CricketPage({ apiBase, token, fetchApi, mode = "cricket", PageHe
 
       {showMatches ? <section className="panel">
         <div className="panel-head"><h2>Matches</h2><p>Current scheduled cricket markets.</p></div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 18 }}>
+          {state.matches.length ? state.matches.map((match) => (
+            <article key={match.id} style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, background: "#fff", boxShadow: "0 12px 28px rgba(15, 23, 42, 0.08)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <TeamLogo name={match.teamA} url={match.teamALogoUrl} />
+                  <strong style={{ fontSize: 12, color: "#64748b" }}>vs</strong>
+                  <TeamLogo name={match.teamB} url={match.teamBLogoUrl} />
+                </div>
+                <span style={{ borderRadius: 999, padding: "6px 10px", background: match.status === "Live" ? "#dcfce7" : "#fee2e2", color: match.status === "Live" ? "#166534" : "#991b1b", fontWeight: 800, fontSize: 12 }}>{match.status}</span>
+              </div>
+              <h3 style={{ margin: "14px 0 4px", fontSize: 18 }}>{match.title}</h3>
+              <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>{match.teamA} vs {match.teamB}</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}>
+                <small style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}><b>Start</b><br />{formatDate(match.startAt)}</small>
+                <small style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}><b>Toss Close</b><br />{formatDate(match.tossCloseAt)}</small>
+              </div>
+              <div className="actions" style={{ marginTop: 14 }}>
+                <button className="secondary" onClick={() => edit(match)}>Edit</button>
+                <button className="secondary" onClick={() => cancelMatch(match)} style={{ borderColor: "#fecaca", color: "#b91c1c" }}>Cancel / Refund</button>
+              </div>
+            </article>
+          )) : <div className="empty-card">No cricket matches yet.</div>}
+        </div>
         <div className="table-wrap">
           <table>
             <thead><tr><th>Match</th><th>Teams</th><th>Start</th><th>Toss</th><th>Markets Close</th><th>Result</th><th>Action</th></tr></thead>

@@ -13,6 +13,7 @@ import {
   setCachedChart,
   setCachedMarkets
 } from "@/lib/content-cache";
+import { getCricketTeamFlag } from "@/lib/cricket-team-flags";
 import { colors } from "@/theme/colors";
 
 type MarketItem = {
@@ -516,10 +517,13 @@ function CricketHomeSection({
 function CricketTeamLogo({ name, url }: { name: string; url?: string }) {
   const initials = getTeamInitials(name);
   const safeUrl = String(url || "").trim();
+  const flag = getCricketTeamFlag(name);
   return (
     <View style={styles.cricketLogoBadge}>
       {safeUrl ? (
         <Image resizeMode="cover" source={{ uri: safeUrl }} style={styles.cricketLogoImage} />
+      ) : flag ? (
+        <Text style={styles.cricketFlagText}>{flag}</Text>
       ) : (
         <Text style={styles.cricketLogoText}>{initials}</Text>
       )}
@@ -709,6 +713,9 @@ const styles = StyleSheet.create({
     color: "#065f46",
     fontSize: 12,
     fontWeight: "900"
+  },
+  cricketFlagText: {
+    fontSize: 22
   },
   cricketVs: {
     color: "#a7f3d0",

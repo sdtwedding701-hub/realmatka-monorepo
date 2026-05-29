@@ -29,6 +29,41 @@ const runOptions = {
   first_3_over_runs: ["0_15", "16_27", "28_39", "40_plus"]
 };
 
+const cricketTeamFlagMap = {
+  india: "🇮🇳",
+  ind: "🇮🇳",
+  bharat: "🇮🇳",
+  australia: "🇦🇺",
+  aus: "🇦🇺",
+  england: "🏴",
+  eng: "🏴",
+  "new zealand": "🇳🇿",
+  nz: "🇳🇿",
+  pakistan: "🇵🇰",
+  pak: "🇵🇰",
+  "south africa": "🇿🇦",
+  sa: "🇿🇦",
+  "sri lanka": "🇱🇰",
+  sri_lanka: "🇱🇰",
+  sl: "🇱🇰",
+  bangladesh: "🇧🇩",
+  ban: "🇧🇩",
+  bd: "🇧🇩",
+  afghanistan: "🇦🇫",
+  afg: "🇦🇫",
+  "west indies": "🏝️",
+  west_indies: "🏝️",
+  wi: "🏝️",
+  ireland: "🇮🇪",
+  ire: "🇮🇪",
+  scotland: "🏴",
+  sco: "🏴",
+  nepal: "🇳🇵",
+  nep: "🇳🇵",
+  uae: "🇦🇪",
+  usa: "🇺🇸"
+};
+
 function toDateTimeInput(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -63,11 +98,21 @@ function TeamLogo({ name, url }) {
     .join("")
     .toUpperCase();
   const safeUrl = String(url || "").trim();
+  const flag = getCricketTeamFlag(name);
   return (
     <span style={{ width: 44, height: 44, borderRadius: 14, overflow: "hidden", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #fff7ed, #fed7aa)", border: "1px solid #fdba74", color: "#9a3412", fontWeight: 900 }}>
-      {safeUrl ? <img alt={name || "Team"} src={safeUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials}
+      {safeUrl ? <img alt={name || "Team"} src={safeUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : flag ? <span style={{ fontSize: 24 }}>{flag}</span> : initials}
     </span>
   );
+}
+
+function getCricketTeamFlag(name) {
+  const normalized = String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return cricketTeamFlagMap[normalized] || cricketTeamFlagMap[normalized.replace(/\s+/g, "_")] || "";
 }
 
 export function CricketPage({ apiBase, token, fetchApi, mode = "cricket", PageHeader, PageState }) {

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackHeader, SurfaceCard } from "@/components/ui";
 import { api, formatApiError, type CricketMatch, type CricketMatchesPayload } from "@/lib/api";
 import { useAppState } from "@/lib/app-state";
+import { getCricketTeamFlag } from "@/lib/cricket-team-flags";
 import { colors } from "@/theme/colors";
 
 const MARKET_ORDER = ["toss_winner", "match_winner", "first_over_runs", "first_2_over_runs", "first_3_over_runs"] as const;
@@ -225,10 +226,13 @@ function CricketMarketGroup({
 
 function CricketTeamLogo({ name, url }: { name: string; url?: string }) {
   const safeUrl = String(url || "").trim();
+  const flag = getCricketTeamFlag(name);
   return (
     <View style={styles.matchLogoBadge}>
       {safeUrl ? (
         <Image resizeMode="cover" source={{ uri: safeUrl }} style={styles.matchLogoImage} />
+      ) : flag ? (
+        <Text style={styles.matchFlagText}>{flag}</Text>
       ) : (
         <Text style={styles.matchLogoText}>{getTeamInitials(name)}</Text>
       )}
@@ -283,6 +287,7 @@ const styles = StyleSheet.create({
   },
   matchLogoImage: { width: "100%", height: "100%" },
   matchLogoText: { color: "#065f46", fontSize: 13, fontWeight: "900" },
+  matchFlagText: { fontSize: 24 },
   matchVs: { color: "#a7f3d0", fontSize: 11, fontWeight: "900" },
   matchTitle: { color: colors.surface, fontSize: 24, fontWeight: "900" },
   matchSub: { color: "#d1fae5", fontSize: 13, fontWeight: "800", marginTop: 4 },

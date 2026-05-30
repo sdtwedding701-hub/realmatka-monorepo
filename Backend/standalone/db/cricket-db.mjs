@@ -49,7 +49,12 @@ function mapBet(row) {
     payout: Number(row.payout ?? 0),
     settledAt: row.settled_at || null,
     settledResult: row.settled_result || "",
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    user: row.user_name || row.user_phone ? {
+      id: row.user_id,
+      name: row.user_name || "Unknown",
+      phone: row.user_phone || ""
+    } : null
   };
 }
 
@@ -338,13 +343,25 @@ export async function listCricketBetsForUser(userId, limit = 200) {
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     const result = await pool.query(
-      `SELECT * FROM cricket_bets WHERE user_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2`,
+      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+       FROM cricket_bets cb
+       LEFT JOIN users u ON u.id = cb.user_id
+       WHERE cb.user_id = $1
+       ORDER BY cb.created_at DESC, cb.id DESC
+       LIMIT $2`,
       [userId, normalizedLimit]
     );
     return result.rows.map(mapBet);
   }
   return __internalGetSqlite()
-    .prepare(`SELECT * FROM cricket_bets WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?`)
+    .prepare(
+      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+       FROM cricket_bets cb
+       LEFT JOIN users u ON u.id = cb.user_id
+       WHERE cb.user_id = ?
+       ORDER BY cb.created_at DESC, cb.id DESC
+       LIMIT ?`
+    )
     .all(userId, normalizedLimit)
     .map(mapBet);
 }
@@ -356,11 +373,24 @@ export async function listCricketBetsForMatch(matchId) {
   }
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
-    const result = await pool.query(`SELECT * FROM cricket_bets WHERE match_id = $1 ORDER BY created_at DESC, id DESC`, [matchId]);
+    const result = await pool.query(
+      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+       FROM cricket_bets cb
+       LEFT JOIN users u ON u.id = cb.user_id
+       WHERE cb.match_id = $1
+       ORDER BY cb.created_at DESC, cb.id DESC`,
+      [matchId]
+    );
     return result.rows.map(mapBet);
   }
   return __internalGetSqlite()
-    .prepare(`SELECT * FROM cricket_bets WHERE match_id = ? ORDER BY created_at DESC, id DESC`)
+    .prepare(
+      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+       FROM cricket_bets cb
+       LEFT JOIN users u ON u.id = cb.user_id
+       WHERE cb.match_id = ?
+       ORDER BY cb.created_at DESC, cb.id DESC`
+    )
     .all(matchId)
     .map(mapBet);
 }
@@ -370,11 +400,24 @@ export async function listAllCricketBets(limit = 500) {
   const normalizedLimit = Math.max(1, Math.min(2000, Number(limit) || 500));
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
-    const result = await pool.query(`SELECT * FROM cricket_bets ORDER BY created_at DESC, id DESC LIMIT $1`, [normalizedLimit]);
+    const result = await pool.query(
+      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+       FROM cricket_bets cb
+       LEFT JOIN users u ON u.id = cb.user_id
+       ORDER BY cb.created_at DESC, cb.id DESC
+       LIMIT $1`,
+      [normalizedLimit]
+    );
     return result.rows.map(mapBet);
   }
   return __internalGetSqlite()
-    .prepare(`SELECT * FROM cricket_bets ORDER BY created_at DESC, id DESC LIMIT ?`)
+    .prepare(
+      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+       FROM cricket_bets cb
+       LEFT JOIN users u ON u.id = cb.user_id
+       ORDER BY cb.created_at DESC, cb.id DESC
+       LIMIT ?`
+    )
     .all(normalizedLimit)
     .map(mapBet);
 }

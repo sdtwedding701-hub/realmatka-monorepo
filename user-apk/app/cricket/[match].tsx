@@ -227,8 +227,9 @@ function CricketMarketGroup({
 function CricketTeamLogo({ name, url }: { name: string; url?: string }) {
   const safeUrl = String(url || "").trim();
   const flag = getCricketTeamFlag(name);
+  const showLooseFlag = Boolean(flag && !safeUrl);
   return (
-    <View style={styles.matchLogoBadge}>
+    <View style={[styles.matchLogoBadge, showLooseFlag && styles.matchLogoFlagOnly]}>
       {safeUrl ? (
         <Image resizeMode="cover" source={{ uri: safeUrl }} style={styles.matchLogoImage} />
       ) : flag ? (
@@ -287,7 +288,14 @@ const styles = StyleSheet.create({
   },
   matchLogoImage: { width: "100%", height: "100%" },
   matchLogoText: { color: "#065f46", fontSize: 13, fontWeight: "900" },
-  matchFlagText: { fontSize: 24 },
+  matchLogoFlagOnly: {
+    width: 36,
+    height: 36,
+    borderRadius: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent"
+  },
+  matchFlagText: { fontSize: 30 },
   matchVs: { color: "#a7f3d0", fontSize: 11, fontWeight: "900" },
   matchTitle: { color: colors.surface, fontSize: 24, fontWeight: "900" },
   matchSub: { color: "#d1fae5", fontSize: 13, fontWeight: "800", marginTop: 4 },

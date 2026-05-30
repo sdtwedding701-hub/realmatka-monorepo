@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { Link, router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
@@ -460,11 +461,11 @@ function CricketHomeSection({
   error: string;
   loading: boolean;
 }) {
-  const [, setClockTick] = useState(0);
+  const [clockTick, setClockTick] = useState(Date.now());
   const matches = data.matches || [];
   const sections = groupCricketMatches(matches);
   useEffect(() => {
-    const timer = setInterval(() => setClockTick((tick) => tick + 1), 30_000);
+    const timer = setInterval(() => setClockTick(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
   return (
@@ -481,7 +482,7 @@ function CricketHomeSection({
           <View key={section.title} style={styles.cricketSection}>
             <Text style={styles.cricketSectionTitle}>{section.title}</Text>
             {section.items.map((match) => (
-              <CricketMatchCard key={match.id} match={match} />
+              <CricketMatchCard key={match.id} match={match} now={clockTick} />
             ))}
           </View>
         ))
@@ -495,7 +496,7 @@ function CricketHomeSection({
   );
 }
 
-function CricketMatchCard({ match }: { match: CricketMatch }) {
+function CricketMatchCard({ match, now }: { match: CricketMatch; now: number }) {
   return (
     <Pressable
       onPress={() => {
@@ -506,21 +507,25 @@ function CricketMatchCard({ match }: { match: CricketMatch }) {
       }}
       style={styles.cricketPosterCard}
     >
-      <View style={styles.cricketPosterContent}>
-        <View style={styles.cricketTeamLogos}>
-          <CricketTeamLogo name={match.teamA} url={match.teamALogoUrl} />
-          <Text style={styles.cricketVs}>VS</Text>
-          <CricketTeamLogo name={match.teamB} url={match.teamBLogoUrl} />
+      <LinearGradient colors={["#013a63", "#00806f", "#ff6a00"]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.cricketPosterGradient}>
+        <View style={styles.cricketCardTop}>
+          <View style={styles.cricketTeamLogos}>
+            <CricketTeamLogo name={match.teamA} url={match.teamALogoUrl} />
+            <View style={styles.cricketVsBadge}>
+              <Text style={styles.cricketVs}>VS</Text>
+            </View>
+            <CricketTeamLogo name={match.teamB} url={match.teamBLogoUrl} />
+          </View>
+          <View style={[styles.cricketStatusPill, hasAnyOpenCricketMarket(match) ? styles.cricketStatusLive : styles.cricketStatusClosed]}>
+            <Text style={styles.cricketStatusText}>{hasAnyOpenCricketMarket(match) ? "OPEN" : "CLOSED"}</Text>
+          </View>
         </View>
         <View style={styles.cricketPosterText}>
           <Text style={styles.cricketPosterTitle}>{match.teamA} vs {match.teamB}</Text>
           <Text style={styles.cricketPosterSubtitle}>{match.title}</Text>
-          <Text style={styles.cricketPosterMeta}>{formatCricketCountdown(match)}</Text>
+          <Text style={styles.cricketPosterMeta}>{formatCricketCountdown(match, now)}</Text>
         </View>
-      </View>
-      <View style={[styles.cricketStatusPill, hasAnyOpenCricketMarket(match) ? styles.cricketStatusLive : styles.cricketStatusClosed]}>
-        <Text style={styles.cricketStatusText}>{hasAnyOpenCricketMarket(match) ? "OPEN" : "CLOSED"}</Text>
-      </View>
+      </LinearGradient>
     </Pressable>
   );
 }
@@ -529,8 +534,9 @@ function CricketTeamLogo({ name, url }: { name: string; url?: string }) {
   const initials = getTeamInitials(name);
   const safeUrl = String(url || "").trim();
   const flag = getCricketTeamFlag(name);
+  const showLooseFlag = Boolean(flag && !safeUrl);
   return (
-    <View style={styles.cricketLogoBadge}>
+    <View style={[styles.cricketLogoBadge, showLooseFlag && styles.cricketLogoFlagOnly]}>
       {safeUrl ? (
         <Image resizeMode="cover" source={{ uri: safeUrl }} style={styles.cricketLogoImage} />
       ) : flag ? (
@@ -586,12 +592,12 @@ function getLocalDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function formatCricketCountdown(match: CricketMatch) {
+function formatCricketCountdown(match: CricketMatch, now = Date.now()) {
   const closeAt = match.markets?.match_winner?.closeAt || match.matchCloseAt || match.startAt;
   if (!closeAt) return "Betting time not set";
   const closeTime = new Date(closeAt).getTime();
   if (Number.isNaN(closeTime)) return formatCricketStart(match.startAt);
-  const remaining = closeTime - Date.now();
+  const remaining = closeTime - now;
   if (remaining <= 0) return "Betting closed";
   const totalSeconds = Math.floor(remaining / 1000);
   const hours = Math.floor(totalSeconds / 3600);
@@ -717,34 +723,34 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   cricketPosterCard: {
-    minHeight: 118,
-    borderRadius: 18,
-    backgroundColor: "#064e3b",
-    borderWidth: 1,
-    borderColor: "#10b981",
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#082f49",
     shadowColor: colors.shadow,
     shadowOpacity: 0.1,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
     elevation: 4
   },
-  cricketPosterContent: {
-    flex: 1,
+  cricketPosterGradient: {
+    width: "100%",
+    minHeight: 132,
+    padding: 14,
+    justifyContent: "space-between",
+    gap: 14
+  },
+  cricketCardTop: {
+    width: "100%",
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: 12
   },
   cricketTeamLogos: {
-    width: 94,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 4
+    gap: 8,
+    flexShrink: 1
   },
   cricketLogoBadge: {
     width: 38,
@@ -757,6 +763,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#86efac"
   },
+  cricketLogoFlagOnly: {
+    width: 54,
+    height: 42,
+    borderRadius: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent"
+  },
   cricketLogoImage: {
     width: "100%",
     height: "100%"
@@ -767,20 +780,35 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   cricketFlagText: {
-    fontSize: 22
+    width: 54,
+    height: 42,
+    fontSize: 40,
+    lineHeight: 42,
+    opacity: 1,
+    includeFontPadding: false,
+    textAlign: "center",
+    textAlignVertical: "center"
+  },
+  cricketVsBadge: {
+    minWidth: 28,
+    minHeight: 22,
+    borderRadius: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent"
   },
   cricketVs: {
-    color: "#a7f3d0",
-    fontSize: 9,
+    color: "#ffffff",
+    fontSize: 10,
     fontWeight: "900"
   },
   cricketPosterText: {
-    flex: 1,
-    gap: 3
+    width: "100%",
+    gap: 5
   },
   cricketPosterTitle: {
     color: colors.surface,
-    fontSize: 19,
+    fontSize: 20,
     fontWeight: "900"
   },
   cricketPosterSubtitle: {
@@ -794,8 +822,8 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   cricketStatusPill: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
+    borderRadius: 6,
+    paddingHorizontal: 11,
     paddingVertical: 6
   },
   cricketStatusLive: {

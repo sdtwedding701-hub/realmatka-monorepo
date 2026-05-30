@@ -747,6 +747,12 @@ a.secondary {
   gap: 14px;
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
 .dashboard-grid,
 .detail-grid {
   margin-top: 18px;
@@ -892,6 +898,47 @@ a.secondary {
   margin-top: 16px;
   display: grid;
   gap: 12px;
+}
+
+.table-wrap {
+  margin-top: 16px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.table-wrap table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+}
+
+.table-wrap th,
+.table-wrap td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  font-size: 13px;
+}
+
+.table-wrap th {
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.table-wrap tr:last-child td {
+  border-bottom: 0;
+}
+
+.table-wrap small {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .admin-market-card-list {
@@ -2319,6 +2366,10 @@ button.secondary.danger {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .data-row {
     flex-direction: column;
     align-items: flex-start;
@@ -2344,6 +2395,10 @@ button.secondary.danger {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .table-wrap {
+    border-radius: 14px;
   }
 
   .dashboard-grid,
@@ -2418,6 +2473,10 @@ button.secondary.danger {
 
   .topbar {
     gap: 12px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 
   .topbar-copy h2,

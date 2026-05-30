@@ -344,11 +344,12 @@ export function CricketPage({ apiBase, token, fetchApi, mode = "cricket", PageHe
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Placed</th><th>Match</th><th>Market</th><th>Selection</th><th>Amount</th><th>Rate</th><th>Status</th><th>Payout</th><th>Result</th></tr></thead>
+            <thead><tr><th>Placed</th><th>User</th><th>Match</th><th>Market</th><th>Selection</th><th>Amount</th><th>Rate</th><th>Status</th><th>Payout</th><th>Result</th></tr></thead>
             <tbody>
               {filteredBets.length ? filteredBets.map((bet) => (
                 <tr key={bet.id}>
                   <td>{formatDate(bet.createdAt)}</td>
+                  <td>{bet.user?.name || "Unknown"}<br /><small>{bet.user?.phone || bet.userId || "-"}</small></td>
                   <td>{bet.matchTitle}</td>
                   <td>{cricketMarkets.find((market) => market.value === bet.marketType)?.label || bet.marketType}</td>
                   <td>{formatSelection(bet.selection)}</td>
@@ -358,7 +359,7 @@ export function CricketPage({ apiBase, token, fetchApi, mode = "cricket", PageHe
                   <td>Rs {Number(bet.payout || 0)}</td>
                   <td>{bet.settledResult || "-"}</td>
                 </tr>
-              )) : <tr><td colSpan={9}>No cricket bets yet.</td></tr>}
+              )) : <tr><td colSpan={10}>No cricket bets yet.</td></tr>}
             </tbody>
           </table>
         </div>

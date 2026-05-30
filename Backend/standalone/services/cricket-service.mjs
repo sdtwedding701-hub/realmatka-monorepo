@@ -265,6 +265,11 @@ export async function settleAdminCricketResult(body) {
   const match = await findCricketMatch(matchId);
   if (!match) return { ok: false, status: 404, error: "Cricket match not found" };
 
+  const existingResults = await listCricketMarketResults([matchId]);
+  if (existingResults.some((result) => result.marketType === marketType)) {
+    return { ok: false, status: 400, error: "This cricket market result is already published. Correction ke liye pehle manual review karo." };
+  }
+
   const pendingBets = (await listCricketBetsForMatch(matchId)).filter((bet) => bet.status === "Pending" && bet.marketType === marketType);
   const resultLabel = `${getMarketLabel(marketType)}: ${getSelectionLabel(match, winner)}`;
   let won = 0;
@@ -314,7 +319,12 @@ export async function cancelAdminCricketMatch(body) {
   const match = await findCricketMatch(matchId);
   if (!match) return { ok: false, status: 404, error: "Cricket match not found" };
 
-  const pendingBets = (await listCricketBetsForMatch(matchId)).filter((bet) => bet.status === "Pending");
+  const allBets = await listCricketBetsForMatch(matchId);
+  if (allBets.some((bet) => bet.status !== "Pending")) {
+    return { ok: false, status: 400, error: "Some cricket bets are already settled. Full cancel/refund is blocked to protect wallet balance." };
+  }
+
+  const pendingBets = allBets.filter((bet) => bet.status === "Pending");
   let refunded = 0;
   let totalPayout = 0;
 

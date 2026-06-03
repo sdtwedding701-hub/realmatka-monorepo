@@ -91,6 +91,12 @@ export default function ForgotPasswordScreen() {
               onChangeText={(value) => {
                 setPhone(value.replace(/[^0-9]/g, ""));
                 setError("");
+                setMessage("");
+                setVerifiedAccessToken("");
+                setSdkReqId("");
+                setOtpMode("otp");
+                setOtpSent(false);
+                setOtp("");
               }}
               style={styles.input}
               value={phone}
@@ -189,9 +195,9 @@ export default function ForgotPasswordScreen() {
                   placeholderTextColor="#94a3b8"
                 />
               </>
-            ) : (
+            ) : verifiedAccessToken ? (
               <Text style={styles.success}>Mobile verification complete. OTP manually daalne ki zaroorat nahi hai.</Text>
-            )}
+            ) : null}
 
             {verifiedAccessToken || otpSent ? (
               <>

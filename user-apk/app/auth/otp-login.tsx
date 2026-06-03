@@ -116,6 +116,9 @@ export default function OtpLoginScreen() {
                 setPhone(value.replace(/[^0-9]/g, ""));
                 setError("");
                 setMessage("");
+                setSdkAccessToken("");
+                setSdkReqId("");
+                setOtpMode("otp");
                 setOtpSent(false);
                 setOtp("");
               }}

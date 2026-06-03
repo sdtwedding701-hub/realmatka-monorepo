@@ -106,6 +106,9 @@ export type CricketBet = {
   userId: string;
   matchId: string;
   matchTitle: string;
+  matchType?: string;
+  teamA?: string;
+  teamB?: string;
   marketType: string;
   selection: string;
   amount: number;

@@ -77,9 +77,9 @@ function formatBoardLabel(label: string) {
   return label.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function formatCricketSelection(selection: string) {
-  if (selection === "team_a") return "Team A";
-  if (selection === "team_b") return "Team B";
+function formatCricketSelection(selection: string, bet?: { teamA?: string | null; teamB?: string | null }) {
+  if (selection === "team_a") return String(bet?.teamA || "").trim() || "Team A";
+  if (selection === "team_b") return String(bet?.teamB || "").trim() || "Team B";
   if (selection === "cancel") return "Refund";
   return String(selection || "").replace(/_/g, "-").replace("-plus", "+");
 }
@@ -162,7 +162,7 @@ export default function BidsScreen() {
         status: bid.status,
         payout: Number(bid.payout || 0),
         sessionType: "NA" as const,
-        digit: formatCricketSelection(bid.selection),
+        digit: formatCricketSelection(bid.selection, bid),
         points: Number(bid.amount || 0),
         marketLine: String(bid.matchTitle || "Cricket Match").toUpperCase(),
         boardLine: `CRICKET ${formatBoardLabel(String(bid.marketType || ""))}`.toUpperCase()

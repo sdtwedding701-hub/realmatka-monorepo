@@ -42,6 +42,9 @@ function mapBet(row) {
     userId: row.user_id,
     matchId: row.match_id,
     matchTitle: row.match_title || "",
+    matchType: row.match_type || "",
+    teamA: row.team_a || "",
+    teamB: row.team_b || "",
     marketType: row.bet_type,
     selection: row.selection,
     amount: Number(row.amount ?? 0),
@@ -332,7 +335,12 @@ export async function addCricketBet({ userId, match, marketType, selection, amou
        RETURNING *`,
       [id, userId, match.id, match.title, marketType, selection, amount, rate, createdAt]
     );
-    return mapBet(result.rows[0]);
+    return {
+      ...mapBet(result.rows[0]),
+      matchType: match.matchType || "",
+      teamA: match.teamA || "",
+      teamB: match.teamB || ""
+    };
   }
   __internalGetSqlite()
     .prepare(
@@ -340,7 +348,12 @@ export async function addCricketBet({ userId, match, marketType, selection, amou
        VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, 'Pending', 0, ?)`
     )
     .run(id, userId, match.id, match.title, marketType, selection, amount, rate, createdAt);
-  return mapBet(__internalGetSqlite().prepare(`SELECT * FROM cricket_bets WHERE id = ? LIMIT 1`).get(id));
+  return {
+    ...mapBet(__internalGetSqlite().prepare(`SELECT * FROM cricket_bets WHERE id = ? LIMIT 1`).get(id)),
+    matchType: match.matchType || "",
+    teamA: match.teamA || "",
+    teamB: match.teamB || ""
+  };
 }
 
 export async function listCricketBetsForUser(userId, limit = 200) {
@@ -349,8 +362,9 @@ export async function listCricketBetsForUser(userId, limit = 200) {
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     const result = await pool.query(
-      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+      `SELECT cb.*, cm.match_type, cm.team_a, cm.team_b, u.name AS user_name, u.phone AS user_phone
        FROM cricket_bets cb
+       LEFT JOIN cricket_matches cm ON cm.id = cb.match_id
        LEFT JOIN users u ON u.id = cb.user_id
        WHERE cb.user_id = $1
        ORDER BY cb.created_at DESC, cb.id DESC
@@ -361,8 +375,9 @@ export async function listCricketBetsForUser(userId, limit = 200) {
   }
   return __internalGetSqlite()
     .prepare(
-      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+      `SELECT cb.*, cm.match_type, cm.team_a, cm.team_b, u.name AS user_name, u.phone AS user_phone
        FROM cricket_bets cb
+       LEFT JOIN cricket_matches cm ON cm.id = cb.match_id
        LEFT JOIN users u ON u.id = cb.user_id
        WHERE cb.user_id = ?
        ORDER BY cb.created_at DESC, cb.id DESC
@@ -380,8 +395,9 @@ export async function listCricketBetsForMatch(matchId) {
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     const result = await pool.query(
-      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+      `SELECT cb.*, cm.match_type, cm.team_a, cm.team_b, u.name AS user_name, u.phone AS user_phone
        FROM cricket_bets cb
+       LEFT JOIN cricket_matches cm ON cm.id = cb.match_id
        LEFT JOIN users u ON u.id = cb.user_id
        WHERE cb.match_id = $1
        ORDER BY cb.created_at DESC, cb.id DESC`,
@@ -391,8 +407,9 @@ export async function listCricketBetsForMatch(matchId) {
   }
   return __internalGetSqlite()
     .prepare(
-      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+      `SELECT cb.*, cm.match_type, cm.team_a, cm.team_b, u.name AS user_name, u.phone AS user_phone
        FROM cricket_bets cb
+       LEFT JOIN cricket_matches cm ON cm.id = cb.match_id
        LEFT JOIN users u ON u.id = cb.user_id
        WHERE cb.match_id = ?
        ORDER BY cb.created_at DESC, cb.id DESC`
@@ -407,8 +424,9 @@ export async function listAllCricketBets(limit = 500) {
   if (isStandalonePostgresEnabled()) {
     const pool = await __internalGetReadyPgPool();
     const result = await pool.query(
-      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+      `SELECT cb.*, cm.match_type, cm.team_a, cm.team_b, u.name AS user_name, u.phone AS user_phone
        FROM cricket_bets cb
+       LEFT JOIN cricket_matches cm ON cm.id = cb.match_id
        LEFT JOIN users u ON u.id = cb.user_id
        ORDER BY cb.created_at DESC, cb.id DESC
        LIMIT $1`,
@@ -418,8 +436,9 @@ export async function listAllCricketBets(limit = 500) {
   }
   return __internalGetSqlite()
     .prepare(
-      `SELECT cb.*, u.name AS user_name, u.phone AS user_phone
+      `SELECT cb.*, cm.match_type, cm.team_a, cm.team_b, u.name AS user_name, u.phone AS user_phone
        FROM cricket_bets cb
+       LEFT JOIN cricket_matches cm ON cm.id = cb.match_id
        LEFT JOIN users u ON u.id = cb.user_id
        ORDER BY cb.created_at DESC, cb.id DESC
        LIMIT ?`

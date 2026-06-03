@@ -117,9 +117,9 @@ function formatBoardName(label: string) {
   return label.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function formatCricketSelection(selection: string) {
-  if (selection === "team_a") return "Team A";
-  if (selection === "team_b") return "Team B";
+function formatCricketSelection(selection: string, bet?: { teamA?: string | null; teamB?: string | null }) {
+  if (selection === "team_a") return String(bet?.teamA || "").trim() || "Team A";
+  if (selection === "team_b") return String(bet?.teamB || "").trim() || "Team B";
   if (selection === "cancel") return "Refund";
   return String(selection || "").replace(/_/g, "-").replace("-plus", "+");
 }
@@ -282,9 +282,9 @@ export default function HistoryScreen() {
       gameType: `Cricket ${String(bid.marketType || "").replace(/_/g, " ")}`,
       gameTime: bid.settledResult || "Pending",
       createdAt: bid.createdAt,
-      digit: formatCricketSelection(bid.selection),
+      digit: formatCricketSelection(bid.selection, bid),
       points: Number(bid.amount || 0),
-      items: [{ digit: formatCricketSelection(bid.selection), points: Number(bid.amount || 0) }],
+      items: [{ digit: formatCricketSelection(bid.selection, bid), points: Number(bid.amount || 0) }],
       source: "CRICKET" as const
     }));
   }, [activeRange, cricketBets]);

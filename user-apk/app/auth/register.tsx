@@ -58,6 +58,10 @@ export default function RegisterScreen() {
     passwordsMatch &&
     isPhoneVerified;
 
+  function isLikelyMsg91AccessToken(token: string) {
+    return token.split(".").length >= 3 && token.length > 32;
+  }
+
   useEffect(() => {
     let active = true;
 
@@ -84,6 +88,12 @@ export default function RegisterScreen() {
     const callbackPhone = String(params.phone || "").replace(/[^0-9]/g, "").slice(-10);
     const purpose = String(params.purpose || "").trim();
     if (!token || purpose !== "register") {
+      return;
+    }
+    if (!isLikelyMsg91AccessToken(token)) {
+      setVerifiedAccessToken("");
+      setSuccess("");
+      setError("");
       return;
     }
 

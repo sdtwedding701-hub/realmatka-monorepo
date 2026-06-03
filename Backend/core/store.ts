@@ -1532,7 +1532,7 @@ export async function updateUserApprovalStatus(userId: string, status: User["app
 
   const approvedAt = status === "Approved" ? now() : null;
   const rejectedAt = status === "Rejected" ? now() : null;
-  const signupBonusGranted = status === "Approved" ? current.signupBonusGranted || true : current.signupBonusGranted;
+  const signupBonusGranted = current.signupBonusGranted;
 
   if (!isPostgresEnabled()) {
     const db = getSqlite();
@@ -1545,18 +1545,6 @@ export async function updateUserApprovalStatus(userId: string, status: User["app
       "UPDATE users SET approval_status = $1, approved_at = $2, rejected_at = $3, signup_bonus_granted = $4 WHERE id = $5",
       [status, approvedAt, rejectedAt, signupBonusGranted, userId]
     );
-  }
-
-  if (status === "Approved" && !current.signupBonusGranted) {
-    const beforeBalance = await getUserBalance(userId);
-    await addWalletEntry({
-      userId,
-      type: "SIGNUP_BONUS",
-      status: "SUCCESS",
-      amount: signupBonusAmount,
-      beforeBalance,
-      afterBalance: beforeBalance + signupBonusAmount
-    });
   }
 
   return findUserById(userId);

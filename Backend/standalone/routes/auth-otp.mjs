@@ -592,7 +592,8 @@ export async function msg91Widget(request) {
   <title>Real Matka OTP Verification</title>
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: Arial, sans-serif; background: #fff7ed; color: #111827; min-height: 100vh; }
+    html { min-height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #fff7ed; color: #111827; min-height: 100vh; min-height: 100dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
     .hero { min-height: 210px; padding: 52px 22px 48px; background: linear-gradient(135deg, #ff7a18, #ff314f); color: #fff; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .logo { width: min(78%, 280px); height: 110px; background: url('https://play.realmatka.in/assets/assets/images/adaptive-icon.b9a301a63caf25a13fb79f1d5f767b26.png'), url('https://play.realmatka.in/assets/images/adaptive-icon.png'); background-position: center; background-size: contain; background-repeat: no-repeat; margin: 20px auto -2px; }
     .logoText { display: none; }
@@ -614,6 +615,13 @@ export async function msg91Widget(request) {
     .secondary { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
     .status { color: #15803d; font-size: 14px; margin-top: 14px; font-weight: 700; min-height: 20px; text-align: center; }
     .error { color: #dc2626; font-size: 14px; margin-top: 10px; font-weight: 700; min-height: 20px; text-align: center; }
+    @media (max-height: 680px) {
+      .hero { min-height: 150px; padding: 24px 18px 26px; }
+      .logo { height: 82px; margin-top: 8px; }
+      .hero p { margin-top: -10px; font-size: 13px; }
+      .content { padding: 0 14px 80px; }
+      .wrap { border-radius: 18px; padding: 18px; }
+    }
   </style>
 </head>
 <body>

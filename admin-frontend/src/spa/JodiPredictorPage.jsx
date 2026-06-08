@@ -120,6 +120,9 @@ export function JodiPredictorPage({ apiBase, token, fetchApi, PageHeader, PageSt
               <div className="mini-stat"><span>Last 90 Hit</span><strong>{prediction.stats?.last90Hits || 0}/90</strong></div>
               <div className="mini-stat"><span>Miss Streak</span><strong>{prediction.stats?.missStreak ?? "-"}</strong></div>
               <div className="mini-stat"><span>Backtest</span><strong>{prediction.stats?.backtest?.hitRate || 0}%</strong></div>
+              <div className="mini-stat"><span>Recent Skipped</span><strong>{prediction.stats?.skippedRecentJodis || 0}</strong></div>
+              <div className="mini-stat"><span>Digit Balance</span><strong>{prediction.stats?.combinedGroupDigitLimit || 6} max</strong></div>
+              <div className="mini-stat"><span>Soft Penalty</span><strong>{prediction.stats?.recentSoftPenaltyDays || 21} days</strong></div>
             </div>
           </section>
 
@@ -129,11 +132,11 @@ export function JodiPredictorPage({ apiBase, token, fetchApi, PageHeader, PageSt
 
           <section className="panel">
             <div className="panel-head">
-              <h2>Latest Chart Jodi</h2>
-              <p>Recent chart values used by predictor.</p>
+              <h2>Recent Skip List</h2>
+              <p>Last {prediction.stats?.recentSkipDays || 7} old result hard skip hain.</p>
             </div>
             <div className="jodi-chip-grid compact">
-              {(prediction.latestResults || []).map((jodi, index) => <span className="jodi-chip muted" key={`${jodi}-${index}`}>{jodi}</span>)}
+              {(prediction.skippedRecent || []).map((jodi, index) => <span className="jodi-chip muted" key={`${jodi}-${index}`}>{jodi}</span>)}
             </div>
           </section>
         </>

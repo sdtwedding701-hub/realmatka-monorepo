@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Linking from "expo-linking";
 import { AppScreen, SurfaceCard } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
 import { api, formatApiError } from "@/lib/api";
@@ -26,7 +25,7 @@ export default function OtpLoginScreen() {
   const [otpSent, setOtpSent] = useState(false);
   const handledTokenRef = useRef("");
   const sendingOtpRef = useRef(false);
-  const normalizedPhone = phone.replace(/[^0-9]/g, "");
+  const normalizedPhone = phone.replace(/[^0-9]/g, "").slice(-10);
   const normalizedOtp = otp.replace(/[^0-9]/g, "");
   const hasValidPhone = normalizedPhone.length === 10;
   const hasValidOtp = normalizedOtp.length === 6;
@@ -160,7 +159,7 @@ export default function OtpLoginScreen() {
                       } else {
                         setSdkReqId(sdkResponse.reqId);
                         setOtpSent(true);
-                        setMessage("OTP SMS successfully sent.");
+                        setMessage("OTP sent. 6 digit OTP enter karo.");
                       }
                       setCooldownSeconds(OTP_RESEND_SECONDS);
                       return;

@@ -212,6 +212,7 @@ const standaloneRoutes = new Map([
   ["/api/admin/settings", { loader: "admin", methods: { OPTIONS: "options", GET: "settingsGet", POST: "settingsUpdate" } }],
   ["/api/admin/operators", { loader: "admin", methods: { OPTIONS: "options", GET: "operators", POST: "operatorSave" } }],
   ["/api/admin/referrals", { loader: "admin", methods: { OPTIONS: "options", GET: "referrals" } }],
+  ["/api/admin/jodi-prediction", { loader: "admin", methods: { OPTIONS: "options", GET: "jodiPrediction" } }],
   ["/api/admin/cricket/matches", { loader: "cricket", methods: { OPTIONS: "options", GET: "adminMatches", POST: "adminSaveMatch" } }],
   ["/api/admin/cricket/bets", { loader: "cricket", methods: { OPTIONS: "options", GET: "adminBets" } }],
   ["/api/admin/cricket/settle", { loader: "cricket", methods: { OPTIONS: "options", POST: "adminSettle" } }],

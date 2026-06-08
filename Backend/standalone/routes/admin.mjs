@@ -1,4 +1,7 @@
-import { corsPreflight } from "../http.mjs";
+import { corsPreflight, fail, ok } from "../http.mjs";
+import { requireAdminUser } from "../middleware/auth-middleware.mjs";
+import { getChartRecord } from "../stores/market-store.mjs";
+import { buildJodiPredictionFromRows } from "../services/jodi-prediction-service.mjs";
 import {
   adminDashboardSummaryController,
   adminExportDataController,
@@ -145,6 +148,28 @@ export async function operatorSave(request) {
 
 export async function referrals(request) {
   return adminReferralSummaryController(request);
+}
+
+export async function jodiPrediction(request) {
+  const admin = await requireAdminUser(request);
+  if (admin.response) return admin.response;
+
+  const url = new URL(request.url);
+  const marketSlug = String(url.searchParams.get("market") || "").trim();
+  if (!marketSlug) {
+    return fail("market query is required", 400, request);
+  }
+
+  const chart = await getChartRecord(marketSlug, "jodi");
+  if (!chart?.rows?.length) {
+    return fail("Jodi chart data not found for this market", 404, request);
+  }
+
+  return ok({
+    marketSlug,
+    chartType: "jodi",
+    ...buildJodiPredictionFromRows(chart.rows)
+  }, request);
 }
 
 export async function bidsList(request) {

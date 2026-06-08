@@ -6,6 +6,7 @@ import { AdminShell } from "./AdminShell.jsx";
 import { AuditPage } from "./AuditPage.jsx";
 import { BonusPage } from "./BonusPage.jsx";
 import { CricketPage } from "./CricketPage.jsx";
+import { JodiPredictorPage } from "./JodiPredictorPage.jsx";
 import { NotificationsPage } from "./NotificationsPage.jsx";
 import { AdminMarketPublishList, AllChartPage, ChartEditorPreviewSection, ResultEnginePage, ResultPublishSettlementSection, buildNextResultFromSlotChange, getAdminCurrentMinutes, getBracketMarkEditorValues, getClearedEditorValues, getEditorValuesFromSelectedCell, getResultSlotNavigationTarget, publishMarketResult, saveMarketChart, sortAdminMarketsByTime } from "./ResultEnginePage.jsx";
 import { SettingsPage } from "./SettingsPage.jsx";
@@ -55,6 +56,7 @@ const navItems = [
   { key: "dashboard", label: "Dashboard" },
   { key: "support", label: "Support Chat" },
   { key: "charts", label: "All Chart" },
+  { key: "jodi-predictor", label: "Jodi Predictor" },
   { key: "reports", label: "Reports" },
   { key: "notifications", label: "Notifications" },
   { key: "bonus", label: "Bonus" },
@@ -100,6 +102,7 @@ const routeMeta = {
   support: { eyebrow: "Support", title: "Support Chat Desk", subtitle: "Respond to player issues quickly with a focused conversation workspace." },
   results: { eyebrow: "Settlement", title: "Result Engine", subtitle: "" },
   charts: { eyebrow: "Data", title: "Chart Operations", subtitle: "Edit and verify chart rows with better visibility into changes and history." },
+  "jodi-predictor": { eyebrow: "Data", title: "Jodi Predictor", subtitle: "Auto-generate today's 40 jodi from chart trend and failure learning." },
   reports: { eyebrow: "Reports", title: "Revenue Reports", subtitle: "Track collection, payout, and user-level exposure across time ranges." },
   bids: { eyebrow: "Betting", title: "All Bets", subtitle: "" },
   notifications: { eyebrow: "Messaging", title: "Notification Center", subtitle: "Broadcast platform updates and target users from one operator screen." },
@@ -309,6 +312,18 @@ export function App() {
         }
         if (route === "results") return <ResultEnginePage LegacyResultsComponent={LegacyResultsPage} apiBase={apiBase} key={`results-${refreshKey}`} token={token} />;
         if (route === "charts") return <AllChartPage LegacyResultsComponent={LegacyResultsPage} apiBase={apiBase} key={`charts-${refreshKey}`} token={token} />;
+        if (route === "jodi-predictor") {
+          return (
+            <JodiPredictorPage
+              apiBase={apiBase}
+              fetchApi={fetchApi}
+              key={`jodi-predictor-${refreshKey}`}
+              PageHeader={PageHeader}
+              PageState={PageState}
+              token={token}
+            />
+          );
+        }
         if (route === "reports") return <ReportsPage {...shared} key={`reports-${refreshKey}`} />;
         if (route === "bids") return <BidsPage {...shared} key={`bids-${refreshKey}`} />;
         if (route === "notifications") {

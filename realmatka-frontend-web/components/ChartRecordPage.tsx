@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { chartMarkets } from "@/lib/market-links";
+import { isRedBracketJodi } from "@/lib/red-bracket";
 
 type ChartType = "jodi" | "panna";
 
@@ -127,7 +128,7 @@ export async function ChartRecordPage({ slug, chartType }: { slug: string; chart
                       </td>
                       {row.cells.map((cell, cellIndex) => (
                         <td key={`jodi-${rowIndex}-${cellIndex}`} className="border border-white/10 px-1 py-2 text-[11px] font-extrabold leading-none text-slate-100 sm:px-3 sm:py-3 sm:text-[14px]">
-                          {cell}
+                          <span className={isRedBracketJodi(cell) ? "text-rose-300" : undefined}>{cell}</span>
                         </td>
                       ))}
                     </tr>
@@ -160,9 +161,9 @@ export async function ChartRecordPage({ slug, chartType }: { slug: string; chart
                       </td>
                       {row.cells.map((cell, cellIndex) => (
                         <td key={`panna-${rowIndex}-${cellIndex}`} className="border border-white/10 px-1 py-2 sm:px-3 sm:py-3">
-                          <div className="text-[8px] font-bold leading-tight text-slate-400 sm:text-[12px]">{cell.open}</div>
-                          <div className="text-[11px] font-extrabold leading-none text-slate-100 sm:text-[14px]">{cell.jodi}</div>
-                          <div className="text-[8px] font-bold leading-tight text-slate-400 sm:text-[12px]">{cell.close}</div>
+                          <div className={`text-[8px] font-bold leading-tight ${isRedBracketJodi(cell.jodi) ? "text-rose-300" : "text-slate-400"} sm:text-[12px]`}>{cell.open}</div>
+                          <div className={`text-[11px] font-extrabold leading-none ${isRedBracketJodi(cell.jodi) ? "text-rose-300" : "text-slate-100"} sm:text-[14px]`}>{cell.jodi}</div>
+                          <div className={`text-[8px] font-bold leading-tight ${isRedBracketJodi(cell.jodi) ? "text-rose-300" : "text-slate-400"} sm:text-[12px]`}>{cell.close}</div>
                         </td>
                       ))}
                     </tr>

@@ -144,17 +144,15 @@ body {
 .market-time-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.65rem;
 }
 
 .market-time-row span {
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
   color: #334155;
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1rem;
-  padding: 0.42rem 0.58rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 0.95rem;
+  padding: 0;
 }
 
 .market-chart-text-link {
@@ -279,6 +277,15 @@ main .text-rose-300 {
   .market-result-pending {
     font-size: 1.08rem;
     line-height: 1.42rem;
+  }
+
+  .market-time-row {
+    gap: 0.5rem;
+  }
+
+  .market-time-row span {
+    font-size: 0.64rem;
+    line-height: 0.85rem;
   }
 
   .market-card-layout {

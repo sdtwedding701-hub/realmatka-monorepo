@@ -13,6 +13,7 @@ export const metadata = buildMetadata({
 const rateList = [
   ["Single Digit", "10"],
   ["Jodi Digit", "100"],
+  ["Red Bracket", "100"],
   ["Single Pana", "160"],
   ["Double Pana", "320"],
   ["Triple Pana", "1000"],
@@ -23,7 +24,7 @@ const rateList = [
 const faqItems = [
   {
     question: "Game Rates page par kya milta hai?",
-    answer: "Yahan Single Digit, Jodi Digit, Single Pana, Double Pana, Triple Pana, Half Sangam aur Full Sangam ke rates diye gaye hain."
+    answer: "Yahan Single Digit, Jodi Digit, Red Bracket, Single Pana, Double Pana, Triple Pana, Half Sangam aur Full Sangam ke rates diye gaye hain."
   },
   {
     question: "Kya ye rates homepage se alag hain?",

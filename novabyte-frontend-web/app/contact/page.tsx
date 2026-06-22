@@ -22,12 +22,16 @@ export default function ContactPage() {
               <h2 className="sectionTitle">Contact Details</h2>
               <div className="invoiceBox">
                 <div className="invoiceRow">
-                  <span>Business Name</span>
+                  <span>Legal / Business Name</span>
                   <strong>{businessContact.legalName}</strong>
                 </div>
                 <div className="invoiceRow">
                   <span>Email</span>
                   <strong>{businessContact.email}</strong>
+                </div>
+                <div className="invoiceRow">
+                  <span>Phone</span>
+                  <strong>{businessContact.phone}</strong>
                 </div>
                 <div className="invoiceRow">
                   <span>Location</span>

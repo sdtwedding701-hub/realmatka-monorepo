@@ -201,8 +201,8 @@ export default function HomePage() {
               <h3>Business Details</h3>
               <div className="invoiceBox">
                 <div className="invoiceRow">
-                  <span>Business</span>
-                  <strong>NovaByte Technologies</strong>
+                  <span>Legal / Business Name</span>
+                  <strong>{businessContact.legalName}</strong>
                 </div>
                 <div className="invoiceRow">
                   <span>Service Category</span>
@@ -211,6 +211,10 @@ export default function HomePage() {
                 <div className="invoiceRow">
                   <span>Support Email</span>
                   <strong>{businessContact.email}</strong>
+                </div>
+                <div className="invoiceRow">
+                  <span>Support Phone</span>
+                  <strong>{businessContact.phone}</strong>
                 </div>
               </div>
               <a className="button buttonPrimary fullButton" href={`mailto:${businessContact.email}?subject=Quote%20Request%20-%20NovaByte%20Technologies`}>
@@ -240,8 +244,8 @@ export default function HomePage() {
             </article>
             <article className="panel infoPanel">
               <span className="eyebrow">Company Details</span>
-              <h2 className="sectionTitle">Registration details will be updated after approval.</h2>
-              <p>CIN, PAN, GST, and compliance details will be updated once company registration and tax registrations are complete.</p>
+              <h2 className="sectionTitle">Clear business and support information for customers.</h2>
+              <p>Review our legal business name, service category, support contact, business location, and customer service hours.</p>
               <a className="button buttonSecondary" href="/company-registration">View Company Details</a>
             </article>
           </div>

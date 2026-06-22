@@ -41,8 +41,8 @@ export default function AddFundPage() {
                 </label>
                 <label>
                   <span>Credit Purpose</span>
-                  <select defaultValue="Account Credit / Wallet Top-up">
-                    <option>Account Credit / Wallet Top-up</option>
+                  <select defaultValue="Approved Service Credit">
+                    <option>Approved Service Credit</option>
                     <option>Daily Digital Support Balance</option>
                     <option>Monthly Maintenance Balance</option>
                     <option>Service Usage Credit</option>

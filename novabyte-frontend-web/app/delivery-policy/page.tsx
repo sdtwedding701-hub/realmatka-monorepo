@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageHero, SiteFooter, SiteHeader } from "../site-shell";
+import { businessContact, PageHero, SiteFooter, SiteHeader } from "../site-shell";
 
 export const metadata: Metadata = {
   title: "Delivery Policy",
@@ -26,6 +26,8 @@ export default function DeliveryPolicyPage() {
             <p>Customers are expected to review delivered work and share feedback within the agreed review period. Delayed feedback may extend the delivery timeline.</p>
             <h2>Handover</h2>
             <p>Final handover may include website URLs, admin credentials, source files where agreed, deployment notes, documentation, or support instructions.</p>
+            <h2>Contact</h2>
+            <p>For delivery questions, email {businessContact.email} or call {businessContact.phone}.</p>
           </article>
         </section>
       </main>

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageHero, SiteFooter, SiteHeader } from "../site-shell";
+import { businessContact, PageHero, SiteFooter, SiteHeader } from "../site-shell";
 
 export const metadata: Metadata = {
   title: "Refund And Cancellation Policy",
@@ -15,9 +15,9 @@ export default function RefundPolicyPage() {
         <section className="shell section">
           <article className="panel policyPanel">
             <h2>Policy Scope</h2>
-            <p>This policy applies to NovaByte Technologies services including account credit, wallet top-up, website development, software development, mobile app UI work, admin dashboards, cloud support, maintenance retainers, consultation, and digital operations support.</p>
-            <h2>Account Credit Refunds</h2>
-            <p>Account credit or wallet top-up payments may be refunded only if the credit has not been used, transferred, consumed, disputed, or adjusted against any service. Refund requests must include payment reference, amount, customer details, and reason for refund.</p>
+            <p>This policy applies to NovaByte Technologies services including approved service credit, website development, software development, mobile app UI work, admin dashboards, cloud support, maintenance retainers, consultation, and digital operations support.</p>
+            <h2>Service Credit Refunds</h2>
+            <p>Approved service credit payments may be refunded only if the credit has not been used, consumed, disputed, or adjusted against any service or invoice. Refund requests must include the payment reference, amount, customer details, and reason for refund.</p>
             <h2>Cancellation Before Work Starts</h2>
             <p>If a customer cancels before work has started, the paid amount may be refunded after deducting payment gateway fees, transaction charges, or administrative charges where applicable. Cancellation requests must be sent by email with the payment reference and service details.</p>
             <h2>After Work Has Started</h2>
@@ -31,7 +31,7 @@ export default function RefundPolicyPage() {
             <h2>Refund Timeline</h2>
             <p>Approved refunds are processed to the original payment method where possible. Bank or gateway processing may take 5 to 10 business days.</p>
             <h2>Contact</h2>
-            <p>For refund or cancellation requests, email novabytetechnoai@gmail.com with invoice details and payment reference.</p>
+            <p>For refund or cancellation requests, email {businessContact.email} or call {businessContact.phone} with invoice details and payment reference.</p>
           </article>
         </section>
       </main>

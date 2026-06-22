@@ -11,7 +11,7 @@ export default function CompanyRegistrationPage() {
     <>
       <SiteHeader />
       <main>
-        <PageHero eyebrow="Company Details" title="Business registration details will be updated after approval." description="This page keeps company information clear for customers, payment partners, and service review." />
+        <PageHero eyebrow="Company Details" title="Business and support information." description="This page keeps our legal business name, service category, and customer contact information clear." />
         <section className="shell section">
           <div className="billingLayout">
             <article className="panel infoPanel">
@@ -19,23 +19,20 @@ export default function CompanyRegistrationPage() {
               <div className="invoiceBox">
                 <div className="invoiceRow"><span>Legal / Business Name</span><strong>{businessContact.legalName}</strong></div>
                 <div className="invoiceRow"><span>Brand Name</span><strong>{businessContact.legalName}</strong></div>
-                <div className="invoiceRow"><span>Status</span><strong>Registration in process</strong></div>
+                <div className="invoiceRow"><span>Service Category</span><strong>Software / IT Enabled Services</strong></div>
                 <div className="invoiceRow"><span>Location</span><strong>{businessContact.location}</strong></div>
-                <div className="invoiceRow"><span>Official Phone</span><strong>To be updated after registration</strong></div>
-                <div className="invoiceRow"><span>Registered Office</span><strong>To be updated after registration</strong></div>
+                <div className="invoiceRow"><span>Official Phone</span><strong>{businessContact.phone}</strong></div>
                 <div className="invoiceRow"><span>Email</span><strong>{businessContact.email}</strong></div>
-                <div className="invoiceRow"><span>CIN</span><strong>To be updated after registration</strong></div>
-                <div className="invoiceRow"><span>PAN</span><strong>To be updated after registration</strong></div>
-                <div className="invoiceRow"><span>GST</span><strong>To be updated if registered</strong></div>
+                <div className="invoiceRow"><span>Support Hours</span><strong>{businessContact.supportHours}</strong></div>
               </div>
             </article>
             <article className="panel infoPanel">
-              <h2 className="sectionTitle">To Be Updated</h2>
+              <h2 className="sectionTitle">Business Services</h2>
               <ul className="list">
-                <li>CIN after company registration approval</li>
-                <li>PAN details where applicable</li>
-                <li>GST details if registration is taken</li>
-                <li>Registered office and official support phone</li>
+                <li>Software and website development</li>
+                <li>Mobile application interfaces</li>
+                <li>Cloud, deployment, and maintenance support</li>
+                <li>Admin dashboards and digital operations</li>
               </ul>
             </article>
           </div>

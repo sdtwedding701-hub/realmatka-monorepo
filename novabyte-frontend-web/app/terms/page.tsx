@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageHero, SiteFooter, SiteHeader } from "../site-shell";
+import { businessContact, PageHero, SiteFooter, SiteHeader } from "../site-shell";
 
 export const metadata: Metadata = {
   title: "Terms And Conditions",
@@ -26,8 +26,8 @@ export default function TermsPage() {
             <p>Customers must provide correct information, content, access details, brand assets, and timely feedback required to complete the service.</p>
             <h2>Payments</h2>
             <p>Payments are collected in INR against approved account credit requests, invoices, service estimates, retainers, maintenance fees, consultation fees, or confirmed digital service work. Prices listed on the website are starting prices and final quotes may vary by scope.</p>
-            <h2>Account Credit / Wallet Top-up</h2>
-            <p>Account credit or wallet top-up payments are accepted only for customer-requested account balance or service balance updates. The customer must use the correct payment amount and reference. Credit may be delayed or held for review if payment details do not match, if payment verification fails, or if the transaction is disputed.</p>
+            <h2>Approved Service Credit</h2>
+            <p>Service credit payments are accepted only for customer-requested digital services, maintenance, support, or approved invoice adjustments. The customer must use the correct payment amount and reference. Credit may be delayed or held for review if payment details do not match, payment verification fails, or the transaction is disputed.</p>
             <h2>Changes And Revisions</h2>
             <p>Minor revisions may be included depending on the agreed scope. New features, redesigns, or additional work may require a revised estimate.</p>
             <h2>Delivery</h2>
@@ -41,7 +41,7 @@ export default function TermsPage() {
             <h2>Limitation</h2>
             <p>NovaByte Technologies is not responsible for third-party downtime, payment provider issues, domain registrar problems, hosting provider outages, or customer-side configuration errors.</p>
             <h2>Contact</h2>
-            <p>For questions about these terms, email novabytetechnoai@gmail.com.</p>
+            <p>For questions about these terms, email {businessContact.email} or call {businessContact.phone}.</p>
           </article>
         </section>
       </main>

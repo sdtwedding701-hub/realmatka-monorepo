@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 const plans = [
   {
-    name: "Account Credit / Wallet Top-up",
+    name: "Approved Service Credit",
     price: "INR 100 onwards",
     details: ["Customer-requested account credit", "Payment reference generated for tracking", "Credit confirmation after successful payment verification", "Used for approved account balance, support balance, or service balance requests"]
   },
@@ -64,7 +64,7 @@ export default function PricingPage() {
           <div className="sectionHead">
             <span className="eyebrow">Service Price List</span>
             <h2 className="sectionTitle">Account credit, software, website, app interface, dashboard, and maintenance services.</h2>
-            <p>All prices are in Indian Rupees (INR). GST or taxes, if applicable after registration, may be charged separately.</p>
+            <p>All prices are in Indian Rupees (INR). Applicable taxes, if any, may be charged separately.</p>
           </div>
           <div className="grid3">
             {plans.map((plan) => (
@@ -79,7 +79,7 @@ export default function PricingPage() {
           </div>
           <article className="panel policyPanel priceNote">
             <h2>Payment Terms</h2>
-            <p>For fixed-scope work, payment may be collected as advance, milestone payment, or full payment depending on the approved estimate. Account credit or wallet top-up payments are processed only after the customer confirms the amount and payment reference. Work or credit confirmation starts only after payment verification.</p>
+            <p>For fixed-scope work, payment may be collected as advance, milestone payment, or full payment depending on the approved estimate. Approved service credit payments are processed only after the customer confirms the amount and payment reference. Work or credit confirmation starts only after payment verification.</p>
             <h2>What Is Included</h2>
             <p>Each service includes agreed design/development work, basic testing, delivery support, and handover of agreed files or deployed pages. Account credit payments include payment verification and account balance update where applicable. Additional features, paid tools, hosting, domains, or third-party services may be billed separately after approval.</p>
           </article>

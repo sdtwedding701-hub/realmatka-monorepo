@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 const checkoutServices = [
-  "Account Credit / Wallet Top-up",
+  "Approved Service Credit",
   "Website Development",
   "Business Website",
   "Mobile App UI",
@@ -59,7 +59,7 @@ export default async function CheckoutPage({
               <p>
                 {hasPaymentSession
                   ? "Amount aur reference verify karein. Cashfree checkout automatically open hoga; agar open na ho to button dabayein."
-                  : "Payments collected here are for NovaByte Technologies services such as websites, mobile app interfaces, admin dashboards, cloud support, maintenance, hosting support, digital service consultation, and approved account credit / wallet top-up."}
+                  : "Payments collected here are for NovaByte Technologies services such as websites, mobile app interfaces, admin dashboards, cloud support, maintenance, hosting support, digital service consultation, and approved service credit."}
               </p>
 
               {hasPaymentSession ? (
@@ -74,7 +74,7 @@ export default async function CheckoutPage({
                   </div>
                   <div>
                     <span>Payment Purpose</span>
-                    <strong>Account Credit / Wallet Top-up</strong>
+                    <strong>Approved Service Credit</strong>
                   </div>
                 </div>
               ) : (
@@ -140,6 +140,7 @@ export default async function CheckoutPage({
                 <div className="invoiceRow"><span>Category</span><strong>Software / IT Enabled Services / Account Credit</strong></div>
                 <div className="invoiceRow"><span>Currency</span><strong>Indian Rupee (INR)</strong></div>
                 <div className="invoiceRow"><span>Email</span><strong>{businessContact.email}</strong></div>
+                <div className="invoiceRow"><span>Phone</span><strong>{businessContact.phone}</strong></div>
                 <div className="invoiceRow"><span>Location</span><strong>{businessContact.location}</strong></div>
               </div>
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageHero, SiteFooter, SiteHeader } from "../site-shell";
+import { businessContact, PageHero, SiteFooter, SiteHeader } from "../site-shell";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
             <h2>Data Retention</h2>
             <p>Project, invoice, and support records may be retained for accounting, compliance, dispute resolution, and service continuity.</p>
             <h2>Contact</h2>
-            <p>For privacy questions, email novabytetechnoai@gmail.com.</p>
+            <p>For privacy questions, email {businessContact.email} or call {businessContact.phone}.</p>
           </article>
         </section>
       </main>

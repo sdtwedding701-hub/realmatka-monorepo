@@ -33,6 +33,7 @@ const policyItems = [
 export const businessContact = {
   legalName: "NovaByte Technologies",
   email: "novabytetechnoai@gmail.com",
+  phone: "+91 8446012081",
   location: "Maharashtra, India",
   supportHours: "10:00 AM - 7:00 PM IST"
 };
@@ -103,6 +104,7 @@ export function SiteFooter() {
           <strong>Contact</strong>
           <div className="footerLinks">
             <a href={`mailto:${businessContact.email}`}>{businessContact.email}</a>
+            <a href={`tel:${businessContact.phone.replace(/\s/g, "")}`}>{businessContact.phone}</a>
             <span>{businessContact.location}</span>
             <span>Support Hours: {businessContact.supportHours}</span>
           </div>

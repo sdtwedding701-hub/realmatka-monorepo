@@ -232,7 +232,7 @@ function buildExternalCheckoutRedirectUrl({ referenceId, amount }) {
 function buildUpiPaymentUri({ upiId, upiName, amount }) {
   const params = new URLSearchParams({
     pa: upiId,
-    pn: upiName || "SDT WEDDING",
+    pn: upiName || "NovaByte Technologies",
     mc: "0000",
     am: Number(amount || 0).toFixed(2),
     cu: "INR"
@@ -385,6 +385,26 @@ export async function createOrder(request) {
   const body = await getJsonBody(request);
   const amount = Number(body.amount ?? 0);
   const platform = String(body.platform ?? "web").trim().toLowerCase();
+  const depositConfig = getDepositConfigSnapshot();
+
+  if (!depositConfig.enabled || depositConfig.mode === "maintenance") {
+    return fail(depositConfig.maintenanceMessage || "Deposit temporarily unavailable", 503, request);
+  }
+
+  if (depositConfig.mode === "manual_qr" || depositConfig.mode === "upi_intent") {
+    const referenceId = buildManualQrReference();
+    const result = await startUpiDepositEntry({
+      userId: user.id,
+      amount,
+      appName: "Manual QR Deposit",
+      referenceId
+    });
+    if (!result.ok) {
+      return fail(result.error, result.status, request);
+    }
+    const redirectUrl = buildManualQrRedirectUrl(request, { referenceId, amount });
+    return ok(buildManualQrOrderResponse({ entry: result.data, redirectUrl, amount, referenceId }), request);
+  }
 
   if (isCashfreeDepositMode()) {
     if (!isCashfreeEnabled()) {

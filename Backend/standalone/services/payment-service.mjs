@@ -44,13 +44,21 @@ function readNumberEnv(name, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+const DEFAULT_MANUAL_DEPOSIT_UPI_ID = "s7568539842258141@slc";
+const DEFAULT_MANUAL_DEPOSIT_UPI_NAME = "NovaByte Technologies";
+
+export function isDepositGatewayHoldEnabled() {
+  return readBooleanEnv("DEPOSIT_GATEWAY_HOLD", true);
+}
+
 export function getDepositConfigSnapshot() {
   const allowedModes = new Set(["manual_qr", "maintenance", "razorpay", "cashfree", "upi_intent"]);
   const configuredMode = String(process.env.DEPOSIT_MODE || "manual_qr").trim().toLowerCase();
-  const mode = allowedModes.has(configuredMode) ? configuredMode : "manual_qr";
+  const requestedMode = allowedModes.has(configuredMode) ? configuredMode : "manual_qr";
+  const mode = isDepositGatewayHoldEnabled() && ["cashfree", "razorpay"].includes(requestedMode) ? "manual_qr" : requestedMode;
   const minAmount = getConfiguredDepositMinAmount();
-  const upiId = String(process.env.DEPOSIT_UPI_ID || process.env.EXPO_PUBLIC_DIRECT_UPI_ID || "9309782081@okbizaxis").trim();
-  const upiName = String(process.env.DEPOSIT_UPI_NAME || process.env.EXPO_PUBLIC_DIRECT_UPI_NAME || "SDT WEDDING").trim();
+  const upiId = String(process.env.DEPOSIT_UPI_ID || process.env.EXPO_PUBLIC_DIRECT_UPI_ID || DEFAULT_MANUAL_DEPOSIT_UPI_ID).trim();
+  const upiName = String(process.env.DEPOSIT_UPI_NAME || process.env.EXPO_PUBLIC_DIRECT_UPI_NAME || DEFAULT_MANUAL_DEPOSIT_UPI_NAME).trim();
   const whatsappNumber = String(process.env.DEPOSIT_WHATSAPP_PHONE || process.env.EXPO_PUBLIC_PAYMENT_WHATSAPP_PHONE || "8446012081").replace(/\D/g, "");
 
   return {
@@ -65,7 +73,7 @@ export function getDepositConfigSnapshot() {
     title: String(process.env.DEPOSIT_TITLE || "Add Fund").trim(),
     message: String(
       process.env.DEPOSIT_MESSAGE ||
-        "Amount enter karke QR generate karein, payment complete karein, aur screenshot WhatsApp par bhejein."
+        "Payment gateway abhi hold par hai. Amount enter karke QR generate karein, payment complete karein, aur screenshot WhatsApp par bhejein."
     ).trim(),
     maintenanceTitle: String(process.env.DEPOSIT_MAINTENANCE_TITLE || "Deposit temporarily manual").trim(),
     maintenanceMessage: String(

@@ -16,14 +16,14 @@ const PAYMENT_STATUS_POLL_INTERVAL_MS = 5000;
 const DEFAULT_DEPOSIT_CONFIG: DepositConfig = {
   version: 1,
   enabled: true,
-  mode: "maintenance",
+  mode: "manual_qr",
   minAmount: MIN_DEPOSIT_AMOUNT,
-  upiId: (process.env.EXPO_PUBLIC_DIRECT_UPI_ID || "9309782081@okbizaxis").trim(),
-  upiName: (process.env.EXPO_PUBLIC_DIRECT_UPI_NAME || "SDT WEDDING").trim(),
+  upiId: (process.env.EXPO_PUBLIC_DIRECT_UPI_ID || "s7568539842258141@slc").trim(),
+  upiName: (process.env.EXPO_PUBLIC_DIRECT_UPI_NAME || "NovaByte Technologies").trim(),
   whatsappNumber: (process.env.EXPO_PUBLIC_PAYMENT_WHATSAPP_PHONE || "8446012081").replace(/\D/g, ""),
   razorpayPlatform: "web",
   title: "Add Fund",
-  message: "Amount enter karke QR generate karein, payment complete karein, aur screenshot WhatsApp par bhejein.",
+  message: "Payment gateway abhi hold par hai. Amount enter karke QR generate karein, payment complete karein, aur screenshot WhatsApp par bhejein.",
   maintenanceTitle: "Deposit temporarily manual",
   maintenanceMessage: "Technical update ke kaaran deposit flow temporarily manual hai. Kripya latest APK use karein.",
   updatedAt: ""
@@ -32,7 +32,7 @@ const DEFAULT_DEPOSIT_CONFIG: DepositConfig = {
 function buildUpiUrl(amount: number | null, config: DepositConfig) {
   const params = new URLSearchParams({
     pa: config.upiId,
-    pn: config.upiName || "SDT WEDDING",
+    pn: config.upiName || "NovaByte Technologies",
     mc: "0000",
     cu: "INR"
   });
@@ -305,13 +305,13 @@ export default function AddFundScreen() {
                 {depositConfig.upiId}
               </Text>
             </View>
-            <Text style={styles.qrHint}>Payment ke baad screenshot lo, phir WhatsApp par proof bhejo. Admin verify karke wallet credit karega.</Text>
+            <Text style={styles.qrHint}>QR scan karke payment complete karo. Payment ke baad screenshot lo, phir WhatsApp par proof bhejo. Admin verify karke wallet credit karega.</Text>
           </SurfaceCard>
         ) : !loadingConfig && isManualMode && manualQrVisible ? (
           <SurfaceCard style={styles.placeholderCard}>
             <Ionicons color={colors.textMuted} name="qr-code-outline" size={34} />
             <Text style={styles.placeholderTitle}>QR abhi generate nahi hua</Text>
-            <Text style={styles.placeholderText}>Amount enter karke Generate QR dabao. Uske baad QR screenshot lekar payment proof bhejna.</Text>
+            <Text style={styles.placeholderText}>Amount enter karke Generate QR dabao. Uske baad QR scan karke payment karo aur payment screenshot WhatsApp par bhejna.</Text>
           </SurfaceCard>
         ) : null}
 
@@ -332,7 +332,7 @@ export default function AddFundScreen() {
           <View style={styles.steps}>
             <Text style={styles.stepText}>1. Amount enter karo.</Text>
             <Text style={styles.stepText}>2. Generate QR dabao.</Text>
-            <Text style={styles.stepText}>3. QR screenshot lo aur UPI app se payment complete karo.</Text>
+            <Text style={styles.stepText}>3. QR scan karke UPI app se payment complete karo.</Text>
             <Text style={styles.stepText}>4. WhatsApp par payment screenshot bhejo.</Text>
             <Text style={styles.stepText}>5. Admin verify karke wallet balance add karega.</Text>
           </View>
@@ -410,13 +410,13 @@ export default function AddFundScreen() {
       const referenceId = createManualDepositReference();
       let entry: WalletEntry;
       try {
-        entry = await api.startUpiDeposit(sessionToken, numericAmount, "Manual QR", referenceId);
+        entry = await api.startUpiDeposit(sessionToken, numericAmount, "Manual QR Deposit", referenceId);
       } catch {
         entry = await api.deposit(sessionToken, numericAmount, referenceId, "", "Manual QR deposit request");
       }
       setPendingManualDeposit(entry);
       setGeneratedAmount(numericAmount);
-      setMessage(`Rs ${numericAmount} ka deposit initiate ho gaya. Reference ${entry.referenceId || referenceId}. Ab QR scan karke payment karo.`);
+      setMessage(`Rs ${numericAmount} ka deposit request admin panel me create ho gaya. Reference ${entry.referenceId || referenceId}. Ab QR scan karke payment karo aur screenshot WhatsApp par bhejo.`);
       await loadWalletHistory({ force: true });
     } catch (manualError) {
       setGeneratedAmount(null);

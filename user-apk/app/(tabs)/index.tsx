@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Link, router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { AppHeader, AppScreen, SurfaceCard } from "@/components/ui";
 import { marketCatalog } from "../../data/mock";
 import { api, formatApiError, type CricketMatch, type CricketMatchesPayload } from "@/lib/api";
@@ -34,6 +34,7 @@ type MarketItem = {
 };
 
 const HOME_SOFT_REFRESH_INTERVAL_MS = 60_000;
+const WHATSAPP_CHANNEL_URL = "https://whatsapp.com/channel/0029VbDOCOeC6Zvc0WMUQm3p";
 const FALLBACK_MARKETS: MarketItem[] = marketCatalog.map((fallback) => ({
   id: fallback.slug,
   slug: fallback.slug,
@@ -180,13 +181,13 @@ export default function HomeScreen() {
       >
         <View style={styles.contentWrap}>
         {homeMode === "matka" ? (
-          <View style={styles.heroBannerCard}>
+          <Pressable onPress={() => void Linking.openURL(WHATSAPP_CHANNEL_URL)} style={styles.heroBannerCard}>
             <Image
               resizeMode="stretch"
               source={require("../../assets/images/realmatkabanner.jpg")}
               style={styles.heroBannerImage}
             />
-          </View>
+          </Pressable>
         ) : null}
         {homeMode === "cricket" ? (
           <CricketHomeSection

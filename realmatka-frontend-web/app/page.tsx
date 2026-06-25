@@ -26,7 +26,7 @@ export const metadata = buildMetadata({
 const webAppBaseUrl = "https://play.realmatka.in";
 const loginUrl = `${webAppBaseUrl}/auth/login`;
 const registerUrl = `${webAppBaseUrl}/auth/register`;
-const telegramChannelUrl = "https://t.me/realmatka";
+const whatsappChannelUrl = "https://whatsapp.com/channel/0029VbDOCOeC6Zvc0WMUQm3p";
 
 const rates = [
   { name: "Single Digit", rate: "9.8" },
@@ -233,14 +233,14 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-white" />
           <div className="relative">
             <a
-              href={telegramChannelUrl}
+              href={whatsappChannelUrl}
               target="_blank"
               rel="noreferrer"
               className="block overflow-hidden border border-white/10 bg-white/5 shadow-[0_20px_60px_-32px_rgba(14,165,233,0.35)] transition hover:border-sky-300/50 hover:bg-white/[0.06]"
             >
               <Image
                 src="/realmatkabanner.jpg"
-                alt="Join Real Matka Telegram Channel"
+                alt="Join Real Matka WhatsApp Channel"
                 width={1600}
                 height={600}
                 priority

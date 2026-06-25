@@ -10,7 +10,7 @@ export const metadata = defaultMetadata;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const whatsappSupportUrl = "https://wa.me/918446012081";
-  const telegramChannelUrl = "https://t.me/realmatka";
+  const whatsappChannelUrl = "https://whatsapp.com/channel/0029VbDOCOeC6Zvc0WMUQm3p";
 
   return (
     <html lang="en-IN">
@@ -35,9 +35,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Header />
         <main>{children}</main>
         <a
-          aria-label="Telegram channel"
+          aria-label="WhatsApp channel"
           className="fixed bottom-[5.5rem] right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full border border-[#38BDF8]/60 bg-[#229ED9] text-white shadow-[0_18px_30px_-16px_rgba(34,158,217,0.95)] transition hover:scale-105"
-          href={telegramChannelUrl}
+          href={whatsappChannelUrl}
           rel="noreferrer"
           target="_blank"
         >

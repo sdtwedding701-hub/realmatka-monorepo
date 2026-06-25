@@ -5,6 +5,8 @@ import { getAppSettings } from "../stores/admin-store.mjs";
 import { addWalletEntry, getBankAccountsForUser, getUserBalance, getWalletEntriesForUser } from "../stores/wallet-store.mjs";
 
 export const MIN_WITHDRAW_AMOUNT = 500;
+const MIN_DEPOSIT_AMOUNT = 200;
+const DEFAULT_DEPOSIT_MULTIPLE = 100;
 const DEFAULT_WITHDRAW_MAX_AMOUNT = 999999;
 const DEFAULT_WITHDRAW_MULTIPLE = 100;
 const WITHDRAW_WEEKEND_CLOSED_MESSAGE = "Saturday aur Sunday ko withdraw service band rahegi.";
@@ -203,6 +205,12 @@ export async function createDepositRequest(userId, amountInput, payload = {}) {
   const note = String(payload.note ?? "").trim();
   if (amount <= 0) {
     return { ok: false, status: 400, error: "Amount must be greater than 0" };
+  }
+  if (amount < MIN_DEPOSIT_AMOUNT) {
+    return { ok: false, status: 400, error: `Minimum deposit is Rs. ${MIN_DEPOSIT_AMOUNT}` };
+  }
+  if (!Number.isInteger(amount / DEFAULT_DEPOSIT_MULTIPLE)) {
+    return { ok: false, status: 400, error: `Deposit amount must be a multiple of Rs. ${DEFAULT_DEPOSIT_MULTIPLE}` };
   }
 
   const beforeBalance = await getUserBalance(userId);

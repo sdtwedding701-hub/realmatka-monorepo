@@ -19,14 +19,24 @@ function roundToPaise(amount) {
 }
 
 function getConfiguredDepositMinAmount() {
-  const value = Number(process.env.DEPOSIT_MIN_AMOUNT || 100);
+  const value = Number(process.env.DEPOSIT_MIN_AMOUNT || 200);
+  return Math.max(200, Number.isFinite(value) ? value : 200);
+}
+
+function getConfiguredDepositMultipleAmount() {
+  const value = Number(process.env.DEPOSIT_AMOUNT_MULTIPLE || 100);
   return Math.max(1, Number.isFinite(value) ? value : 100);
 }
 
 function validateDepositAmount(amountPaise) {
   const minAmount = getConfiguredDepositMinAmount();
+  const multipleAmount = getConfiguredDepositMultipleAmount();
+  const amount = Number(amountPaise || 0) / 100;
   if (amountPaise < roundToPaise(minAmount)) {
     return `Minimum deposit is Rs. ${minAmount}`;
+  }
+  if (!Number.isInteger(amount / multipleAmount)) {
+    return `Deposit amount must be a multiple of Rs. ${multipleAmount}`;
   }
   return "";
 }
@@ -543,9 +553,9 @@ export async function confirmNativePaymentOrder({ userId, referenceId, payload }
 }
 
 export async function startUpiDepositEntry({ userId, amount, appName, referenceId }) {
-  const minAmount = getConfiguredDepositMinAmount();
-  if (amount < minAmount) {
-    return { ok: false, status: 400, error: `Minimum deposit is Rs. ${minAmount}` };
+  const validationError = validateDepositAmount(roundToPaise(amount));
+  if (validationError) {
+    return { ok: false, status: 400, error: validationError };
   }
   if (!referenceId) {
     return { ok: false, status: 400, error: "referenceId is required" };
@@ -630,7 +640,7 @@ export async function processUpiNotificationCredit({ amount, utr, appName, rawTe
   if (!normalizedUtr) {
     return { ok: false, status: 400, error: "UTR not found in notification" };
   }
-  if (!Number.isFinite(normalizedAmount) || normalizedAmount < getConfiguredDepositMinAmount()) {
+  if (!Number.isFinite(normalizedAmount) || validateDepositAmount(roundToPaise(normalizedAmount))) {
     return { ok: false, status: 400, error: "Valid amount not found in notification" };
   }
 

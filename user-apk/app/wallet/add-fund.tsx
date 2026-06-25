@@ -10,7 +10,8 @@ import { useAppState } from "@/lib/app-state";
 import { readWalletBoolean, readWalletText, useWalletRemoteSettings } from "@/lib/wallet-remote-config";
 import { colors } from "@/theme/colors";
 
-const MIN_DEPOSIT_AMOUNT = 100;
+const MIN_DEPOSIT_AMOUNT = 200;
+const DEPOSIT_AMOUNT_MULTIPLE = 100;
 const PAYMENT_VERIFICATION_TIMEOUT_SECONDS = 15 * 60;
 const PAYMENT_STATUS_POLL_INTERVAL_MS = 5000;
 const DEFAULT_DEPOSIT_CONFIG: DepositConfig = {
@@ -78,8 +79,9 @@ export default function AddFundScreen() {
   const statusCheckInFlightRef = useRef(false);
 
   const numericAmount = Number(amount || 0);
-  const minAmount = Math.max(1, Number(depositConfig.minAmount || MIN_DEPOSIT_AMOUNT));
-  const hasValidAmount = Number.isFinite(numericAmount) && numericAmount >= minAmount;
+  const minAmount = Math.max(MIN_DEPOSIT_AMOUNT, Number(depositConfig.minAmount || MIN_DEPOSIT_AMOUNT));
+  const isValidDepositMultiple = Number.isInteger(numericAmount / DEPOSIT_AMOUNT_MULTIPLE);
+  const hasValidAmount = Number.isFinite(numericAmount) && numericAmount >= minAmount && isValidDepositMultiple;
   const hasGeneratedQr = generatedAmount !== null;
   const isManualMode = depositConfig.enabled && (depositConfig.mode === "manual_qr" || depositConfig.mode === "upi_intent");
   const isRazorpayMode = depositConfig.enabled && (depositConfig.mode === "razorpay" || depositConfig.mode === "cashfree");
@@ -203,7 +205,10 @@ export default function AddFundScreen() {
               value={amount}
             />
           </View>
-          {!hasValidAmount && amount ? <Text style={styles.errorText}>Minimum deposit Rs {minAmount} hai.</Text> : null}
+          {amount && numericAmount < minAmount ? <Text style={styles.errorText}>Minimum deposit Rs {minAmount} hai.</Text> : null}
+          {amount && numericAmount >= minAmount && !isValidDepositMultiple ? (
+            <Text style={styles.errorText}>Deposit amount Rs {DEPOSIT_AMOUNT_MULTIPLE} ke multiple me hona chahiye, jaise 200, 300, 400.</Text>
+          ) : null}
           {loadingConfig ? (
             <View style={styles.configLoadingRow}>
               <ActivityIndicator color={colors.primary} size="small" />
@@ -398,7 +403,7 @@ export default function AddFundScreen() {
       return;
     }
     if (!hasValidAmount) {
-      setError(`Minimum deposit Rs ${minAmount} hai.`);
+      setError(`Deposit amount Rs ${minAmount} se kam nahi hona chahiye aur Rs ${DEPOSIT_AMOUNT_MULTIPLE} ke multiple me hona chahiye.`);
       return;
     }
 
@@ -433,7 +438,7 @@ export default function AddFundScreen() {
       return;
     }
     if (!hasValidAmount) {
-      setError(`Minimum deposit Rs ${minAmount} hai.`);
+      setError(`Deposit amount Rs ${minAmount} se kam nahi hona chahiye aur Rs ${DEPOSIT_AMOUNT_MULTIPLE} ke multiple me hona chahiye.`);
       return;
     }
 
